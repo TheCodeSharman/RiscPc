@@ -71,6 +71,25 @@ class Decoder(srd.Decoder):
             2: shift in a `0` bit.
             3: prepare for a `WS` command. 
             4: prepare for a `RD` command.
+
+        Ok I think ther protocol is this:
+         state = TXRDY
+         if 3 pulses then state = WS
+         if 4 pulses then state = RD
+
+         when `WS`:
+            - 1 pulse followed by interbit delay sends a `1`
+            - 2 pulses followed by interbit delay sends a `0`
+            - after all bits have been sent send 3 pulses to return to TXRDY
+        
+        when `RD`:
+            - keeping pulsing until a `1` is read
+            - then keep reading bits by pulsing A23
+            - after the inter bit delay return to TXRDY??
+
+        in the LCD printing routintes we also pulse a23 12 times and this is
+        also appatently a RD operation (says to flush some kid of buffer).
+        
         """
         match pulse_count:
             case 4: # RD command
