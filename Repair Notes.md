@@ -1,6 +1,69 @@
-Notes
+# Risc PC Repair Notes
 
-Set 7 Jun
+Tested power suply voltages all good
+
+noticed the reset switch wasn't mechanically working so removed it from the board this brought the
+machine out of reset.
+
+Clock from the crystal oscilator is present at 80Mhz
+
+Data lines have some suspcious signals though:
+D17 and D18 look lke they aren't pulling low.
+
+
+Swapped Risc OS ROMS to se if it is the output driver of the ROM - when I siwtched them the line seemed to function fine?? But when I switched them back to Older Risc OS 3.6 the issue came back. Not sure what this means.
+
+Trace the D17 line to pin 4 on IC30 
+
+D24 looks like there is maybe a reflectiojn? (double HIGH)
+D23 ditto
+D28 looks like stuck low
+D29, D30, D31 looks like reflection double HIGH 
+
+
+
+VGA signals all look good, cehckign HSYnc and VSync and red, green, blue. All look good.
+
+
+(pin 7 top, and pin 8 bottom)
+
+
+Resflowed a bunch of buffer chips to the VIDC chip - teh lega of one chip phsyically lifted off the pad - so resoldered them all. The D17 still doesn't drive low.
+
+
+New symptoms
+
+I noticed that D17 does drive low untiol a few seconds into boot.
+
+
+I looked the OE for these video buffer chips and there is no correlation between the OE asserting and the bus not driving D17 low.
+
+
+This suggests it might be enabling another chip causing thr issue.
+
+Looking at the shcematics the only other thing I think is connected to the system bus (I have the RAm removed) is the upper 16 bit latch that connects tot he buffered datab 16 bit bus. IC24 connects to the D17 line.
+
+zThe OE and E lines don't seem to correlate either
+
+## May 31
+
+Traced out the continuuity to the RP13 and noticed there was a short between pin 14 
+and pin 13 --> whcih were connected to D17 and D18 respectively. I though this
+was the issue but after refloing the pins the issue seemed to return.
+
+Mysteriously I though the signals looked fine - suspicous, did I inorrectlyh probe
+or was it temporarily fixed?
+
+## Jun 5
+
+Update Retro scaler doesn't seem to support video signal - sounds like the chipset just can't sync to these signals.
+Thought about tying ID 0 low to simulate VGA monitor but can't understand why my actually monitor doesn't already do this??
+
+Made dummy test harness by puting diode acros testack and a23, put 4k7 pull up from D0 to +5V, and 4k7 pulldown from tesak to 0V
+
+I can see POST pulses on the scope now !!! 
+
+## 7 Jun
 
 The low 8 bits of the Vcd bus to the VIDC20 chip were disconnected due to battery leak damage.
 
@@ -61,3 +124,10 @@ We have an actual fault to fix (besides the CMOS circuit) ! I'll try the monitor
 once we can get the VIDC outputing the correct sync signals and pixel clock!
 
 Still this is video circuitry, it does give any insight into where the POST is failing.
+
+## Jun 8
+Managed to restore a via on the D0 video bus lines. This makes it look like rat nest of bodges wires can be avoided.
+
+Having a go at gluing copper tape in the shape of SOIC sized pads using JB weld - ChatGPT suggested this as a suitable glue
+becasue it has very high temperature resistence after curing so should be easier to solder to, I'm willing to give it a go.
+
