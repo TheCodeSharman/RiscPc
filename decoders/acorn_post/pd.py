@@ -7,7 +7,7 @@ class Decoder(srd.Decoder):
     longname = 'Acorn Risc PC POST proprietary protocol'
     desc = 'Decodes the proprietary bit protocol sent to A23.'
     license = 'gplv2+'
-    inputs = ['logic']s
+    inputs = ['logic']
     outputs = []
     tags = ['Embedded/insdustrial']
     channels = (
