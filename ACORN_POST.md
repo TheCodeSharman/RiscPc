@@ -67,4 +67,6 @@ This interfaces to an attached HD44780 display controller, operating a 4-bit mod
 - A '0' bit is encoded as two pulses (HIGH-LOW-HIGH-LOW transitions)
 - Each byte is sent as two 4-bit fields (high nibble first, then low nibble)
 - Between each bit transmission, there is a delay of `ts_recover_time` (implemented as a 16-loop delay)
+
+### `ts_SendEnd`
 - After sending text, there is a pause of `ts_pause_time` to allow reading
