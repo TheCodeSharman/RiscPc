@@ -1,0 +1,3 @@
+[submodule "external/Kernel"]
+	path = external/Kernel
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/Kernel.git
