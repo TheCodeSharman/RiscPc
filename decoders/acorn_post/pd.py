@@ -2,16 +2,16 @@ import sigrokdecode as srd
 
 class Decoder(srd.Decoder):
     api_version = 3
-    id = 'acorn_post_extio'
-    name = 'Acorn POST ExtIO'
-    longname = 'Acorn Risc PC POST ExtIO proprietary protocol'
-    desc = 'Decodes the proprietary bit protocol sent to ts_A23 (ts_Alias_bits).'
+    id = 'acorn_post'
+    name = 'Acorn POST'
+    longname = 'Acorn Risc PC POST proprietary protocol'
+    desc = 'Decodes the proprietary bit protocol sent to A23.'
     license = 'gplv2+'
-    inputs = ['logic']
+    inputs = ['logic']s
     outputs = []
-    tags = ['Embedded/industrial']
+    tags = ['Embedded/insdustrial']
     channels = (
-        {'id': 'a23', 'name': 'A23', 'desc': 'A23 line (ts_Alias_bits)'},
+        {'id': 'a23', 'name': 'A23', 'desc': 'A23 lines'},
     )
     annotations = (
         ('bit', 'Data Bit'),
