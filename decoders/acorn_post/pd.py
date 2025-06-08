@@ -64,6 +64,14 @@ class Decoder(srd.Decoder):
                 counting = False
              
         # Depending on how many pulses we get we can determine what should follow
+
+        """HANG ON:
+        Can we collapse this into a simple pulse count and just switch based on:
+            1: shift in a `1` bit.
+            2: shift in a `0` bit.
+            3: prepare for a `WS` command. 
+            4: prepare for a `RD` command.
+        """
         match pulse_count:
             case 4: # RD command
                 self.put(start, self.samplenum, self.out_ann, [1, ['RD', 'R']])
