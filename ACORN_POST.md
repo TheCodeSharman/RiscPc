@@ -24,9 +24,12 @@ Then wire the following circuit (I solder headers to the pins of the components 
 A23 ---> D1 (cathode) --> TestAck
 TestAck --> R2 --> GND
 
-Then attach a logical analyser probe between TestAck and GND.
+Then attach a logical analyser probe between TestAck and GND, and connect the exernal clock to MCLCK (pin 20 of the open bus port) - this helps the decoder to know how many clock cycles a pulse has been.
 
 Reset the machine and there should now be a sequence of pulse on A23 over the next 5 seconds as the POST is run.
+
+## ROM pattern test
+Before the POST protocol is used the ROM runs `ts_RomPatt` and since this exercises every bit of the bus, it will pulse A23 as well.
 
 ## POST protocol
 
