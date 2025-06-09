@@ -126,8 +126,14 @@ once we can get the VIDC outputing the correct sync signals and pixel clock!
 Still this is video circuitry, it does give any insight into where the POST is failing.
 
 ## Jun 8
+
 Managed to restore a via on the D0 video bus lines. This makes it look like rat nest of bodges wires can be avoided.
 
 Having a go at gluing copper tape in the shape of SOIC sized pads using JB weld - ChatGPT suggested this as a suitable glue
 becasue it has very high temperature resistence after curing so should be easier to solder to, I'm willing to give it a go.
 
+## Jun 9
+
+Decided to finish the POST decoder, I managed to get this working! The POST without any RAM or VRAM continues until the final RAM: and then freezes. I assume this is normal, need to dig.
+
+When I unplugged the VRAM, and DRAM in I was getting more specific failures, it looks like to me the VRAM is fine. The DRAM reports 2 banks of 4Mb each - I'm fiarly sure there's 4Mb missing there, and it seems to be listed bad addrs, I'll need to either reverse engineer from the ROM source or find documentation for what the POST text means. Looks like it could point to specific address lines that are not working. I suspec the SIMM sockets might have some corrosion on some pins - bit would be good to pin point the specific faults.
