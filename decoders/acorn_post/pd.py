@@ -100,25 +100,25 @@ class Decoder(srd.Decoder):
         foundTrailingInput = False
         while outputing_bits:
             pulse_count, last_pulse_start, data = self.count_pulses(self.interbit_interval)
-            match pulse_count:
-                case 1:
-                    self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['1']])
-                    value = (value << 1) | 1
-                case 2:
-                    self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['0']])
-                    value = (value << 1) | 0
-                case 3: 
-                    # 3 pulses seperate one byte from the next
-                    pass
-                case 0:
-                    # We didn't find any pulses so this output is complete
-                    outputing_bits = False
-                case 4:
-                    # output ends with an immediate input, we need to signal this
-                    # to the caller to immediate start readinf the input
-                    self.start = last_pulse_start # set the global start to the beginning of the input
-                    outputing_bits = False
-                    foundTrailingInput = True
+            # Replace match-case with if-elif-else for compatibility
+            if pulse_count == 1:
+                self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['1']])
+                value = (value << 1) | 1
+            elif pulse_count == 2:
+                self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['0']])
+                value = (value << 1) | 0
+            elif pulse_count == 3:
+                # 3 pulses seperate one byte from the next
+                pass
+            elif pulse_count == 0:
+                # We didn't find any pulses so this output is complete
+                outputing_bits = False
+            elif pulse_count == 4:
+                # output ends with an immediate input, we need to signal this
+                # to the caller to immediate start readinf the input
+                self.start = last_pulse_start # set the global start to the beginning of the input
+                outputing_bits = False
+                foundTrailingInput = True
                 
         self.put(ouput_start, last_pulse_start, self.out_ann, [3, ['Output: ' + hex(value), hex(value), 'O']])
         self.put(ouput_start, last_pulse_start, self.out_python, ['output', value])
@@ -128,18 +128,18 @@ class Decoder(srd.Decoder):
     def decode_adapter_operation(self):
         self.start = self.samplenum
         pulse_count, start, data = self.count_pulses()
-        match pulse_count:
-            case 4:
+        # Replace match-case with if-elif-else for compatibility
+        if pulse_count == 4:
+            self.decode_input(data)
+        elif pulse_count == 3:
+            _, inputDetected, data = self.decode_output()
+            # somes times outputs are followed by an input
+            if inputDetected:
                 self.decode_input(data)
-            case 3:
-                _, inputDetected, data = self.decode_output()
-                # somes times outputs are followed by an input
-                if inputDetected:
-                    self.decode_input(data)
-            case 0:
-                pass
-            case _: 
-                self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
+        elif pulse_count == 0:
+            pass
+        else:
+            self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
                 
     def decode(self):
         while True:
