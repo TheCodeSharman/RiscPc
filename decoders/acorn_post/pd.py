@@ -17,8 +17,8 @@ class Decoder(srd.Decoder):
     annotations = (
         ('out_bits', 'Output bits'),
         ('in_bits', 'Input bits'),
-        ('read', 'Read'),
-        ('write', 'Write'),
+        ('input', 'Input'),
+        ('output', 'Output'),
         ('warnings', 'Human readable warnings')
     )
     annotation_rows = (
@@ -26,12 +26,18 @@ class Decoder(srd.Decoder):
          ('commands', 'Commands', (2,3)),
          ('warnings', 'Warnings', (4,))
      )
+    class Pulse:
+        def __init__(self, count, start, end, data):
+            self.count = count
+            self.start = start
+            self.end = end
+            self.data = data
 
     def __init__(self):
        self.reset()
 
     def reset(self):
-        pass
+        self.pulse_buffer = []
    
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
@@ -52,7 +58,7 @@ class Decoder(srd.Decoder):
         self.wait([{0: 'r'}, {'skip': window}])
         start = self.samplenum
         if self.matched == 2:
-            return (0, start, data)
+            return Decoder.Pulse(0, start, self.samplenum, data)
         else:
             pulse_count += 1
         
@@ -65,20 +71,23 @@ class Decoder(srd.Decoder):
             else:
                 break
 
-        return (pulse_count, start, data)
+        return Decoder.Pulse(pulse_count, start, self.samplenum, data)
         
-    def decode_input(self, ack):
+    def decode_input(self):
+        if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 4):
+            return
+        
         value = 0
-        reading_bits = True
+        pulse = self.pulse_buffer.pop()
+        ack = pulse.data
     
         # wait for adapter to acknowledge read request
         while not ack:
             _, ack = self.wait([{0: 'r' }, {'skip': self.pulse_duration}])
             if self.matched == 2:
-                break
-                reading_bits = False
+                return
 
-        while reading_bits:
+        while True:
             start = self.samplenum
             self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
             if self.matched == 1:
@@ -86,60 +95,62 @@ class Decoder(srd.Decoder):
                 value = (value << 1) | data
                 self.put(start, self.samplenum, self.out_ann, [1, [str(data)]])
             else:
-                reading_bits = False
+                break
 
-        self.put(self.start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value), 'IN', '']])
-        self.put(self.start, self.samplenum, self.out_python, ['input', value])
-        return value
+        self.put(pulse.start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value),  hex(value), 'I']])
+        self.put(pulse.start, self.samplenum, self.out_python, ['input', value])
 
     def decode_output(self):
+        if not (len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 3):
+            return
+        
         value = 0
-        ouput_start = self.start
-        last_pulse_start = self.samplenum
-        outputing_bits = True
-        foundTrailingInput = False
-        while outputing_bits:
-            pulse_count, last_pulse_start, data = self.count_pulses(self.interbit_interval)
+        begin_pulse = self.pulse_buffer.pop()
+        previous_pulse = begin_pulse
+
+        while True:
+            pulse = self.count_pulses(self.interbit_interval)
             # Replace match-case with if-elif-else for compatibility
-            if pulse_count == 1:
-                self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['1']])
+            if pulse.count == 1:
+                self.put(pulse.start, pulse.end, self.out_ann, [0, ['1']])
                 value = (value << 1) | 1
-            elif pulse_count == 2:
-                self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['0']])
+            elif pulse.count == 2:
+                self.put(pulse.start, pulse.end, self.out_ann, [0, ['0']])
                 value = (value << 1) | 0
-            elif pulse_count == 3:
+            elif pulse.count == 3:
                 # 3 pulses seperate one byte from the next
                 pass
-            elif pulse_count == 0:
-                # We didn't find any pulses so this output is complete
-                outputing_bits = False
-            elif pulse_count == 4:
-                # output ends with an immediate input, we need to signal this
-                # to the caller to immediate start readinf the input
-                self.start = last_pulse_start # set the global start to the beginning of the input
-                outputing_bits = False
-                foundTrailingInput = True
-                
-        self.put(ouput_start, last_pulse_start, self.out_ann, [3, ['Output: ' + hex(value), hex(value), 'O']])
-        self.put(ouput_start, last_pulse_start, self.out_python, ['output', value])
-        return (value, foundTrailingInput, data)
+            elif pulse.count == 0:
+                break
+            elif pulse.count == 4:
+                # Leave the input pulse in the buffer so it can be processed next
+                self.pulse_buffer.append(pulse)
+                break
+            previous_pulse = pulse
 
+        self.put(begin_pulse.start, previous_pulse.end, self.out_ann, [3, ['Output: ' + hex(value), hex(value), 'O']])
+        self.put(begin_pulse.start, previous_pulse.end, self.out_python, ['output', value])
+            
+    def invalid_bits(self):
+        if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count in (1, 2)):
+            return
+        
+        pulse = self.pulse_buffer.pop()
+        self.put(pulse.start, pulse.end, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
+    
+    def no_pulse(self):
+        if not( len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 0 ):
+            return
+        self.pulse_buffer.pop()
 
     def decode_adapter_operation(self):
-        self.start = self.samplenum
-        pulse_count, start, data = self.count_pulses()
-        # Replace match-case with if-elif-else for compatibility
-        if pulse_count == 4:
-            self.decode_input(data)
-        elif pulse_count == 3:
-            _, inputDetected, data = self.decode_output()
-            # somes times outputs are followed by an input
-            if inputDetected:
-                self.decode_input(data)
-        elif pulse_count == 0:
-            pass
-        else:
-            self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
+        self.pulse_buffer.append(self.count_pulses())
+
+        while len(self.pulse_buffer) > 0:
+            self.decode_input()
+            self.decode_output()
+            self.invalid_bits()
+            self.no_pulse()
                 
     def decode(self):
         while True:
