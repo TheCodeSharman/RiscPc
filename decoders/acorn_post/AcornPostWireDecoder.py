@@ -111,7 +111,7 @@ class AcornPostWireDecoder(srd.Decoder):
 
     def decode(self, startsample, endsample, data):            
         cmd_type, value = data
-        self.command_buffer.append(Decoder.Command(startsample, endsample, cmd_type, value))
+        self.command_buffer.append(AcornPostWireDecoder.Command(startsample, endsample, cmd_type, value))
 
         if self.state == 'idle':
             self.decode_get_command()

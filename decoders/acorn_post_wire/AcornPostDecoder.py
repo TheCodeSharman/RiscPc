@@ -1,6 +1,6 @@
 import sigrokdecode as srd
 
-class Decoder(srd.Decoder):
+class AcornPostDecoder(srd.Decoder):
     api_version = 3
     id = 'acorn_post_wire'
     name = 'Acorn POST wire'
@@ -58,7 +58,7 @@ class Decoder(srd.Decoder):
         self.wait([{0: 'r'}, {'skip': window}])
         start = self.samplenum
         if self.matched == 2:
-            return Decoder.Pulse(0, start, self.samplenum, data)
+            return AcornPostDecoder.Pulse(0, start, self.samplenum, data)
         else:
             pulse_count += 1
         
@@ -71,7 +71,7 @@ class Decoder(srd.Decoder):
             else:
                 break
 
-        return Decoder.Pulse(pulse_count, start, self.samplenum, data)
+        return AcornPostDecoder.Pulse(pulse_count, start, self.samplenum, data)
         
     def decode_input(self):
         if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 4):
