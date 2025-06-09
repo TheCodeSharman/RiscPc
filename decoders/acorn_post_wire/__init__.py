@@ -1,1 +1,1 @@
-from .AcornPostDecoder import AcornPostDecoder
+from .pd import Decoder

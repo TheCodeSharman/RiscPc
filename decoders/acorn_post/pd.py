@@ -1,6 +1,6 @@
 import sigrokdecode as srd
 
-class AcornPostWireDecoder(srd.Decoder):
+class Decoder(srd.Decoder):
     api_version = 3
     id = 'acorn_post'
     name = 'Acorn POST'
@@ -111,7 +111,7 @@ class AcornPostWireDecoder(srd.Decoder):
 
     def decode(self, startsample, endsample, data):            
         cmd_type, value = data
-        self.command_buffer.append(AcornPostWireDecoder.Command(startsample, endsample, cmd_type, value))
+        self.command_buffer.append(Decoder.Command(startsample, endsample, cmd_type, value))
 
         if self.state == 'idle':
             self.decode_get_command()
