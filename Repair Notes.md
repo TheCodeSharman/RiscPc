@@ -150,3 +150,69 @@ Test for later: swap the DRAM modules and see if the errors change. This should
 help determine if its the module is bad or the socket is bad.
 
 Interesting the RAM test gets entered but freezes - possibly due to the address bus to the RAM is corrupting the RAM test code.
+
+Since no usable DRAM was found if `MemSize` ever gets called it will loop forefver in `NoDRAMPanic` which fits what I'm seeing.
+
+What's confusing me is that the since I think `R_LINFAILBIT` should be set I wonder why the RAM test isn't being skipped (no report of "skipping").
+
+I figured out why it isn't skipped the code is:
+
+```
+        MOV_fiq r0,r12_fiq              ; skip this test if data line fault
+        AND     r1,r0,#(R_MEMSKIP :OR: R_HARD)  ; or the user didn't want it
+        TEQS    r1,#(R_MEMSKIP :OR: R_HARD)
+        ANDNE   r1,r1,#R_LINFAILBIT
+        TEQNE   r1,#R_LINFAILBIT
+        BNE     %12
+```
+
+But the initial `AND` masks out the `R_LINFAILBIT` so it will never be set even if the line tests failed!
+
+This means we're definitely jumping into `MemSize` which will fail because no usable DRAM has been found.
+
+I also found a bug in the data line test code, if the inverse walk fails the bit is never reported:  
+
+```
+ts_Dataline     ROUT
+
+;
+; Write all walking-zero, walking-one patterns
+;
+10      MOV     r6,r1                   ; set pointer for a write loop
+        MOV     r5,#1                   ; set initial test pattern
+        MVN     r4,r5                   ; and it's inverse        
+11
+        STMIA   r6!,{r4-r5}             ; write the patterns
+
+        ADDS    r5,r5,r5                ; shift the pattern (into Carry)
+        MVN     r4,r5
+        BCC     %BT11                   ; repeat until all bits done
+;
+; Read back and accumulate in r0 any incorrect bits
+;
+        MOV     r6,r1                   ; set pointer for a read loop
+        MOV     r5,#1                   ; set initial test pattern
+        MVN     r4,r5                   ; and it's inverse        
+        MOV     r0,#0                   ; accumulate result
+21
+        LDMIA   r6!,{r2-r3}             ; read the patterns
+        EOR     r2,r2,r4
+        ORR     r0,r0,r2                ; OR any failed bits into r0
+        EOR     r3,r3,r5
+        ORR     r0,r0,r2
+```
+But here we should be `ORR r0,r0,r3` so if the non inverted succceeds but the inverted test fails no error will be reported.
+```
+
+        ADDS    r5,r5,r5                ; shift the pattern (into Carry)
+        MVN     r4,r5
+        BCC     %BT21                   ; repeat until all bits done
+;
+; After all checks at this address group, report back errors
+;
+        MOVS    r0,r0                   ; check for any result bits set 
+        MOV     pc,r14 
+```
+
+This is really subtle though.
+
