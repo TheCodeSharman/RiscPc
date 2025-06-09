@@ -11,11 +11,10 @@ class Decoder(srd.Decoder):
     outputs = ['python']
     tags = ['Debug/trace']
     annotations = (
-        ('commands', 'Command'),
         ('getcommand', 'GetCommand'),
     )
     annotation_rows = (
-        ('commands', 'Commands', (0,1)),
+        ('commands', 'Commands', (0,)),
     )
 
     def __init__(self):
@@ -41,16 +40,9 @@ class Decoder(srd.Decoder):
             cmd_num = (cmd_value >> 3) & 0x1F  # First 5 bits
             param = cmd_value & 0x07           # Last 3 bits
             
-            # Output the individual commands
-            for ss, es, cmd, val in commands:
-                self.put(ss, es, self.out_ann,
-                        [0, [f'{cmd.title()}: {val:02X}h']])
-                self.put(ss, es, self.out_python,
-                        [cmd, val])
-            
             # Output the interpreted GetCommand
             self.put(start_sample, end_sample, self.out_ann,
-                    [1, [f'GetCommand: cmd={cmd_num}, param={param}']])
+                    [0, [f'GetCommand: cmd={cmd_num}, param={param}']])
             return True
         return False
 
