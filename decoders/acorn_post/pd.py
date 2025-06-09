@@ -62,24 +62,6 @@ class Decoder(srd.Decoder):
                 break
 
         return (pulse_count, start)
-
-    def decode_output_byte(self):
-        value = 0
-        for bit in range(8):
-            pulse_count, start = self.count_pulses()
-            value = value << 1
-            match pulse_count:
-                case 1:
-                    self.put(start, self.samplenum, self.out_ann, [0, ['1']])
-                    value = value | 1
-                case 2:
-                    self.put(start, self.samplenum, self.out_ann, [0, ['0']])
-                    value = value | 0
-                case 0:
-                    self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
-                    return 0
-            
-        return value
         
     def decode_input(self):
         # wait for adapter to acknowledge read request
@@ -102,7 +84,43 @@ class Decoder(srd.Decoder):
                 break
 
         return value
-    
+
+    def decode_output_byte(self):
+        value = 0
+        for bit in range(8):
+            pulse_count, start = self.count_pulses()
+            value = value << 1
+            match pulse_count:
+                case 1:
+                    self.put(start, self.samplenum, self.out_ann, [0, ['1']])
+                    value = value | 1
+                case 2:
+                    self.put(start, self.samplenum, self.out_ann, [0, ['0']])
+                    value = value | 0
+                case _:
+                    self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
+                    return None
+        return value
+
+    def decode_output(self):
+        value = 0
+        while (byte:= self.decode_output_byte()) is not None:
+            value = (value << 8) + byte
+            pulse_count, start = self.count_pulses()
+            if pulse_count == 4:
+                # lcd outputs pulse for 12 bits...
+                self.count_pulses() # second 4 pulses
+                self.count_pulses() # third 4 pulses
+            else if pulse_count == 3:
+                # 3 pulses either means another byte will be sent
+                # or this is end of the output stream.
+                pass
+            else:
+                self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
+                return None
+        return value
+
+
     def decode_adapter_operation(self):
         start = self.samplenum
         pulse_count, start = self.count_pulses()
@@ -111,7 +129,7 @@ class Decoder(srd.Decoder):
                 value = self.decode_input()
                 self.put(start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value), 'IN', 'R']])
             case 3:
-                value = self.decode_output_byte()
+                value = self.decode_output()
                 self.put(start, self.samplenum, self.out_ann, [3, ['Output: ' + hex(value), 'OUT', 'O']])
             case 0:
                 pass
