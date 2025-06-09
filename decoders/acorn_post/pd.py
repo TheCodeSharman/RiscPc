@@ -111,7 +111,7 @@ class Decoder(srd.Decoder):
                 # lcd outputs pulse for 12 bits...
                 self.count_pulses() # second 4 pulses
                 self.count_pulses() # third 4 pulses
-            else if pulse_count == 3:
+            elif pulse_count == 3:
                 # 3 pulses either means another byte will be sent
                 # or this is end of the output stream.
                 pass
