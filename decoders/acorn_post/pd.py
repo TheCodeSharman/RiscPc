@@ -81,9 +81,9 @@ class Decoder(srd.Decoder):
             start = self.samplenum
             self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
             if self.matched == 1:
-                _, d0 = self.wait({0: 'f'}) 
-                value = (value << 1) | d0
-                self.put(start, self.samplenum, self.out_ann, [1, [str(d0)]])
+                _, data = self.wait({0: 'f'}) 
+                value = (value << 1) | data
+                self.put(start, self.samplenum, self.out_ann, [1, [str(data)]])
             else:
                 reading_bits = False
 
