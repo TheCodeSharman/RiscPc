@@ -42,95 +42,97 @@ class Decoder(srd.Decoder):
         self.interbit_interval = (self.samplerate // 1_000_000) * 164
 
     # Look for a burst of pulses within 164μS window
-    def count_pulses(self):
+    def count_pulses(self, window = None):
         pulse_count = 0
+        data = None
+        if not window:
+            window = self.pulse_duration
         self.wait({0: 'l'})
-        self.wait([{0: 'r'}, {'skip': self.interbit_interval}])
+        self.wait([{0: 'r'}, {'skip': window}])
         start = self.samplenum
         if self.matched == 2:
-            return (0, start)
+            return (0, start, data)
         else:
             pulse_count += 1
         
         # Count the number of consecutive pulses
         while pulse_count < 4:
             self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
-            if (self.matched == 1): # WTF: shouldn't this be self.matched == (True, False)?
-                self.wait({0: 'f'})
+            if (self.matched == 1):
+                _, data = self.wait({0: 'f'})
                 pulse_count += 1
             else:
                 break
 
-        return (pulse_count, start)
+        return (pulse_count, start, data)
         
-    def decode_input(self):
-        # wait for adapter to acknowledge read request
-        self.wait([{0: 'h', 1: 'h'}, {'skip': self.pulse_duration}])
-        if self.matched == 2:
-            return 0
-
+    def decode_input(self, ack):
         value = 0
-        bits_received = 0
+        reading_bits = True
+    
+        # wait for adapter to acknowledge read request
+        while not ack:
+            _, ack = self.wait([{0: 'r' }, {'skip': self.pulse_duration}])
+            if self.matched == 2:
+                break
+                reading_bits = False
 
-        while bits_received <= 32:
+        while reading_bits:
             start = self.samplenum
             self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
             if self.matched == 1:
-                a23, d0 = self.wait({0: 'f'})
-                bits_received += 1
-                value = (value << 1) | d0
-                self.put(start, self.samplenum, self.out_ann, [1, [d0]])
+                _, d0 = self.wait({0: 'f'})  # Just wait for A23 falling edge and read D0 state
+                value = (value << 1) | d0  # D0 is already 1 or 0
+                self.put(start, self.samplenum, self.out_ann, [1, [str(d0)]])
             else:
-                break
+                reading_bits = False
 
-        return value
-
-    def decode_output_byte(self):
-        value = 0
-        for bit in range(8):
-            pulse_count, start = self.count_pulses()
-            value = value << 1
-            match pulse_count:
-                case 1:
-                    self.put(start, self.samplenum, self.out_ann, [0, ['1']])
-                    value = value | 1
-                case 2:
-                    self.put(start, self.samplenum, self.out_ann, [0, ['0']])
-                    value = value | 0
-                case _:
-                    self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
-                    return None
+        self.put(self.start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value), 'IN', '']])
         return value
 
     def decode_output(self):
         value = 0
-        while (byte:= self.decode_output_byte()) is not None:
-            value = (value << 8) + byte
-            pulse_count, start = self.count_pulses()
-            if pulse_count == 4:
-                # lcd outputs pulse for 12 bits...
-                self.count_pulses() # second 4 pulses
-                self.count_pulses() # third 4 pulses
-            elif pulse_count == 3:
-                # 3 pulses either means another byte will be sent
-                # or this is end of the output stream.
-                pass
-            else:
-                self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
-                return None
-        return value
+        ouput_start = self.start
+        last_pulse_start = self.samplenum
+        outputing_bits = True
+        foundTrailingInput = False
+        while outputing_bits:
+            pulse_count, last_pulse_start, data = self.count_pulses(self.interbit_interval)
+            match pulse_count:
+                case 1:
+                    self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['1']])
+                    value = (value << 1) | 1
+                case 2:
+                    self.put(last_pulse_start, self.samplenum, self.out_ann, [0, ['0']])
+                    value = (value << 1) | 0
+                case 3: 
+                    # 3 pulses seperate one byte from the next
+                    pass
+                case 0:
+                    # We didn't find any pulses so this output is complete
+                    outputing_bits = False
+                case 4:
+                    # output ends with an immediate input, we need to signal this
+                    # to the caller to immediate start readinf the input
+                    self.start = last_pulse_start # set the global start to the beginning of the input
+                    outputing_bits = False
+                    foundTrailingInput = True
+                
+        self.put(ouput_start, last_pulse_start, self.out_ann, [3, ['Output: ' + hex(value), hex(value), 'O']])
+        return (value, foundTrailingInput, data)
 
 
     def decode_adapter_operation(self):
-        start = self.samplenum
-        pulse_count, start = self.count_pulses()
+        self.start = self.samplenum
+        pulse_count, start, data = self.count_pulses()
         match pulse_count:
             case 4:
-                value = self.decode_input()
-                self.put(start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value), 'IN', 'R']])
+                self.decode_input(data)
             case 3:
-                value = self.decode_output()
-                self.put(start, self.samplenum, self.out_ann, [3, ['Output: ' + hex(value), 'OUT', 'O']])
+                _, inputDetected, data = self.decode_output()
+                # somes times outputs are followed by an input
+                if inputDetected:
+                    self.decode_input(data)
             case 0:
                 pass
             case _: 
