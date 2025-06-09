@@ -80,7 +80,7 @@ class Decoder(srd.Decoder):
                 # This is a printable character
                 ascii_char  = chr(value)
                 self.put(self.command_buffer[0].start, self.command_buffer[3].end, self.out_ann,
-                        [1, [f'LCD Print: {ascii_char}', ascii_char]])
+                        [1, [f'LCD Print: {hex(value)}', ascii_char]])
                 
                 if self.text_sequence_start is None:
                     self.text_sequence_start = self.command_buffer[0].start
