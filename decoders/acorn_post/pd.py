@@ -60,7 +60,7 @@ class Decoder(srd.Decoder):
                 pulse_count += 1
             else:
                 break
-        print(f"pulse_count: {pulse_count}")
+
         return (pulse_count, start)
 
     def decode_output_byte(self):
