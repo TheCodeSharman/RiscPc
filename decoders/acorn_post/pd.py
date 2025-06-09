@@ -67,6 +67,7 @@ class Decoder(srd.Decoder):
         value = 0
         for bit in range(8):
             pulse_count, start = self.count_pulses()
+            value = value << 1
             match pulse_count:
                 case 1:
                     self.put(start, self.samplenum, self.out_ann, [0, ['1']])
@@ -77,7 +78,7 @@ class Decoder(srd.Decoder):
                 case 0:
                     self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
                     return 0
-            value = value << 1
+            
         return value
         
     def decode_input(self):
