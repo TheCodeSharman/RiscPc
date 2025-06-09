@@ -81,8 +81,8 @@ class Decoder(srd.Decoder):
             start = self.samplenum
             self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
             if self.matched == 1:
-                _, d0 = self.wait({0: 'f'})  # Just wait for A23 falling edge and read D0 state
-                value = (value << 1) | d0  # D0 is already 1 or 0
+                _, d0 = self.wait({0: 'f'}) 
+                value = (value << 1) | d0
                 self.put(start, self.samplenum, self.out_ann, [1, [str(d0)]])
             else:
                 reading_bits = False
