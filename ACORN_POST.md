@@ -1,17 +1,29 @@
 # Acorn POST documentation
 
-The purpose of this documentation is to keep notes on how the POST protocol works at a low level in order to write a sigrok decoder for use with a logic analyer and ultimately get ASCII strings output for troubleshootinh purposes.
+The purpose of this documentation is to keep notes on how the POST protocol works at a low level in order to write a sigrok decoder for use with a logic analyer and ultimately get ASCII strings output for troubleshooting purposes.
 
-## Hardware Setup
+## POST test connector
 
 The POST port on the RISC PC motherboard is 6 pin header with the following pin out:
 
 1: +5V
-2: D0
-3: A23
-4: TestAck
-5: Reset
-6: GND
+2: D<0>
+3: La<23>
+4: Testak
+5: Rst*
+6: 0V
+
+This is clever scheme where the Testak pin is wired to IC21 enable pin (active low) so that it disables the ROM chips when asserted HIGH. 
+
+This floats the bus and allows D<0> to be driven by the test adapter.
+
+## External diagnostic interface hardware
+
+The real POST unit adapter uses a shift register to convert the serialized bits to parallel, along with a PAL to perform control and decoding functions.
+
+Discrimination is performed by a retriggerable monostable with a period near 104.
+
+## Dummy adapter hardware setup
 
 In order to get RISC OS to output messages via this port a dummy POST jig can be created with the following hardware:
 R1: 4k7 
@@ -20,18 +32,42 @@ R2: 4k7
 
 Then wire the following circuit (I solder headers to the pins of the components to make it easily removable):
 
-+5V ---> R1 --> D0
-A23 ---> D1 (cathode) --> TestAck
-TestAck --> R2 --> GND
++5V ---> R1 --> D<0>
+La<23> ---> D1 (cathode) --> Testak
+Testak --> R2 --> 0V
 
-Then attach a logical analyser probe between TestAck and GND.
+Then attach logics analyser probes to La<23> and D<0>.
 
-Reset the machine and there should now be a sequence of pulse on A23 over the next 5 seconds as the POST is run.
+Reset the machine and there should now be a sequence of pulses on La<23> as the POST is run.
 
-## ROM pattern test
-Before the POST protocol is used the ROM runs `ts_RomPatt` and since this exercises every bit of the bus, it will pulse A23 as well.
+## Acorn POST protocol
 
-## POST protocol
+The specification for the protocol is desribhed in `docs/A500 R200 Service Manual.pdf` section 5.15. The only difference is the address line has been changed from A21 to A23.
+
+### Low level signal timings
+
+The serial protocol is encoded using groups of pulses closer together than 4μS or spaced apart by more than 164μS. The number of pulses indicate to the adapter
+which operation to perform.
+
+#### Input
+
+Four pulses are sent to initiate an input, then a pulse is repeated until it is asserted. The next 8 to 32 pulses clock in data bits, most significant bit first, for either a byte or a word.
+
+#### Output
+
+Three pulses are sent to initiate an output. If the data line isn't asserted at the second pulse then the adapter is assumed not present and output is skipped.
+
+### Initialisation
+
+After the machine is reset the following sequence occurs:
+
+1. A read operation is perform but no bits are actually read.
+2. The hello byte `&90` is output.
+3. A command byte is read.
+
+If in step 3 the adapter doesn't respond by asserting the data line then the adapter is assumed not present and the normal startup code is run.
+
+## Source code notes
 
 The source code for POST port lives in `TestSrc/ExtIO`. This checks for a 1 on the D0 line immediately after A23 has been pulled HIGH. This code refers to constants than can be found at the beginning of the file `TestSrc/Begin`.
 
