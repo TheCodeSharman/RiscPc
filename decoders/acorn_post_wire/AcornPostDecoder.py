@@ -2,9 +2,9 @@ import sigrokdecode as srd
 
 class Decoder(srd.Decoder):
     api_version = 3
-    id = 'acorn_post'
-    name = 'Acorn POST'
-    longname = 'Acorn POST diagnostic adapter protocol'
+    id = 'acorn_post_wire'
+    name = 'Acorn POST wire'
+    longname = 'Acorn POST diagnostic adapter wire protocol'
     desc = 'Decodes the proprietary bit protocol sent to A23 and D0 lines of the Acorn diagnostic adapter.'
     license = 'gplv2+'
     inputs = ['logic']

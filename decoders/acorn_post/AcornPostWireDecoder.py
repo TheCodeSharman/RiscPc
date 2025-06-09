@@ -1,11 +1,11 @@
 import sigrokdecode as srd
 
-class Decoder(srd.Decoder):
+class AcornPostWireDecoder(srd.Decoder):
     api_version = 3
-    id = 'acorn_post_interpreter'
-    name = 'Acorn POST Interpreter'
-    longname = 'Acorn POST command interpreter'
-    desc = 'Interprets the commands from the Acorn POST decoder into meaningful operations.'
+    id = 'acorn_post'
+    name = 'Acorn POST'
+    longname = 'Acorn POST diagnostics adapter protocol'
+    desc = 'Decodes the Acorn POST diagnostics adapter protocol data, stacking on top of the Acorn POST Wire decoder.'
     license = 'gplv2+'
     inputs = ['python']
     outputs = []
