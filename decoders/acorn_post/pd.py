@@ -8,7 +8,7 @@ class Decoder(srd.Decoder):
     desc = 'Decodes the proprietary bit protocol sent to A23 and D0 lines of the Acorn diagnostic adapter.'
     license = 'gplv2+'
     inputs = ['logic']
-    outputs = []
+    outputs = ['python']
     tags = ['Debug/trace']
     channels = (
         {'id': 'a23', 'name': 'A23', 'desc': 'A23 pin'},
@@ -35,6 +35,7 @@ class Decoder(srd.Decoder):
    
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
+        self.out_python = self.register(srd.OUTPUT_PYTHON)
         
         # Use existing rate or default to 20MHz
         self.samplerate = getattr(self, 'samplerate', 20_000_000)
@@ -88,6 +89,7 @@ class Decoder(srd.Decoder):
                 reading_bits = False
 
         self.put(self.start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value), 'IN', '']])
+        self.put(self.start, self.samplenum, self.out_python, ['input', value])
         return value
 
     def decode_output(self):
@@ -119,6 +121,7 @@ class Decoder(srd.Decoder):
                     foundTrailingInput = True
                 
         self.put(ouput_start, last_pulse_start, self.out_ann, [3, ['Output: ' + hex(value), hex(value), 'O']])
+        self.put(ouput_start, last_pulse_start, self.out_python, ['output', value])
         return (value, foundTrailingInput, data)
 
 
