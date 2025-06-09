@@ -8,136 +8,114 @@ class Decoder(srd.Decoder):
     desc = 'Interprets the commands from the Acorn POST decoder into meaningful operations.'
     license = 'gplv2+'
     inputs = ['python']
-    outputs = ['python']
+    outputs = []
     tags = ['Debug/trace']
     annotations = (
-        ('getcommand', 'GetCommand'),
-        ('sendtext', 'SendText'),
-        ('lcdcmd', 'LCD Command'),
-        ('text', 'Text'),  # New annotation for complete text sequences
+        ('get_command', 'GetCommand'),
+        ('lcd_chr', 'LCD Character'),
+        ('lcd_cmd', 'LCD Command'),
+        ('send_text', 'LCD Display Text'), 
     )
     annotation_rows = (
         ('commands', 'Commands', (0,1,2)),
-        ('text', 'Text', (3,)),  # New row for text annotations
+        ('text', 'Text', (3,)), 
     )
 
     def __init__(self):
         self.reset()
 
     def reset(self):
+        self.state = 'idle'
         self.command_buffer = []
-        self.sequence_start = None
-        self.last_getcommand = None
-        self.text_buffer = []
-        self.text_start = None
-        self.last_lcd_output = None  # Track the last LCD output command
-        self.collected_text = []  # Buffer to collect printable characters
-        self.text_sequence_start = None  # Track start of text sequence
+
+        self.collected_text = [] 
+        self.text_sequence_start = None  
+        self.text_sequence_end = None
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
-        self.out_python = self.register(srd.OUTPUT_PYTHON)
 
-    def decode_get_command(self, commands, start_sample, end_sample):
-        first_input, output, second_input = commands
+    def decode_get_command(self):
+        if len(self.command_buffer) < 3:
+            return
         
         # Check if this matches the ts_GetCommand pattern
-        if (first_input[2] == 'input' and first_input[3] == 0 and
-            output[2] == 'output' and output[3] == 0x90):
+        if (self.command_buffer[0].type == 'input' 
+            and self.command_buffer[0].value == 0x00
+            and self.command_buffer[1].type == 'output'
+            and self.command_buffer[1].value == 0x90
+            and self.command_buffer[2].type == 'input'):
             
             # Parse the command and parameter from the last input
-            cmd_value = second_input[3]
+            cmd_value = self.command_buffer[2].value
             cmd_num = (cmd_value >> 3) & 0x1F  # First 5 bits
             param = cmd_value & 0x07           # Last 3 bits
             
             # Output the interpreted GetCommand
-            self.put(start_sample, end_sample, self.out_ann,
+            self.put(self.command_buffer[0].start, self.command_buffer[2].end, self.out_ann,
                     [0, [f'GetCommand: cmd={cmd_num}, param={param}']])
             
-            # Store the last GetCommand for SendText detection
-            self.last_getcommand = (cmd_num, param)
-            return True
-        return False
-
-    def decode_sendtext(self, startsample, endsample, data):
-        cmd_type, value = data
-        
-        # Handle input acknowledgment for previous LCD output
-        if cmd_type == 'input' and self.last_lcd_output is not None:
-            # Input acknowledgment received, clear the last output
-            self.last_lcd_output = None
-            return True
-            
-        if cmd_type != 'output':
-            return False
-            
-        # Store the start of the text sequence
-        if self.text_start is None:
-            self.text_start = startsample
-            if self.text_sequence_start is None:
-                self.text_sequence_start = startsample
-            
-        # Check if this is a print command (MSB = 1000)
-        if (value & 0xF0) == 0x80:
-            # This is a print command, the LSB is the character
-            char = value & 0x0F
-            # Convert to ASCII character
-            if char < 10:
-                ascii_char = chr(ord('0') + char)
+            #  If this command switches on LCD output switch state
+            if cmd_num == 0 or cmd_num == 31:
+                self.state = 'lcd'
             else:
-                ascii_char = chr(ord('A') + (char - 10))
-            self.collected_text.append(ascii_char)
-            self.put(self.text_start, endsample, self.out_ann,
-                    [1, [f'Print: {ascii_char}']])
-        else:
-            # This is an LCD control command
-            self.put(self.text_start, endsample, self.out_ann,
-                    [2, [f'LCD: {value:02X}h']])
-            
-            # If this is a NOP (0x00), output the collected text
-            if value == 0x00 and self.collected_text:
-                text = ''.join(self.collected_text)
-                # Output the complete text sequence spanning from start to end
-                if self.text_sequence_start is not None:
-                    self.put(self.text_sequence_start, endsample, self.out_ann,
-                            [3, [f'Text: {text}']])
-                self.collected_text = []  # Clear the buffer
-                self.text_sequence_start = None  # Reset sequence start
-        
-        # Store this output command to wait for its input acknowledgment
-        self.last_lcd_output = (startsample, endsample, value)
-        self.text_start = None
-        return True
+                self.state = 'other'
 
-    def decode(self, startsample, endsample, data):
-        if not data:
-            return
-            
-        cmd_type, value = data
-        
-        # If we're expecting SendText (after GetCommand 0 or 31)
-        if self.last_getcommand:
-            cmd_num, _ = self.last_getcommand
-            if cmd_num in (0, 31):  # LCD display or dummy adapter
-                if self.decode_sendtext(startsample, endsample, data):
-                    return
-                # If we get here, it wasn't a SendText command, so reset the state
-                self.last_getcommand = None
-                self.text_buffer = []
-                self.text_start = None
-                self.text_sequence_start = None
-            
-        # Try to decode as GetCommand
-        self.command_buffer.append((startsample, endsample, cmd_type, value))
-        
-        # If this is the first command in a potential sequence, record its start
-        if self.sequence_start is None:
-            self.sequence_start = startsample
-            
-        # Check if we have a complete ts_GetCommand sequence
-        if len(self.command_buffer) == 3:
-            self.decode_get_command(self.command_buffer, self.sequence_start, endsample)
-            
-            # Reset for next sequence
+            # consume the buffer
             self.command_buffer = []
-            self.sequence_start = None 
+    
+    def decode_send_text(self):
+        if len(self.command_buffer) < 4:
+            return
+        
+        if (self.command_buffer[0].type == 'output' 
+            and self.command_buffer[1].type == 'input'
+            and self.command_buffer[2].type == 'output' 
+            and self.command_buffer[3].type == 'input'):
+
+            lcd_register = (self.command_buffer[0].value & 0x8) >> 3
+            value = (self.command_buffer[0].value & 0xF0) | (self.command_buffer[2].value & 0xF0) >> 4
+             
+            if lcd_register == 1:
+                # This is a printable character
+                ascii_char  = chr(value)
+                self.put(self.command_buffer[0].start, self.command_buffer[3].end, self.out_ann,
+                        [1, [f'LCD Print: {ascii_char}', ascii_char]])
+                
+                if self.text_sequence_start is None:
+                    self.text_sequence_start = self.command_buffer[0].start
+                    self.collected_text = []
+
+                self.collected_text.append(ascii_char)
+                self.text_sequence_end = self.command_buffer[3].end
+            else:
+                # This is an LCD control command
+                self.put(self.command_buffer[0].start, self.command_buffer[3].end, self.out_ann,
+                        [2, [f'LCD Control: 0x{value:02X}', f'{value:02X}', 'C']])
+                
+                # If this is a NOP (0x00), output the collected text
+                if value == 0x00 and len(self.collected_text) > 0:
+                    self.put(self.text_sequence_start, self.text_sequence_end, self.out_ann,
+                                [3, ["".join(self.collected_text), "Text", "T"]])
+                    self.collected_text = []  
+                    self.text_sequence_start = None 
+                    self.text_sequence_end = None
+
+            self.command_buffer = []
+    class Command:
+        def __init__(self, start, end, type, value):
+            self.type = type
+            self.value = value
+            self.start = start
+            self.end = end
+
+    def decode(self, startsample, endsample, data):            
+        cmd_type, value = data
+        self.command_buffer.append(Decoder.Command(startsample, endsample, cmd_type, value))
+
+        if self.state == 'idle':
+            self.decode_get_command()
+        elif self.state == 'lcd':
+            self.decode_send_text()
+        else:
+            raise ValueError(f"Unknown state: {self.state}")
