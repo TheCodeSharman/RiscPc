@@ -4,25 +4,30 @@ class Decoder(srd.Decoder):
     api_version = 3
     id = 'acorn_post'
     name = 'Acorn POST'
-    longname = 'Acorn Risc PC POST proprietary protocol'
-    desc = 'Decodes the proprietary bit protocol sent to A23.'
+    longname = 'Acorn POST diagnostic adapter protocol'
+    desc = 'Decodes the proprietary bit protocol sent to A23 and D0 lines of the Acorn diagnostic adapter.'
     license = 'gplv2+'
     inputs = ['logic']
     outputs = []
-    tags = ['Embedded/industrial']
+    tags = ['Debug/trace']
     channels = (
-        {'id': 'a23', 'name': 'A23', 'desc': 'A23 lines'},
+        {'id': 'a23', 'name': 'A23', 'desc': 'A23 pin'},
+        {'id': 'd0', 'name': 'D0', 'desc': 'D0 pin'},
     )
     annotations = (
-        ('bit', 'Data Bit'),
-        ('post_command', 'POST Command'),
+        ('out_bits', 'Output bits'),
+        ('in_bits', 'Input bits'),
+        ('read', 'Read'),
+        ('write', 'Write'),
+        ('warnings', 'HUman readable warnings')
     )
     annotation_rows = (
-         ('bits', 'Bits', (0,)),
-         ('commands', 'Commands', (1,)),
+         ('bits', 'Bits', (0,1)),
+         ('commands', 'Commands', (2,3,4)),
      )
 
     def __init__(self):
+        self.interbit_interval = 164 * self.samplerate  # in microseconds, as per the protocol spec
         self.reset()
 
     def reset(self):
@@ -31,84 +36,69 @@ class Decoder(srd.Decoder):
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
 
-    def read_byte(self):
+    # Count the number of pulses within 164μS window
+    def count_pulses(self):
+        pulse_count = 0
+
+        # Count the number of consecutive pulses
+        while pulse_count <= 4:
+            self.wait([{0: 'r'}, {'skip': self.interbit_interval}])
+            if (self.matched == 1): # WTF: shouldn't this be self.matched == (True, False)?
+                self.wait({0: 'f'})
+                pulse_count += 1
+            else:
+                break
+
+        return pulse_count
+
+    def decode_output_byte(self):
         value = 0
         for bit in range(8):
             start = self.samplenum
-            # 1 pulse is 1, 2 pulses is 0
-            self.wait({0: 'r'})
+
+            match self.count_pulses():
+                case 1:
+                    self.put(start, self.samplenum, self.out_ann, [0, ['1']])
+                    value = value | 1
+                case 2:
+                    self.put(start, self.samplenum, self.out_ann, [0, ['0']])
+
+            value = value << 1
+        return value
+        
+    def decode_input(self):
+        # wait for adapter to acknowledge read request
+        self.wait([{0: 'r', 1: 'h'}, {'skip': self.interbit_interval}])
+        if self.matched == 2:
             self.wait({0: 'f'})
-            self.wait([{0: 'r'}, {'skip': 10}])
-            
-            if (self.matched == 1):
-                self.wait({0: 'f'})
-                value = (value << 1)
-                self.put(start, self.samplenum, self.out_ann, [0, ['0']])
+            return 0
+
+        value = 0
+        bits_recieved = 0
+
+        while bits_received <= 32:
+            self.wait({0: 'r'}, {'skip': self.interbit_interval})
+            if self.matched == 1:
+                a23, d0 = self.wait({0: 'f'})
+                bits_received += 1
+                value = (value << 1) | d0
+                self.put(start, self.samplenum, self.out_ann, [1, [d0]])
             else:
-                self.put(start, self.samplenum, self.out_ann, [0, ['1']])
-                value = (value << 1) | 1
+                break
+
         return value
     
     def decode_adapter_operation(self):
         start = self.samplenum
-        pulse_count = 0
-        counting = True
-
-        # Count the number of consecutive pulses
-        while counting || pulse_count < 5:
-            self.wait({0: 'r'}, {'skip': 3})
-            if (self.matched == 1):
-                self.wait({0: 'f'})
-                pulse_count += 1
-            else:
-                counting = False
-             
-        # Depending on how many pulses we get we can determine what should follow
-
-        """HANG ON:
-        Can we collapse this into a simple pulse count and just switch based on:
-            1: shift in a `1` bit.
-            2: shift in a `0` bit.
-            3: prepare for a `WS` command. 
-            4: prepare for a `RD` command.
-
-        Ok I think ther protocol is this:
-         state = TXRDY
-         if 3 pulses then state = WS
-         if 4 pulses then state = RD
-
-         when `WS`:
-            - 1 pulse followed by interbit delay sends a `1`
-            - 2 pulses followed by interbit delay sends a `0`
-            - after all bits have been sent send 3 pulses to return to TXRDY
-        
-        when `RD`:
-            - keeping pulsing until a `1` is read
-            - then keep reading bits by pulsing A23
-            - after the inter bit delay return to TXRDY??
-
-        in the LCD printing routintes we also pulse a23 12 times and this is
-        also appatently a RD operation (says to flush some kid of buffer).
-        
-        """
-        match pulse_count:
-            case 4: # RD command
-                self.put(start, self.samplenum, self.out_ann, [1, ['RD', 'R']])
-            case 3: # WS command
-                value = self.read_byte()
-                self.put(start, self.samplenum, self.out_ann, [1, ['WS: ' + hex(value), 'WS', 'W']])
-            case 2 | 1: 
-                # This shouldn't happen unless we're out of sync with the stream
-                # so we just skip a bunch of clocks and try again.
-                self.wait({'skip': 32})
+        match self.count_pulses():
+            case 4:
+                value = self.decode_input()
+                self.put(start, self.samplenum, self.out_ann, [1, ['Input: ' + hex(value), 'IN', 'R']])
+            case 3:
+                value = self.decode_output_byte()
+                self.put(start, self.samplenum, self.out_ann, [0, ['Output: ' + hex(value), 'OUT', 'O']])
             case _: 
-                # if get here this is the pulsing to read a command from the POST adapter
-                # but since we're a dummy adapter we just wait for the rest of the 8 bits
-                # to pulse.
-                for _ in range(7):
-                    self.wait({0: 'r'})
-                    self.wait({0: 'f'})
-                self.put(start, self.samplenum, self.out_ann, [1, ['Get Command', 'GC', 'G']])
+                self.put(start, self.samplenum, self.out_ann, [4, ['Invalid bits', 'INV', 'IN', 'I']])
                 
     def decode(self):
         while True:
