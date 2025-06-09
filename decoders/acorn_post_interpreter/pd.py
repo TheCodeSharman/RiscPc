@@ -14,9 +14,11 @@ class Decoder(srd.Decoder):
         ('getcommand', 'GetCommand'),
         ('sendtext', 'SendText'),
         ('lcdcmd', 'LCD Command'),
+        ('text', 'Text'),  # New annotation for complete text sequences
     )
     annotation_rows = (
         ('commands', 'Commands', (0,1,2)),
+        ('text', 'Text', (3,)),  # New row for text annotations
     )
 
     def __init__(self):
@@ -29,6 +31,8 @@ class Decoder(srd.Decoder):
         self.text_buffer = []
         self.text_start = None
         self.last_lcd_output = None  # Track the last LCD output command
+        self.collected_text = []  # Buffer to collect printable characters
+        self.text_sequence_start = None  # Track start of text sequence
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
@@ -70,17 +74,35 @@ class Decoder(srd.Decoder):
         # Store the start of the text sequence
         if self.text_start is None:
             self.text_start = startsample
+            if self.text_sequence_start is None:
+                self.text_sequence_start = startsample
             
         # Check if this is a print command (MSB = 1000)
         if (value & 0xF0) == 0x80:
             # This is a print command, the LSB is the character
             char = value & 0x0F
+            # Convert to ASCII character
+            if char < 10:
+                ascii_char = chr(ord('0') + char)
+            else:
+                ascii_char = chr(ord('A') + (char - 10))
+            self.collected_text.append(ascii_char)
             self.put(self.text_start, endsample, self.out_ann,
-                    [1, [f'Print: {char:02X}h']])
+                    [1, [f'Print: {ascii_char}']])
         else:
             # This is an LCD control command
             self.put(self.text_start, endsample, self.out_ann,
                     [2, [f'LCD: {value:02X}h']])
+            
+            # If this is a NOP (0x00), output the collected text
+            if value == 0x00 and self.collected_text:
+                text = ''.join(self.collected_text)
+                # Output the complete text sequence spanning from start to end
+                if self.text_sequence_start is not None:
+                    self.put(self.text_sequence_start, endsample, self.out_ann,
+                            [3, [f'Text: {text}']])
+                self.collected_text = []  # Clear the buffer
+                self.text_sequence_start = None  # Reset sequence start
         
         # Store this output command to wait for its input acknowledgment
         self.last_lcd_output = (startsample, endsample, value)
@@ -103,6 +125,7 @@ class Decoder(srd.Decoder):
                 self.last_getcommand = None
                 self.text_buffer = []
                 self.text_start = None
+                self.text_sequence_start = None
             
         # Try to decode as GetCommand
         self.command_buffer.append((startsample, endsample, cmd_type, value))
