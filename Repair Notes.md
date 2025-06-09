@@ -137,3 +137,16 @@ becasue it has very high temperature resistence after curing so should be easier
 Decided to finish the POST decoder, I managed to get this working! The POST without any RAM or VRAM continues until the final RAM: and then freezes. I assume this is normal, need to dig.
 
 When I unplugged the VRAM, and DRAM in I was getting more specific failures, it looks like to me the VRAM is fine. The DRAM reports 2 banks of 4Mb each - I'm fiarly sure there's 4Mb missing there, and it seems to be listed bad addrs, I'll need to either reverse engineer from the ROM source or find documentation for what the POST text means. Looks like it could point to specific address lines that are not working. I suspec the SIMM sockets might have some corrosion on some pins - bit would be good to pin point the specific faults.
+
+DRAM 1 fails the data bus test on bit 2.
+DRAM 2 fails teh data bus test on all bits which make sense because its not fitted.
+
+DRAM 3 passes data tests, reports 4Mb, but fails on address bit 8.
+DRAM 4 passes data tests, reports 4Mb, bit fails on address bit 8.
+
+This also makes sense becasue DRAM 3/4 are both on socket 2 so share that address.
+
+Test for later: swap the DRAM modules and see if the errors change. This should
+help determine if its the module is bad or the socket is bad.
+
+Interesting the RAM test gets entered but freezes - possibly due to the address bus to the RAM is corrupting the RAM test code.
