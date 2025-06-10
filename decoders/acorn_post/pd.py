@@ -102,6 +102,7 @@ class Decoder(srd.Decoder):
                     self.text_sequence_end = None
 
             self.command_buffer = []
+            
     class Command:
         def __init__(self, start, end, type, value):
             self.type = type

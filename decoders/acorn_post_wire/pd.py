@@ -45,7 +45,7 @@ class Decoder(srd.Decoder):
         
         # Use existing rate or default to 20MHz
         self.samplerate = getattr(self, 'samplerate', 20_000_000)
-        self.pulse_duration = (self.samplerate // 1_000_000) * 4
+        self.pulse_duration = (self.samplerate // 1_000_000) * 8
         self.interbit_interval = (self.samplerate // 1_000_000) * 164
 
     # Look for a burst of pulses within 164μS window
