@@ -1,0 +1,45 @@
+ROM   :
+VRAM  :
+01 MByte
+Data  :
+Addrs :
+Byte  :
+DRAM 0:
+04 MByte
+Data  :
+Addrs :
+Byte  :
+DRAM 1:
+04 MByte
+Data  :
+Addrs :
+Byte  :
+DRAM 2:
+00 MByte
+Data  :
+Data-FFFFFFFFF
+DRAM 3:
+00 MByte
+Data  :
+Data-FFFFFFFFF
+DRAM
+08 MByte
+IOMD  :
+IOMD  :
+D4E7 V.3
+SRAM  :
+SRAM-F
+IOinit:
+Speed :
+Speed3E80.1.0
+RAM   :
+RAM   :02000000
+RAM   :10000000
+RAM   :14000000
+VIDC  :
+Mid0 1
+Virq bad 0.FFFFF
+Sirq bad0002C
+ARM ID:
+ARM ID41047100
+FAIL  :0001C09C
