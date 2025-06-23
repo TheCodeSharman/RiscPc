@@ -216,3 +216,31 @@ But here we should be `ORR r0,r0,r3` so if the non inverted succceeds but the in
 
 This is really subtle though.
 
+## 12 Jun
+
+Ok time to have a go at makeshit pad repair.
+
+I tried using a copper tape and JB Weld overnight and the copper didn't bond, perplexity tells me it should in theory bond to metal, so I probably need to prepare the surface and apply pressure.
+
+This was extremely difficult, but I found some circuit medic tutorials where they use Kapton tape to precisely align the repalce pads. Their repair kits are so expensive they aren't worth for hobbyists.
+
+But the technique gave me an idea:
+
+1. Tape down a piece of Kapton tape sticky side up with blue painters tape around all four sides.
+2. Stick down the copper tape (exposed copper side down) and remove backing paper.
+3. Measure the precise size of the replacement pad(s)
+4. Cut with kraft knife and peel away unwanted copper tape.
+5. Cut around Kapton tape and pads.
+6. Put jb weld on the PCB board, and place pads down using Kapton tape to precisely position.
+7. Apply pressure.
+8. Leave for 24 hours for JBWeld to cure.
+9. Peel off Kapton tape.
+
+If all goes well the copper pads should be bonded to the PCB.
+
+I'm trying a test run of this tonight.
+
+If it does work I'm also going to remove the adhesive from the copper tape by soak some tape in acetone overnight.
+
+Then try again, but this time once the tape is taped down, use fine grain sand paper to rough up the copper too. Then clean with IPA, dry, and be very careful not to touch. it sound like I hould apply epoxy to both the copper and the PCB then apply pressure.
+
