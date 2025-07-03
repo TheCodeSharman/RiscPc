@@ -269,3 +269,18 @@ FAIL  :0001809C
 So looks like something is wrong with Sirq - possibility there a bus signal integrity issues but I don't know what the 02F2C means, the previous failure was 0002C.
 
 Also the FAIL code has changed from 0001C09C -> 0001809C
+
+3 Jul
+
+Ok, had another attempt at repairing the circuitry around IC33, and unfortunately lost a bunch more pads, so had multiple attempts. The PCB is missing most pads bare 2. On the upside I was able to avoid using any 
+flying bodge wires for D0.
+
+But unfortunately, disaster, the machine will no longer run then POST routines, there is definitely address and data bus activity but the A23 is just flipping between high and low, no evidence of any pulse signalling. So this suggests soemthing is going very wrong early in the boot.
+
+It's entirely possible that by bodges, having ripped up mroe pads on IC33 are just too much and interfering with the data bus? But I couldn't see any obvious glitches or ringing on any of the bus lines, each one I checked seems to transition cleanly from high to low, and there is isn't any significant difference I can see from the unmolested data lines. 
+
+So before desoldering the chip to see if the POST starts to function again (and confirming I have some lind of subtle signal integrity issues), I wired up the d0-7 and a2-a7 to the logic analyser hoping to get enough insight from the early boot to see which specific bits aren;t being read correctly and exactly where the process fails.
+
+Also noticed that the power supply was cuasing tingly feelings in my fingers - not good, I'm worried about lekage currents now due to aging caps, so switched to powering the board from my power supply, which is probably a safer option anyway as I can create a conservative current limit.
+
+The next day I couldn't reproduce the tingling and thre was no AC voltage between the grounds I was touching - weird - maybe related to not having the plug socketted properly creating a poor earth conection, I have no idea. Still will suspect the power supply needs to be recapped so will continue to use my lab power supply to fix the motherboard issues.
