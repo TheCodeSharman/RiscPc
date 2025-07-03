@@ -244,3 +244,28 @@ If it does work I'm also going to remove the adhesive from the copper tape by so
 
 Then try again, but this time once the tape is taped down, use fine grain sand paper to rough up the copper too. Then clean with IPA, dry, and be very careful not to touch. it sound like I hould apply epoxy to both the copper and the PCB then apply pressure.
 
+## 23 Jun
+
+The replacement IC33 and RP16 components components arrvied, so I gave up on replace copper pads and instead use tiny 30AWG wirewrap wires to fix up corroded vias and solder to the chips.
+
+I also acquired a digital microscope from AliExpress - this is a god send, I can zoom right in and see
+what I'm doing now.
+
+It was painful but I've got all the bus lines passing a continuity test.
+
+I plugged in the dummy POST adapter, power the machine on, and noticed that the Virq tet is passing!!
+
+I plugged in a VGA monitor and yep, I'm seeinfg the RED POST screen.
+
+Interestingly after a few minutes (?) the machine reboots - this is surpising because I thought once yuou get to a RED screen the machine hangs indefinitely, possible symptom of something else, or is there a timeout after which the machine resets?
+
+I can see the PURPLE -> CYAN -> RED sequence.
+
+Sirq bad02F2C
+ARM ID:
+ARM ID41047100
+FAIL  :0001809C
+
+So looks like something is wrong with Sirq - possibility there a bus signal integrity issues but I don't know what the 02F2C means, the previous failure was 0002C.
+
+Also the FAIL code has changed from 0001C09C -> 0001809C
