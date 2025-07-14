@@ -284,3 +284,50 @@ So before desoldering the chip to see if the POST starts to function again (and 
 Also noticed that the power supply was cuasing tingly feelings in my fingers - not good, I'm worried about lekage currents now due to aging caps, so switched to powering the board from my power supply, which is probably a safer option anyway as I can create a conservative current limit.
 
 The next day I couldn't reproduce the tingling and thre was no AC voltage between the grounds I was touching - weird - maybe related to not having the plug socketted properly creating a poor earth conection, I have no idea. Still will suspect the power supply needs to be recapped so will continue to use my lab power supply to fix the motherboard issues.
+
+14 July 
+
+OK massive updates.
+
+1. Signal integrity issues
+
+I used Ghidra and the binaries I downloaded from archive.org of rhe Risc OS 3.60 ROMs to verify that the system bus integrity has been comproised. I could see anything terrible on the scope so instead I use a logica analyser to capture 6 address lines and the LSB of the system bus. 
+
+This seems to indicate that the beginning of the romtest starts but it jumps around when it shouldn't also the bus lines aren't displaying the correct values, so yeah confirmed system bus isn;t functioning.
+
+To be doubly sure I captured the MSB 4 bits as the CPU loaded instructions form the ROM because these should all be HIGH to indicate the never execute condition to the ARM CPU. The booot up sequence on Risc OS 3.6 has walking bit system bus and address bus code that is made from undefined instructions that have the NV bits set. This way the CPU doesn't exceute any code but the bus lines are set and the pattern should be visible on a logic analyser. 
+
+But I'm not seeing that pattern, doh!
+
+Removing all my bodge work (after all but 2 pads on IC33 were lifted) fixes the problem and the machine is exceuting the POST code again.
+
+2. Daughter repair board
+
+In order to fix the integrity issues I decide to have a go and manufacturing and duaghter PCB that I can "stitch" to the motherboard restoring the IC33 and RP16 pads that have been removed.
+
+I sent an order to PCBway as a backup (with slow but cheap postage) but decided to try to etch the board myself. This was a major exercise but I'm quite happy with the results, I had some trouble applying solder maks evenly, but turns out it sands down quite well. 
+
+The idea behind the repair PCB is to incorporate a ground plane so that the signal wires have a much better ground and hopefully this resolves the cross talk issues by give the signal a robust low impedance return path so they signals won't interfere.
+
+After I'd solderd 30AWG wires down my "vias" i rrealised i could have potentially used some thicker wire from through component leads to make a much better via.
+
+I also broke all by tiny bits dirlling holes, and this set me up for a massive fail next:
+
+3. Oh no disaster I drilled out the barrells on D0, D2 and D3 !!
+
+In a fit of madness, I tried to redrill these vias on the motherboard using my smallest remaining drill bit in order to lcear out the solder mask I applied to cover up the power plane that was now exposed in order to remove any risk of the daughterboard shorting.
+
+I did three of them before I realise my mistake - and now it's imopossible to reconnect the inner layers!!
+
+4. Discussions with perplexity save the day.
+
+After intially thinking the repair was hopeless now, we've come up with a plan:
+
+ - continue stitching the data lines where the inner layers are accessible.
+ - run bodge wires *on the under side* of the board from my repair PCB to the VCd pins on the VRAM socket:
+        - this means that hte ground plane is available to greatly improve signal integrity.
+        - the alterantive was to run ground wires in twisted paris directly to the VIDC20 chip but going to the sockets makes the wires a lot shorter and they can use the preexisting ground plane.
+
+- Phew! its an actionable plan that means my assessment of failure was premature. 
+
+Hopefully with all the work to create proper PCB 
