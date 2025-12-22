@@ -1,15 +1,15 @@
 {
   "board": {
-    "active_layer": 17,
-    "active_layer_preset": "",
+    "active_layer": 0,
+    "active_layer_preset": "All Layers",
     "auto_track_width": true,
     "hidden_netclasses": [],
     "hidden_nets": [],
     "high_contrast_mode": 0,
     "net_color_mode": 1,
     "opacity": {
-      "images": 1.0,
-      "pads": 0.5899999737739563,
+      "images": 0.6800000071525574,
+      "pads": 0.44999998807907104,
       "shapes": 1.0,
       "tracks": 1.0,
       "vias": 1.0,
