@@ -331,3 +331,32 @@ After intially thinking the repair was hopeless now, we've come up with a plan:
 - Phew! its an actionable plan that means my assessment of failure was premature. 
 
 Hopefully with all the work to create proper PCB 
+
+Feb 16 2026
+
+haven't updatred log in a while. The daughter board didn't work, not sure why, but something is preventing the POST code from execuating properly, I'm guessing either there is still too much load on the bus, perhaps the ground plane on my daughter board doesn't have a good enough connection.
+
+Symptoms similar to when I had flying wires.
+
+So I've paintstakingly removed the daughter board to see if that gets the machine back to funcitoning POST.
+
+Update: after removing the daughterboard the symptoms are the same!!
+Not sure whats going on but maybe the daughterboard wasn't the problem after all.
+
+I'll try to see if any of the data bus lines have been shorted.
+
+One thing to check is my POST dummy interface - I removed a rssiter becasue I thought it was optional but maybe it wasn't. Nope: added that resister and it makes no different, POST isn't entered. Posibily i've shorted the bus during my repair. Nope. Nothing seems shorted.
+
+It might be a bus line not functioning properly, next I'll try doing a similar test to before: try to see the firmware bit pattern test, and try to trace the very early boot.
+
+if the bus is dodgey i'm expecting data to read as currupt.
+
+Feb 19
+
+Break through: went back to basics, clock. Looks like there is no clock signal being generated from the crystal oscillator on the ARM710 processor board. Intersteing the address walk doesn't seem to need an fCLK.
+
+Plugged in SA110 board and this demonstrates bus activity.
+
+ORdered new crystal oscaillator to replace. In the mean time lets focus on the SA110. Interestingly with the 3.7 ROMS installed the bus halts after a few ms. Traced the strat up and I can see D3 looks like it is stuck low.  Suspect damaged ROMS. I note if ROM 2 is removed then the bus is still active. Perplexity sems to beleive that the IOMD will detect a bus conflict and deassert MREQ due to a bus conflict.
+
+Tried powerijng up the ROMS on a breadboard but could see any obvious problems.
