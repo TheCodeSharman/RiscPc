@@ -360,3 +360,7 @@ Plugged in SA110 board and this demonstrates bus activity.
 ORdered new crystal oscaillator to replace. In the mean time lets focus on the SA110. Interestingly with the 3.7 ROMS installed the bus halts after a few ms. Traced the strat up and I can see D3 looks like it is stuck low.  Suspect damaged ROMS. I note if ROM 2 is removed then the bus is still active. Perplexity sems to beleive that the IOMD will detect a bus conflict and deassert MREQ due to a bus conflict.
 
 Tried powerijng up the ROMS on a breadboard but could see any obvious problems.
+
+D3 was a false positive - the analyser probe wasn't plugged in properly.
+
+I traced the entire databus and I can see the bit walk so this confirms the ROMS appear to work. Not work why the boot halts but maybe 3.7 is just coded different - of thats the case then this is good news. I shoud be able to add the repair daughterboard and use the bit walk to test the signal integrity.
