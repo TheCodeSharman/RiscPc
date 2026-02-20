@@ -364,3 +364,11 @@ Tried powerijng up the ROMS on a breadboard but could see any obvious problems.
 D3 was a false positive - the analyser probe wasn't plugged in properly.
 
 I traced the entire databus and I can see the bit walk so this confirms the ROMS appear to work. Not work why the boot halts but maybe 3.7 is just coded different - of thats the case then this is good news. I shoud be able to add the repair daughterboard and use the bit walk to test the signal integrity.
+
+Feb 10
+
+Yesterday a did two traces to get the dull data bus, the 1 and 0 walk o fhte data bus is clearly visible so this suggest both ROMs are working fine, and the data bus has good signal integrity. (yay!)
+
+Realsied that becasue teh SA110 has a large intruction prefetch cache a tight loop will not show any bus activity - so now I suspect everything is working fine. I confirmed that hte POST code is skipped in the 3.7 ROMS if SA110. SO all my symptoms appear normal. As a final verification of that hypothesis I'm going to trace the address bus and get an idea whats happening in terms of code esxecution.
+
+Note" The few few times I booted the machine I was getting garbage on the bus, however after warmimg up everything is as expected. I'm not sure what could cause that?
