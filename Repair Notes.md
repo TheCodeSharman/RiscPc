@@ -371,4 +371,8 @@ Yesterday a did two traces to get the dull data bus, the 1 and 0 walk o fhte dat
 
 Realsied that becasue teh SA110 has a large intruction prefetch cache a tight loop will not show any bus activity - so now I suspect everything is working fine. I confirmed that hte POST code is skipped in the 3.7 ROMS if SA110. SO all my symptoms appear normal. As a final verification of that hypothesis I'm going to trace the address bus and get an idea whats happening in terms of code esxecution.
 
-Note" The few few times I booted the machine I was getting garbage on the bus, however after warmimg up everything is as expected. I'm not sure what could cause that?
+Note: The few few times I booted the machine I was getting garbage on the bus, however after warmimg up everything is as expected. I'm not sure what could cause that?
+
+Feb 21
+
+Traced the address bus to see where the hang is occurring at it seems to be the first byte written to the VIDC20 chip (16CC). So this could be related to the part of the circuit connrcting the bus to the VIDC20. Not sure why it hangs though, possibly because he VIDC needs to ack the config byte?
