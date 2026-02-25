@@ -386,3 +386,5 @@ Anyhow, painstakingly resoldered the board (twice unncessarily). Looks like in t
 Managed to boot with the bus bitwalk cleary visible D0-D14 in one trace and D15-D27 in the other! I soldering on the buffer chip and am seeing D0-D7 correctly buffered!
 
 Looks good, the last steps are to wire in the 6 bidge wires to the video bus, then fingers crossed that particular circuit board damage should be fixed I am expecting the VIDC chip to initialise correctly - we should see the grey "POST" screen (SA110 is incompatible with POST code so it behaves as if it was warm started or POST disabled).
+
+Also, I found anothe breakthough, the ground pin pad for IC30 had lifted and was no longer connected I woner if this explains the suden freeze when trying to configure the VIDC20 chip - it would mess up the upper bits, whereas previosuly we were only losing the low 8 bits. 
