@@ -381,10 +381,14 @@ Feb 24
 
 Desolder and res-soldered the repair daughterboard - I thought I'd accidenntally bridged GND to 5V so I removed the board. I was researching how to find the short and sleep on it over night, the next day I tried passing 300mA at 1V to see if anything lit up under the thermal camera. But the short was gone! Later on the same thing happened. I figured out that it was my very liberal application of flux was shorting pins. Applying some current apparenlty evaporates the liquid, as does leaving it overnight I guess. 
 
-Anyhow, painstakingly resoldered the board (twice unncessarily). Looks like in the process of drilling out some data line vias I lost D2 and D7 and only two of the video bus data lines vias are intact. Thats a shame but with the PCB in place I can solder bodge wires on the underside of the board, this should ensure signal integrity due to sitting directly on top of the ground plane. The bus speeds aren't fast enough to require special attention to trace length (16Mhz), at least I think.
+Anyhow, painstakingly resoldered the board (twice unncessarily). Looks like in the process of drilling out some data line vias I lost D1 and D7 and only two of the video bus data lines vias are intact. Thats a shame but with the PCB in place I can solder bodge wires on the underside of the board, this should ensure signal integrity due to sitting directly on top of the ground plane. The bus speeds aren't fast enough to require special attention to trace length (16Mhz), at least I think.
 
 Managed to boot with the bus bitwalk cleary visible D0-D14 in one trace and D15-D27 in the other! I soldering on the buffer chip and am seeing D0-D7 correctly buffered!
 
 Looks good, the last steps are to wire in the 6 bidge wires to the video bus, then fingers crossed that particular circuit board damage should be fixed I am expecting the VIDC chip to initialise correctly - we should see the grey "POST" screen (SA110 is incompatible with POST code so it behaves as if it was warm started or POST disabled).
 
-Also, I found anothe breakthough, the ground pin pad for IC30 had lifted and was no longer connected I woner if this explains the suden freeze when trying to configure the VIDC20 chip - it would mess up the upper bits, whereas previosuly we were only losing the low 8 bits. 
+Also, I found anothe breakthough, the ground pin pad for IC30 had lifted and was no longer connected I woner if this explains the suden freeze when trying to configure the VIDC20 chip - it would mess up the upper bits, whereas previosuly we were only losing the low 8 bits.
+
+Feb 25
+
+Daughterboard connected to D0-D7 successfully (two bidge wires one for D1 and another for D7) passes the "traingle test" which indicates signal integrity is good. Trianlge test is my name for the bitwalk ROM code that is designed to show a distinctive pattern on a logic analyser - it looks like two triangles.
