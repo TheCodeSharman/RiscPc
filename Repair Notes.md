@@ -392,3 +392,12 @@ Also, I found anothe breakthough, the ground pin pad for IC30 had lifted and was
 Feb 25
 
 Daughterboard connected to D0-D7 successfully (two bidge wires one for D1 and another for D7) passes the "traingle test" which indicates signal integrity is good. Trianlge test is my name for the bitwalk ROM code that is designed to show a distinctive pattern on a logic analyser - it looks like two triangles.
+ 
+Feb 26
+
+Replacement crystal osicallato came today, so I'm ready to repair the ARM710 board.
+But before I do that, I've attempted multiple times to bidge the VIDC20 bus bits on Vcd0, Vcd7, Vcd6, Vcd5, Vcd3, Vcd2 lines, it turns out as long as the bodges laid flat and avoided running across anywhere near the databus lines then the machine behaves. I added them one by one and traced the address lines A2 to A12 which is enough to see if secuation is behaving. THe slighest bus signal integrity tends to cause the address to load out of sequence so this is a good canary test for bus integrity. 
+
+Looks good for now!!
+
+I'll see if the video bus lines are behaving as expected tomorrow to further test, but this is excellent, I haven't been able to get this far since I lifted all the pads around IC33!!
