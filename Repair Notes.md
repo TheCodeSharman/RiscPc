@@ -416,6 +416,7 @@ Pin 9 on SIMM socket 1: 0.5ohm
 Pin 190 on IOMD chip: 2.6ohm
 Pin 5 on IC23: 5.2ohm
 Pin 13 on RP8: 4.8ohm
+Pin 82 on VRAM socket: 0.3ohm
 
 
 So the AI theory of short between pin 9 and pin 10 checks out. Looks likely its SIMM socket 0.
@@ -423,3 +424,5 @@ So the AI theory of short between pin 9 and pin 10 checks out. Looks likely its 
 The AI references stardot thread where some one has the same issue but no resolution yet. It suggest I should destructively remove pin 9 to see if the short clears. If it doesn't try drilling down the via.
 
 So I guess that SIMM socket has to die :-( at least they are replacable but on the upside I can work with only one SIMM socket whilst I wait for a replacement.
+
+OK I'm such an idit after destroying the SIM socket and drilling out pin 9 and 10 I remembered a mistake a made weeks ago - the pin i routed to power was lined up with a via I originally thought was poer but urns out to be a bus data line. Guess which one it was D19 !! So I've desoldered the power and the short has gone. At least the damage I did removing the socket is repairable worse case I can bodge from nearby SIMM socker 1 but probbaly there are closer vias!                                                                                                                                                                                                                                                                                                           
