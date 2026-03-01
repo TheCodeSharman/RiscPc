@@ -392,3 +392,34 @@ Also, I found anothe breakthough, the ground pin pad for IC30 had lifted and was
 Feb 25
 
 Daughterboard connected to D0-D7 successfully (two bidge wires one for D1 and another for D7) passes the "traingle test" which indicates signal integrity is good. Trianlge test is my name for the bitwalk ROM code that is designed to show a distinctive pattern on a logic analyser - it looks like two triangles.
+
+So next step is to wire up the video bus of the circuit, this should get us video back if all goes well and assuming no other faults.
+
+Mar 1
+
+Ok disaster struck. After several attempts at tracing hte exdecution to see where it was failing , I was intermittatnly getting garbage on the bus. Sometimes everyhitng was fine, sometimes there seemed to be bus corruption. So naturally I removed all my bodge wires. The issue was still there.
+
+
+
+I noticed that D19 data line is stuck HIGH now so this is going to stop the sysmte data bus from working. Probing around I noticed that D19 on PIN 20 of ROM socket 2 was measrueing 3.3ohms.
+So I desoldering IC30 becasue this is the buffer on that bus line. No improvememnt still 3.3ohm short.
+
+AI suggested an internal short between pin 9 and pin 10 on the SIMM socket, and sure enough the resistance measures 0.1ohm between those to pins.
+
+Tracing the data bus I got the following resistance readings from pin 1 the +5V on the power socket:
+
+Pin 9 on CPU slot 0: 2.4 ohm
+Pin 9 on CPU Slot 1: 2.6 ohm
+Pin 20 on ROM 2 socket: 3.3ohm
+Pin 9 on SIMM socket 0: 0.1ohm
+Pin 9 on SIMM socket 1: 0.5ohm
+Pin 190 on IOMD chip: 2.6ohm
+Pin 5 on IC23: 5.2ohm
+Pin 13 on RP8: 4.8ohm
+
+
+So the AI theory of short between pin 9 and pin 10 checks out. Looks likely its SIMM socket 0.
+
+The AI references stardot thread where some one has the same issue but no resolution yet. It suggest I should destructively remove pin 9 to see if the short clears. If it doesn't try drilling down the via.
+
+So I guess that SIMM socket has to die :-( at least they are replacable but on the upside I can work with only one SIMM socket whilst I wait for a replacement.
