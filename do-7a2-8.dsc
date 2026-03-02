@@ -28,7 +28,7 @@
             "enabled": true,
             "index": 0,
             "name": "nRESET",
-            "strigger": 0,
+            "strigger": 1,
             "type": 10000,
             "view_index": 0
         },
@@ -163,7 +163,7 @@
             "enabled": true,
             "index": 15,
             "name": "a8",
-            "strigger": 1,
+            "strigger": 0,
             "type": 10000,
             "view_index": 15
         }
