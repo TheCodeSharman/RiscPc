@@ -36,7 +36,7 @@
             "colour": "#f9f06b",
             "enabled": true,
             "index": 1,
-            "name": "d0",
+            "name": "d15",
             "strigger": 0,
             "type": 10000,
             "view_index": 1
@@ -45,7 +45,7 @@
             "colour": "#f8e45c",
             "enabled": true,
             "index": 2,
-            "name": "d1",
+            "name": "d16",
             "strigger": 0,
             "type": 10000,
             "view_index": 2
@@ -54,7 +54,7 @@
             "colour": "#f6d32d",
             "enabled": true,
             "index": 3,
-            "name": "d2",
+            "name": "d17",
             "strigger": 0,
             "type": 10000,
             "view_index": 3
@@ -63,7 +63,7 @@
             "colour": "#f5c211",
             "enabled": true,
             "index": 4,
-            "name": "d3",
+            "name": "d18",
             "strigger": 0,
             "type": 10000,
             "view_index": 4
@@ -72,7 +72,7 @@
             "colour": "#e5a50a",
             "enabled": true,
             "index": 5,
-            "name": "d4",
+            "name": "d19",
             "strigger": 0,
             "type": 10000,
             "view_index": 5
@@ -81,7 +81,7 @@
             "colour": "#ffbe6f",
             "enabled": true,
             "index": 6,
-            "name": "d5",
+            "name": "d20",
             "strigger": 0,
             "type": 10000,
             "view_index": 6
@@ -90,7 +90,7 @@
             "colour": "#ffa348",
             "enabled": true,
             "index": 7,
-            "name": "d6",
+            "name": "d21",
             "strigger": 0,
             "type": 10000,
             "view_index": 7
@@ -99,7 +99,7 @@
             "colour": "#ff7800",
             "enabled": true,
             "index": 8,
-            "name": "d7",
+            "name": "d22",
             "strigger": 0,
             "type": 10000,
             "view_index": 8
@@ -108,7 +108,7 @@
             "colour": "#c64600",
             "enabled": true,
             "index": 9,
-            "name": "d8",
+            "name": "d23",
             "strigger": 0,
             "type": 10000,
             "view_index": 9
@@ -117,7 +117,7 @@
             "colour": "#cdab8f",
             "enabled": true,
             "index": 10,
-            "name": "d9",
+            "name": "d24",
             "strigger": 0,
             "type": 10000,
             "view_index": 10
@@ -126,7 +126,7 @@
             "colour": "#b5835a",
             "enabled": true,
             "index": 11,
-            "name": "d10",
+            "name": "d25",
             "strigger": 0,
             "type": 10000,
             "view_index": 11
@@ -135,7 +135,7 @@
             "colour": "#986a44",
             "enabled": true,
             "index": 12,
-            "name": "d11",
+            "name": "d26",
             "strigger": 0,
             "type": 10000,
             "view_index": 12
@@ -144,7 +144,7 @@
             "colour": "#865e3c",
             "enabled": true,
             "index": 13,
-            "name": "d12",
+            "name": "d27",
             "strigger": 0,
             "type": 10000,
             "view_index": 13
@@ -153,7 +153,7 @@
             "colour": "#63452c",
             "enabled": true,
             "index": 14,
-            "name": "d13",
+            "name": "d28",
             "strigger": 0,
             "type": 10000,
             "view_index": 14
@@ -162,7 +162,7 @@
             "colour": "#f66151",
             "enabled": true,
             "index": 15,
-            "name": "d14",
+            "name": "d29",
             "strigger": 0,
             "type": 10000,
             "view_index": 15

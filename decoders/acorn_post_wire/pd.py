@@ -33,6 +33,11 @@ class Decoder(srd.Decoder):
             self.end = end
             self.data = data
 
+        def debug(self, decoder):
+            print(f"count = #{self.count}, data = #{self.data}")
+            decoder.put(self.start, self.end, decoder.out_ann, [4, [f"Debug: count = #{self.count}, data = #{self.data}", 'D' ]])
+      
+
     def __init__(self):
        self.reset()
 
@@ -58,7 +63,9 @@ class Decoder(srd.Decoder):
         self.wait([{0: 'r'}, {'skip': window}])
         start = self.samplenum
         if self.matched == 2:
-            return Decoder.Pulse(0, start, self.samplenum, data)
+            pulse = Decoder.Pulse(0, start, self.samplenum, data)
+            pulse.debug(self)
+            return pulse
         else:
             pulse_count += 1
         
@@ -71,7 +78,9 @@ class Decoder(srd.Decoder):
             else:
                 break
 
-        return Decoder.Pulse(pulse_count, start, self.samplenum, data)
+        pulse = Decoder.Pulse(pulse_count, start, self.samplenum, data)
+        pulse.debug(self)
+        return pulse
         
     def decode_input(self):
         if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 4):

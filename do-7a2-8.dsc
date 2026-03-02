@@ -20,7 +20,7 @@
     "Trigger slope": 0,
     "Trigger source": 0,
     "Using Clock Negedge": 0,
-    "Using External Clock": 1,
+    "Using External Clock": 0,
     "Version": 3,
     "channel": [
         {
@@ -28,7 +28,7 @@
             "enabled": true,
             "index": 0,
             "name": "nRESET",
-            "strigger": 1,
+            "strigger": 0,
             "type": 10000,
             "view_index": 0
         },
@@ -105,65 +105,65 @@
             "view_index": 8
         },
         {
-            "colour": "#c64600",
+            "colour": "#99c1f1",
             "enabled": true,
             "index": 9,
-            "name": "d8",
+            "name": "a2",
             "strigger": 0,
             "type": 10000,
             "view_index": 9
         },
         {
-            "colour": "#cdab8f",
+            "colour": "#62a0ea",
             "enabled": true,
             "index": 10,
-            "name": "d9",
+            "name": "a3",
             "strigger": 0,
             "type": 10000,
             "view_index": 10
         },
         {
-            "colour": "#b5835a",
+            "colour": "#3584e4",
             "enabled": true,
             "index": 11,
-            "name": "d10",
+            "name": "a4",
             "strigger": 0,
             "type": 10000,
             "view_index": 11
         },
         {
-            "colour": "#986a44",
+            "colour": "#1c71d8",
             "enabled": true,
             "index": 12,
-            "name": "d11",
+            "name": "a5",
             "strigger": 0,
             "type": 10000,
             "view_index": 12
         },
         {
-            "colour": "#865e3c",
+            "colour": "#1a5fb4",
             "enabled": true,
             "index": 13,
-            "name": "d12",
+            "name": "a6",
             "strigger": 0,
             "type": 10000,
             "view_index": 13
         },
         {
-            "colour": "#63452c",
+            "colour": "#8ff0a4",
             "enabled": true,
             "index": 14,
-            "name": "d13",
+            "name": "a7",
             "strigger": 0,
             "type": 10000,
             "view_index": 14
         },
         {
-            "colour": "#f66151",
+            "colour": "#57e389",
             "enabled": true,
             "index": 15,
-            "name": "d14",
-            "strigger": 0,
+            "name": "a8",
+            "strigger": 1,
             "type": 10000,
             "view_index": 15
         }

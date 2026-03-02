@@ -9,7 +9,7 @@
     "Language": 31,
     "Max Height": "1X",
     "Operation Mode": 0,
-    "Sample count": "250880",
+    "Sample count": "50176",
     "Sample rate": "50000000",
     "Stop Options": 1,
     "Threshold Level": "2",
@@ -24,7 +24,7 @@
     "Version": 3,
     "channel": [
         {
-            "colour": "#613583",
+            "colour": "#a51d2d",
             "enabled": true,
             "index": 0,
             "name": "nRESET",
@@ -33,142 +33,207 @@
             "view_index": 0
         },
         {
-            "colour": "#f9f06b",
+            "colour": "#62a0ea",
             "enabled": true,
             "index": 1,
-            "name": "d0",
+            "name": "a17",
             "strigger": 0,
             "type": 10000,
             "view_index": 1
         },
         {
-            "colour": "#f8e45c",
+            "colour": "#3584e4",
             "enabled": true,
             "index": 2,
-            "name": "d1",
+            "name": "a18",
             "strigger": 0,
             "type": 10000,
             "view_index": 2
         },
         {
-            "colour": "#f6d32d",
+            "colour": "#1c71d8",
             "enabled": true,
             "index": 3,
-            "name": "d2",
+            "name": "a19",
             "strigger": 0,
             "type": 10000,
             "view_index": 3
         },
         {
-            "colour": "#f5c211",
+            "colour": "#1a5fb4",
             "enabled": true,
             "index": 4,
-            "name": "d3",
+            "name": "a20",
             "strigger": 0,
             "type": 10000,
             "view_index": 4
         },
         {
-            "colour": "#e5a50a",
+            "colour": "#8ff0a4",
             "enabled": true,
             "index": 5,
-            "name": "d4",
+            "name": "a21",
             "strigger": 0,
             "type": 10000,
             "view_index": 5
         },
         {
-            "colour": "#ffbe6f",
+            "colour": "#57e389",
             "enabled": true,
             "index": 6,
-            "name": "d5",
+            "name": "a22",
             "strigger": 0,
             "type": 10000,
             "view_index": 6
         },
         {
-            "colour": "#ffa348",
+            "colour": "#33d17a",
             "enabled": true,
             "index": 7,
-            "name": "d6",
+            "name": "a23",
             "strigger": 0,
             "type": 10000,
             "view_index": 7
         },
         {
-            "colour": "#ff7800",
+            "colour": "#2ec27e",
             "enabled": true,
             "index": 8,
-            "name": "d7",
+            "name": "a24",
             "strigger": 0,
             "type": 10000,
             "view_index": 8
         },
         {
-            "colour": "#c64600",
+            "colour": "#26a269",
             "enabled": true,
             "index": 9,
-            "name": "d8",
+            "name": "a25",
             "strigger": 0,
             "type": 10000,
             "view_index": 9
         },
         {
-            "colour": "#cdab8f",
+            "colour": "#dc8add",
             "enabled": true,
             "index": 10,
-            "name": "d9",
+            "name": "a26",
             "strigger": 0,
             "type": 10000,
             "view_index": 10
         },
         {
-            "colour": "#b5835a",
+            "colour": "#c061cb",
             "enabled": true,
             "index": 11,
-            "name": "d10",
+            "name": "a27",
             "strigger": 0,
             "type": 10000,
             "view_index": 11
         },
         {
-            "colour": "#986a44",
+            "colour": "#9141ac",
             "enabled": true,
             "index": 12,
-            "name": "d11",
+            "name": "a28",
             "strigger": 0,
             "type": 10000,
             "view_index": 12
         },
         {
-            "colour": "#865e3c",
+            "colour": "#813d9c",
             "enabled": true,
             "index": 13,
-            "name": "d12",
+            "name": "a29",
             "strigger": 0,
             "type": 10000,
             "view_index": 13
         },
         {
-            "colour": "#63452c",
+            "colour": "#000000",
             "enabled": true,
             "index": 14,
-            "name": "d13",
+            "name": "?",
             "strigger": 0,
             "type": 10000,
             "view_index": 14
         },
         {
-            "colour": "#f66151",
+            "colour": "#000000",
             "enabled": true,
             "index": 15,
-            "name": "d14",
+            "name": "?",
             "strigger": 0,
             "type": 10000,
             "view_index": 15
         }
     ],
     "decoder": [
+        {
+            "channel": [
+                {
+                    "d13": 12
+                },
+                {
+                    "d12": 11
+                },
+                {
+                    "d11": 10
+                },
+                {
+                    "d10": 9
+                },
+                {
+                    "d16": 15
+                },
+                {
+                    "d15": 14
+                },
+                {
+                    "d14": 13
+                },
+                {
+                    "d2": 1
+                },
+                {
+                    "d6": 5
+                },
+                {
+                    "d5": 4
+                },
+                {
+                    "d4": 3
+                },
+                {
+                    "d3": 2
+                },
+                {
+                    "d9": 8
+                },
+                {
+                    "d8": 7
+                },
+                {
+                    "d7": 6
+                }
+            ],
+            "id": "parallel",
+            "label": "Parallel",
+            "options": {
+                "clock_edge": "rising",
+                "endianness": "little",
+                "wordsize": 0
+            },
+            "show": {
+                "parallel": true,
+                "parallel: Items": true,
+                "parallel: Words": true
+            },
+            "stacked decoders": [
+            ],
+            "version": 2,
+            "view_index": -1
+        }
     ],
     "trigger": {
         "advTriggerMode": false,
