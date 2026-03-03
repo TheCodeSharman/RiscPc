@@ -439,3 +439,25 @@ Mar 3
 Resoldered on reapir for damaged area - desoldered competely the SIMM 0 socket and ordered a replacment. Turns out I needn't have destroyed that one, careful wicking was able to remove it cleanly, another cicumstance led astray by AI in desperate moment.
 
 I started to get intermittent early boot ROM failures, and I traced it to the ROM data bus pin to D31 being not connecting via the ROM socket 2. I guess becasue I kkeep inserting and removing the ROM sockets the connections are fatiguing mechanically. Only bit is D31 so far but worthwhile lookkjgn out for - maybe I should replace the ROM Sockets too. 
+
+Its worthwhile making a note of symptoms are diagnosis procedure for the two recent failures:
+
+1. D19 stuck HIGH
+
+Noticed that early boot was freezing, so used logic analyser to get a snapshot of waht is going on for D0-D14 and then D15-D29. I noticed that D19 was stuck.
+Continuity testing showed it was shorted to VCC but I had no idea where.
+Using the ohms resistance rating range on my DMM I found the lowest resistence at the SIMM 0 socket pins 9 and pin 10. Forum posts suggested a similar instance with an internal short. This turned out to be *NOT* the case for, but before I figured out what was going I'd already followed AI advice to remove plastic from the SIMM socket to expose the top of the PCB.
+
+I then remember, annd apparently I neglected to make a note of this, that my reapir board had a flaw that the pin marked "PWR" which I originally thoguth was a via to 5V was infact a via to D19. Becasue this via is very very close to pin 9 on the SIM 0 socket this explains the 0.1ohm resistance. SO no it wasn't a internel board short, I wonder if the OP for the forum topic did the same misdiagnosis. Resistence is to inaccurate to get a firm diagnsosis of "internal" short.
+
+Anyhow I desoldered the rest of the SIM socket and I realise with careufl wicking and plenty of flux its easy enough to free all 72 pins and lift out the socket, this would have been a nondestructive way to do this test: the AI was inssiiting it was worth sacrificing. 
+
+I also drilled out the pin 9 and pin 10 because I was convined the short must be right at the pin - this was unncessary and competely destrcutive. I knew I could bodge around it, but also it *did* break the D19 trace but in the wrong direction, it just disconnected the data line from SIMM 1. So lession learned - no need to do crazy destructive things like that, I was just gettting desperate and was led astray by AI and forums LOL.
+
+2. D31 stuck low
+
+After all the reapir I was still seeing freezes, intermittantly. Turnns outs that PIN 30 on the ROM socket wasn't making a good connection and this had the effect of corrupting the negative constant that was the start of the ROM address walk in the early boot. Specifically: when r2 is loaded with -338 then bit 31 reads as 0, and as a result bit twos complement addition when PC is added to this constant, the result would normally be 0, it instead had bit 31 set to 1.
+
+This causes an address exception and the 0x14 address exception handler is invoked, freezing the machiine loop infintely at 0x5C. Becasue of ARM piplining the CPU fetches 0x60 and 0x64. It looks like the bad address is loaded onto the address bus, but becasue I was only tracing bits A<2>-A<14> it looked as if it was correct: 0x0000. I didn't prove but I imagine bit 31 was set, and this was cauusing ARM to raise address exception because this is never a valid physical address. 
+
+I pressed the pin 30 socket to the side and this seems to have restored functionality for now but I ordered high quality Milli Max replacement sockets so I can install /remove ROMs wiithout failure in future. 
