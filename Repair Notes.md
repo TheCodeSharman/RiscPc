@@ -461,3 +461,34 @@ After all the reapir I was still seeing freezes, intermittantly. Turnns outs tha
 This causes an address exception and the 0x14 address exception handler is invoked, freezing the machiine loop infintely at 0x5C. Becasue of ARM piplining the CPU fetches 0x60 and 0x64. It looks like the bad address is loaded onto the address bus, but becasue I was only tracing bits A<2>-A<14> it looked as if it was correct: 0x0000. I didn't prove but I imagine bit 31 was set, and this was cauusing ARM to raise address exception because this is never a valid physical address. 
 
 I pressed the pin 30 socket to the side and this seems to have restored functionality for now but I ordered high quality Milli Max replacement sockets so I can install /remove ROMs wiithout failure in future. 
+
+Mar 4
+
+Whilst I wait for replacement ROM sockets I seem to be having a freeze right after the ROM checksum. 
+The address trace goes:
+
+0x2920  ----> movs pc.lr
+0x2924  ----> +4 pipeline fetch
+0x2928  ----> +8 pipeline fetch
+
+I expect the CPU to start fetch instructions from 0x1720
+
+But instead we get:
+0x292C   ----> start of ts_ROM_alias
+...
+and execution continues until the AddressExecption handler is entered.
+
+I've not sure whats going on:
+  - is the instruction mov pc,lr corrupted?
+  - is the value of r14 corrupted?
+  - is the CPU jumping to a different page that I can't see due to being in the high address lines?
+
+Whats puzzling is that the code keeps executing but not looping - so what code is it reading?
+
+I guess if the ROM was bad at these addresses this would explain things. Once I've got my EPROM programmer
+I should be able to image the ROM and rule that out. I guess in the meantime I could swap ROMS to 3.7.
+
+Given the CPU is executing code so successfully its hard to imagine a system bus corruption. 
+I guess the high bits of the ROM address lines could have poor connections to the ROM - I continuity tested them from the address latches though and found no issues. But that seems weird too. 
+
+Suspect actual ROM degradation?!
