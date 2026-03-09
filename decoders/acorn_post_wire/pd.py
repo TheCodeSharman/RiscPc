@@ -34,8 +34,7 @@ class Decoder(srd.Decoder):
             self.data = data
 
         def debug(self, decoder):
-            print(f"count = #{self.count}, data = #{self.data}")
-            decoder.put(self.start, self.end, decoder.out_ann, [4, [f"Debug: count = #{self.count}, data = #{self.data}", 'D' ]])
+            decoder.put(self.start, self.end, decoder.out_ann, [4, [f"Debug: count = #{self.count}", f"D: #{self.count}", 'D' ]])
       
 
     def __init__(self):
