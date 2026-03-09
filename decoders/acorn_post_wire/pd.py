@@ -34,7 +34,7 @@ class Decoder(srd.Decoder):
             self.data = data
 
         def debug(self, decoder):
-            decoder.put(self.start, self.end, decoder.out_ann, [4, [f"Debug: count = #{self.count}", f"D: #{self.count}", 'D' ]])
+            decoder.put(self.start, self.end, decoder.out_ann, [4, [f"Debug: count = #{self.count}, data=#{self.data}", f"D: #{self.count}", 'D' ]])
       
 
     def __init__(self):
@@ -42,68 +42,58 @@ class Decoder(srd.Decoder):
 
     def reset(self):
         self.pulse_buffer = []
+
+    def metadata(self, key, value):
+        if key == srd.SRD_CONF_SAMPLERATE:
+            self.samplerate = value
+            print(f"Sample rate received: {self.samplerate} Hz")
    
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
         self.out_python = self.register(srd.OUTPUT_PYTHON)
-        
-        # Use existing rate or default to 20MHz
-        self.samplerate = getattr(self, 'samplerate', 20_000_000)
-        self.pulse_duration = (self.samplerate // 1_000_000) * 8
-        self.interbit_interval = (self.samplerate // 1_000_000) * 164
+        one_microsecond = self.samplerate / 1_000_000.0
+        self.interbit_interval = int(3 * one_microsecond)
 
     # Look for a burst of pulses within 164μS window
-    def count_pulses(self, window = None):
+    def count_pulses(self):
         pulse_count = 0
-        data = None
-        if not window:
-            window = self.pulse_duration
-        self.wait({0: 'l'})
-        self.wait([{0: 'r'}, {'skip': window}])
         start = self.samplenum
-        if self.matched == 2:
-            pulse = Decoder.Pulse(0, start, self.samplenum, data)
-            pulse.debug(self)
-            return pulse
-        else:
-            pulse_count += 1
         
-        # Count the number of consecutive pulses
-        while pulse_count < 4:
-            self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
-            if (self.matched == 1):
-                _, data = self.wait({0: 'f'})
-                pulse_count += 1
-            else:
-                break
+        # Wait for the first rising edge
+        self.wait({0: 'r'})
+        _, value = self.wait([{0: 'f'}, {'skip': self.interbit_interval}])
 
-        pulse = Decoder.Pulse(pulse_count, start, self.samplenum, data)
+        # If the first pulse is detected, check for up to 3 more pulses within the interbit interval
+        if self.matched == 1:
+            pulse_count = 1
+
+            # Count the number of consecutive pulses
+            while True:
+
+                self.wait([{0: 'r'}, {'skip': self.interbit_interval}])
+                if self.matched == 2:
+                    break
+
+                _, data = self.wait([{0: 'f'}, {'skip': self.interbit_interval}])
+                if self.matched == 2:
+                    break
+
+                value = (value << 1) | data
+                pulse_count += 1    
+
+        # Return the number of pulses detected within the window
+        pulse = Decoder.Pulse(pulse_count, start, self.samplenum, value)
         pulse.debug(self)
         return pulse
         
     def decode_input(self):
-        if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count == 4):
+        if not(len(self.pulse_buffer) == 1 and self.pulse_buffer[0].count >= 4):
             return
         
-        value = 0
         pulse = self.pulse_buffer.pop()
-        ack = pulse.data
-    
-        # wait for adapter to acknowledge read request
-        while not ack:
-            _, ack = self.wait([{0: 'r' }, {'skip': self.pulse_duration}])
-            if self.matched == 2:
-                return
 
-        while True:
-            start = self.samplenum
-            self.wait([{0: 'r'}, {'skip': self.pulse_duration}])
-            if self.matched == 1:
-                _, data = self.wait({0: 'f'}) 
-                value = (value << 1) | data
-                self.put(start, self.samplenum, self.out_ann, [1, [str(data)]])
-            else:
-                break
+        # The real value is value with the top four 4 bits masked off.
+        value = pulse.data & ((1 << (pulse.count - 4)) - 1)
 
         self.put(pulse.start, self.samplenum, self.out_ann, [2, ['Input: ' + hex(value),  hex(value), 'I']])
         self.put(pulse.start, self.samplenum, self.out_python, ['input', value])
@@ -117,8 +107,7 @@ class Decoder(srd.Decoder):
         previous_pulse = begin_pulse
 
         while True:
-            pulse = self.count_pulses(self.interbit_interval)
-            # Replace match-case with if-elif-else for compatibility
+            pulse = self.count_pulses()
             if pulse.count == 1:
                 self.put(pulse.start, pulse.end, self.out_ann, [0, ['1']])
                 value = (value << 1) | 1
@@ -130,7 +119,7 @@ class Decoder(srd.Decoder):
                 pass
             elif pulse.count == 0:
                 break
-            elif pulse.count == 4:
+            elif pulse.count >= 4:
                 # Leave the input pulse in the buffer so it can be processed next
                 self.pulse_buffer.append(pulse)
                 break
