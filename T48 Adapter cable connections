@@ -1,0 +1,110 @@
+T48 Adapter cable connections
+
+ 1 A9 ==> 40 A9 (yes this connects to both I checked!!)
+ 2 NC
+ 3 AO ==> 10 A0
+ 4 NC
+ 5 NC
+ 6 A1 ==> 9 A1
+ 7 NC
+ 8 A2 ==> 8 A2
+ 9 A3 ==> 7 A3
+10 A4 ==> 6 A4
+11 A5 ==> 5 A5
+12 NC
+13 A6 ==> 4 A6
+14 NC
+15 NC
+16 NC
+
+(checked from PCB design all good)
+
+T48 ZIFF socket connections
+
+ 1 D8   ==> 15 D8
+ 2 NCE  ==> 11 NCE
+ 3 A18  ==> 1 A18
+ 4 A17  ==> 2 A17
+ 5 NC
+ 6 A15  ==> 34 A15
+ 7 A14  ==> 35 A14
+ 8 NC
+ 9 A13  ==> 36 A13
+10 A12  ==> 37 A12
+11 A11  ==> 38 A11
+12 A10  ==> 39 A10
+13 A9   ==> 40 A9
+14 A8   ==> 41 A8
+15 A7   ==>  3 A7
+16 A16  ==> 33 A16
+17 NC
+18 VSS  ==> 31 VSS
+19 D9   ==> 17 D9
+20 D10  ==> 19 D10
+21 D2   ==> 18 D2
+22 D7   ==> 29 D7
+23 D6   ==> 27 D6
+24 D5   ==> 25 D5
+25 D4   ==> 23 D4
+26 D3   ==> 20 D3
+27 D1   ==> 16 D1
+28 D0   ==> 14 D0
+29 NC
+30 VSS_1
+31 VCC  ==> 22 VCC
+32 D15  ==> 30 D15A-1
+33 D14  ==> 28 D14
+34 D13  ==> 26 D13
+35 D12  ==> 24 D12
+36 D11  ==> 21 D11
+37 A20  ==> 32 BYTE# / VPP (A20)
+38 A19  ==> 42 NC (A19)
+39 NWE  ==> 12 NWE
+40 NOE  ==> 13 NOE
+
+ (checked from PCB design all good)
+
+xxx27C800 socket connections
+
+ 1 A18
+ 2 A17
+ 3 A7
+ 4 A6
+ 5 A5
+ 6 A4
+ 7 A3
+ 8 A2
+ 9 A1
+10 A0
+11 NCE
+12 NWE
+13 NOE
+14 D0
+15 D8
+16 D1
+17 D9
+18 D2
+19 D10
+20 D3
+21 D11
+22 VCC
+23 D4
+24 D12
+25 D5
+26 D13
+27 D6
+28 D14
+29 D7
+30 D15A-1
+31 VSS
+32 BYTE# / VPP (A20)
+33 A16
+34 A15
+35 A14
+36 A13
+37 A12
+38 A11
+39 A10
+40 A9
+41 A8
+42 NC (A19)
