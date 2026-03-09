@@ -33,8 +33,7 @@ R2: 4k7
 Then wire the following circuit (I solder headers to the pins of the components to make it easily removable):
 
 +5V ---> R1 --> D<0>
-La<23> ---> D1 (cathode) --> Testak
-Testak --> R2 --> 0V
+La<23> ---> (anode) D1 (cathode) --> Testak
 
 Then attach logics analyser probes to La<23> and D<0>.
 
