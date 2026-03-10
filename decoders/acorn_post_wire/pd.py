@@ -63,7 +63,7 @@ class Decoder(srd.Decoder):
         self.wait({0: 'r'})
         _, value = self.wait([{0: 'f'}, {'skip': self.interbit_interval}])
 
-        # If the first pulse is detected, check for up to 3 more pulses within the interbit interval
+        # If the first pulse is detected, check for more pulses closely following
         if self.matched == 1:
             pulse_count = 1
 
