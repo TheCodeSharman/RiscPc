@@ -5,6 +5,14 @@ description: Render a specific page and region of a PDF at high DPI so fine sche
 
 Render a PDF page at high resolution and crop to a specific region so it can be read clearly.
 
+## Prerequisites
+
+```bash
+sudo apt install poppler-utils imagemagick   # Debian/Ubuntu
+sudo pacman -S poppler imagemagick           # Arch
+brew install poppler imagemagick             # macOS
+```
+
 ## Steps
 
 1. Render the target page at 300 DPI using `pdftoppm`:
