@@ -1,2 +1,8 @@
 .DS_Store
 **/__pycache__/*
+
+# KiCad
+**/*-backups/
+**/fp-info-cache
+**/*.lck
+**/_autosave-*
