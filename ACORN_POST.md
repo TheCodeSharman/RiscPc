@@ -28,7 +28,6 @@ Discrimination is performed by a retriggerable monostable with a period near 104
 In order to get RISC OS to output messages via this port a dummy POST jig can be created with the following hardware:
 R1: 4k7 
 D1: 1N4148
-R2: 4k7
 
 Then wire the following circuit (I solder headers to the pins of the components to make it easily removable):
 
