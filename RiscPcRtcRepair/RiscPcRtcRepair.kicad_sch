@@ -1,0 +1,19 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "7dd0612d-24f5-436a-9fd4-f1ef6c878b14")
+	(paper "A4")
+	(title_block
+		(title "RiscPc RTC Repair Board")
+		(rev "1")
+		(comment 1 "PCF8583 RTC/SRAM replacement with CR2032 battery backup")
+		(comment 2 "Replaces NiCad battery with non-rechargeable button cell")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)
