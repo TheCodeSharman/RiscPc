@@ -492,3 +492,7 @@ Given the CPU is executing code so successfully its hard to imagine a system bus
 I guess the high bits of the ROM address lines could have poor connections to the ROM - I continuity tested them from the address latches though and found no issues. But that seems weird too. 
 
 Suspect actual ROM degradation?!
+
+Apr 14
+
+Replaced the ROM sockets - unfortunately I managed to lift a pad on pin 37 of one of the ROMs. Added a bodge wire. Machine didn;'t get to he cyan screen anymore. Plug in POST dummy adapter and the POSt was failing the checksum and identified the 0x4000 as the ROM size. The bodge wire turned out to be accidentally touching the ground plane due to having scrapped away a tiny piece of solder mask. Reapplied solder mask and resoldered. Now I'm getting reliable Purple -> Cyan -> Black -> Red then eventually reboots and cycles. Suspect SRAM failing is stopping early Risc OS boot. So started designing a replace RTC reapir using the same technique used for the video bus damage.

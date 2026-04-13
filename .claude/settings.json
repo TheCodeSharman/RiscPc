@@ -3,7 +3,28 @@
     "allow": [
       "Bash(git mv:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(ls -lt /home/msharman/.claude/projects/-home-msharman-Projects-RiscPc/*.jsonl)",
+      "Bash(python3 -c ':*)",
+      "Bash(pdftoppm -r 300 -f 1 -l 1 \"/home/msharman/Projects/RiscPc/docs/Risc PC Technical Reference Manual/Acorn_RPCTRM_MainPCBCircuitDiagram1of7.pdf\" /tmp/pdfzoom)",
+      "Bash(convert /tmp/pdfzoom-1.ppm /tmp/pdfzoom.png)",
+      "Bash(identify /tmp/pdfzoom.png)",
+      "Bash(convert /tmp/pdfzoom.png -crop 2500x1800+0+5200 /tmp/pdfzoom_crop.png)",
+      "Bash(convert /tmp/pdfzoom.png -crop 2000x1400+0+5400 /tmp/pdfzoom_crop2.png)",
+      "Bash(pdftoppm -r 300 -f 1 -l 1 \"/home/msharman/Projects/RiscPc/docs/PCF8583_5.pdf\" /tmp/pcf)",
+      "Bash(convert /tmp/pcf-1.ppm /tmp/pcf.png)",
+      "Bash(identify /tmp/pcf.png)",
+      "Bash(ls /tmp/pcf*)",
+      "Bash(pdftoppm -r 300 \"/home/msharman/Projects/RiscPc/docs/PCF8583_5.pdf\" /tmp/pcf)",
+      "Bash(convert /tmp/pcf-05.png -crop 2480x1800+0+1700 /tmp/pcf_app.png)",
+      "Bash(convert /tmp/pcf-22.png -crop 600x900+0+600 /tmp/pcf_crystal.png)",
+      "Bash(convert /tmp/pcf-22.png -crop 1200x1200+0+400 /tmp/pcf_crystal2.png)",
+      "Read(//home/msharman/.config/**)",
+      "Read(//home/msharman/**)"
+    ],
+    "additionalDirectories": [
+      "/home/msharman/.var/app/org.kicad.KiCad/config/kicad/9.0",
+      "/home/msharman/.var/app/org.kicad.KiCad/config/kicad/8.0"
     ]
   }
 }
