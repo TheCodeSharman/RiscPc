@@ -1375,22 +1375,22 @@
 		(uuid "16ed218a-a261-4f4e-aa1f-23a6b909cc84")
 	)
 	(junction
+		(at 121.92 85.09)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "209cafcb-291d-4162-8938-a8c8bd40ec06")
+	)
+	(junction
 		(at 100.33 120.65)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "2f11c58b-2c79-4a97-9682-06a5c9870101")
 	)
 	(junction
-		(at 76.2 110.49)
+		(at 121.92 74.93)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "3694659a-4739-42f9-bcec-a5229d5b48b5")
-	)
-	(junction
-		(at 111.76 81.28)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "5f2acaf5-863e-4b11-91d1-152251e39e28")
+		(uuid "597da32d-0c88-45fa-89f6-ea65fb2023a2")
 	)
 	(junction
 		(at 138.43 85.09)
@@ -1399,16 +1399,16 @@
 		(uuid "76b352db-8583-435b-8647-662c12f5a7de")
 	)
 	(junction
-		(at 111.76 85.09)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "7c05231e-c896-4e11-b95a-abb892b24908")
-	)
-	(junction
 		(at 87.63 99.06)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "825f1a4b-52f2-4945-83d5-5d5e3ce241bc")
+	)
+	(junction
+		(at 109.22 85.09)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "b7e32a39-5002-4fd7-bb4c-6cafe492186b")
 	)
 	(junction
 		(at 100.33 116.84)
@@ -1421,6 +1421,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "cf29fa6f-ca02-4281-9b5f-6c2a4f1cc279")
+	)
+	(junction
+		(at 121.92 77.47)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d259a280-fb7c-444a-a979-1c5090c656d1")
 	)
 	(junction
 		(at 99.06 85.09)
@@ -1446,16 +1452,6 @@
 	)
 	(wire
 		(pts
-			(xy 72.39 109.22) (xy 72.39 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0d02c826-41d6-4f49-8cb3-e4cd63942f87")
-	)
-	(wire
-		(pts
 			(xy 127 109.22) (xy 124.46 109.22)
 		)
 		(stroke
@@ -1476,13 +1472,13 @@
 	)
 	(wire
 		(pts
-			(xy 80.01 110.49) (xy 80.01 109.22)
+			(xy 121.92 74.93) (xy 121.92 77.47)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "1e55592b-a203-420e-9230-7c6c3fd30f01")
+		(uuid "15fc8d85-cae7-43e5-8433-3730826c0e21")
 	)
 	(wire
 		(pts
@@ -1556,17 +1552,7 @@
 	)
 	(wire
 		(pts
-			(xy 111.76 78.74) (xy 111.76 81.28)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "56333f0d-b1ea-496f-b0d2-a98fcaf7bf2a")
-	)
-	(wire
-		(pts
-			(xy 111.76 85.09) (xy 127 85.09)
+			(xy 99.06 85.09) (xy 109.22 85.09)
 		)
 		(stroke
 			(width 0)
@@ -1606,13 +1592,13 @@
 	)
 	(wire
 		(pts
-			(xy 111.76 81.28) (xy 111.76 85.09)
+			(xy 109.22 85.09) (xy 121.92 85.09)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "742dcfea-9ce2-4386-b5fa-fa9a8c00601e")
+		(uuid "66430936-d189-41f7-ae4e-86053a45931f")
 	)
 	(wire
 		(pts
@@ -1666,16 +1652,6 @@
 	)
 	(wire
 		(pts
-			(xy 72.39 110.49) (xy 76.2 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9cc752ad-6db1-4f92-9cd4-2711a5ba1160")
-	)
-	(wire
-		(pts
 			(xy 99.06 85.09) (xy 99.06 90.17)
 		)
 		(stroke
@@ -1683,16 +1659,6 @@
 			(type default)
 		)
 		(uuid "9dac26ae-8ba2-44b1-9b5b-639fffc73698")
-	)
-	(wire
-		(pts
-			(xy 76.2 110.49) (xy 80.01 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a094675c-1071-48bc-adb3-20c2a5048189")
 	)
 	(wire
 		(pts
@@ -1716,16 +1682,6 @@
 	)
 	(wire
 		(pts
-			(xy 99.06 85.09) (xy 111.76 85.09)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b40d78b6-b8e1-411a-9203-f3873af22540")
-	)
-	(wire
-		(pts
 			(xy 138.43 104.14) (xy 138.43 99.06)
 		)
 		(stroke
@@ -1746,16 +1702,6 @@
 	)
 	(wire
 		(pts
-			(xy 76.2 110.49) (xy 76.2 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c7ec5d77-0803-41a8-8ec4-e39b16b28199")
-	)
-	(wire
-		(pts
 			(xy 104.14 114.3) (xy 100.33 114.3)
 		)
 		(stroke
@@ -1763,6 +1709,16 @@
 			(type default)
 		)
 		(uuid "d63e7a4f-feb6-4ce7-bf97-6782a75e196f")
+	)
+	(wire
+		(pts
+			(xy 121.92 73.66) (xy 121.92 74.93)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d888fe87-0f83-4487-b436-7f519d24830d")
 	)
 	(wire
 		(pts
@@ -1804,6 +1760,83 @@
 		)
 		(uuid "f24f7683-a63e-40de-9d06-a42cfbb970c5")
 	)
+	(wire
+		(pts
+			(xy 121.92 85.09) (xy 127 85.09)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fee9b71a-29cb-401d-b81a-2345a8129976")
+	)
+	(symbol
+		(lib_id "Device:D_Schottky")
+		(at 121.92 81.28 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "0063b054-3c36-48e0-8eb8-19f8b78e5aba")
+		(property "Reference" "D1"
+			(at 124.46 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "BAT85"
+			(at 118.618 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Diode_SMD:D_SOD-323"
+			(at 121.92 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 121.92 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Schottky diode"
+			(at 121.92 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b529c53c-3d27-4aa0-b5dc-68e44050c9e2")
+		)
+		(pin "2"
+			(uuid "a7892527-4f3b-4847-919a-0de00f24f361")
+		)
+		(instances
+			(project "RiscPcRtcRepair"
+				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
+					(reference "D1")
+					(unit 1)
+				)
+			)
+		)
+	)
 	(symbol
 		(lib_id "Connector:TestPoint")
 		(at 142.24 116.84 270)
@@ -1832,7 +1865,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm"
 			(at 142.24 121.92 0)
 			(effects
 				(font
@@ -1873,15 +1906,16 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 80.01 109.22 0)
+		(at 121.92 74.93 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "0e5aea72-7667-4a45-858d-b4ec9eb0d0c5")
-		(property "Reference" "F1"
-			(at 82.804 106.172 0)
+		(fields_autoplaced yes)
+		(uuid "1cd84c29-c97c-429c-abc7-fdbd5a078766")
+		(property "Reference" "+5V1"
+			(at 127 74.9299 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1890,7 +1924,7 @@
 			)
 		)
 		(property "Value" "TestPoint"
-			(at 82.55 107.1879 0)
+			(at 127 76.1999 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1899,8 +1933,8 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_1.5x1.5mm_Drill0.7mm"
-			(at 85.09 109.22 0)
+		(property "Footprint" ""
+			(at 121.92 80.01 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1909,7 +1943,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 85.09 109.22 0)
+			(at 121.92 80.01 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1918,7 +1952,7 @@
 			)
 		)
 		(property "Description" "test point"
-			(at 80.01 109.22 0)
+			(at 121.92 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1927,12 +1961,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "7e896df7-bd63-4abb-b777-32191ea5cee9")
+			(uuid "fe365d21-1698-475c-b5b9-b8d9b8842f7f")
 		)
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "F1")
+					(reference "+5V1")
 					(unit 1)
 				)
 			)
@@ -2005,75 +2039,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 72.39 109.22 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "3df4c29e-0f70-428c-a2b9-7cbee0cc35ec")
-		(property "Reference" "F2"
-			(at 68.072 106.172 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 74.93 107.1879 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-		(property "Footprint" ""
-			(at 77.47 109.22 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 77.47 109.22 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 72.39 109.22 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "cf7eeee2-8056-475f-92cc-64cd5efee609")
-		)
-		(instances
-			(project "RiscPcRtcRepair"
-				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "F2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:PWR_FLAG")
-		(at 111.76 81.28 90)
+		(at 109.22 85.09 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2081,7 +2048,7 @@
 		(dnp no)
 		(uuid "51e6dc56-5129-4059-a5a9-67dc7f245932")
 		(property "Reference" "#FLG02"
-			(at 109.855 81.28 0)
+			(at 109.22 83.185 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2090,7 +2057,7 @@
 			)
 		)
 		(property "Value" "PWR_FLAG"
-			(at 107.95 80.772 90)
+			(at 109.22 81.534 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2099,7 +2066,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 111.76 81.28 0)
+			(at 109.22 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2108,7 +2075,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 111.76 81.28 0)
+			(at 109.22 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2117,7 +2084,7 @@
 			)
 		)
 		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 111.76 81.28 0)
+			(at 109.22 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2166,7 +2133,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_1.5x1.5mm_Drill0.7mm"
+		(property "Footprint" ""
 			(at 100.33 129.54 0)
 			(effects
 				(font
@@ -2200,6 +2167,72 @@
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
 					(reference "GND1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 121.92 77.47 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "678bf409-b8b8-4628-92b8-5c0344f32bf6")
+		(property "Reference" "#FLG03"
+			(at 123.825 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 125.476 77.47 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 121.92 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 121.92 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 121.92 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "0a179a09-d6a0-436f-b0d7-7544efefc4c1")
+		)
+		(instances
+			(project "RiscPcRtcRepair"
+				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
+					(reference "#FLG03")
 					(unit 1)
 				)
 			)
@@ -2267,72 +2300,6 @@
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
 					(reference "#FLG01")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 76.2 113.03 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "9deafe34-1608-42f7-a470-26312663286e")
-		(property "Reference" "#PWR05"
-			(at 76.2 119.38 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 76.2 118.11 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 76.2 113.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 76.2 113.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 76.2 113.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "37cc8b98-afc1-463d-9d3c-5cc35319608b")
-		)
-		(instances
-			(project "RiscPcRtcRepair"
-				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -2416,7 +2383,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a21834f7-7882-43f6-9dd8-423202f71510")
-		(property "Reference" "INT#1"
+		(property "Reference" "INT1"
 			(at 129.54 112.014 90)
 			(effects
 				(font
@@ -2468,7 +2435,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "INT#1")
+					(reference "INT1")
 					(unit 1)
 				)
 			)
@@ -2476,7 +2443,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 111.76 78.74 0)
+		(at 121.92 73.66 0)
 		(mirror y)
 		(unit 1)
 		(exclude_from_sim no)
@@ -2485,7 +2452,7 @@
 		(dnp no)
 		(uuid "a3b4c5d6-e7f8-9012-6789-123456789013")
 		(property "Reference" "#PWR02"
-			(at 111.76 82.296 0)
+			(at 121.92 77.216 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2494,7 +2461,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 114.554 76.708 0)
+			(at 124.714 71.628 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2502,7 +2469,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 111.76 78.74 0)
+			(at 121.92 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2511,7 +2478,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 111.76 78.74 0)
+			(at 121.92 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2520,7 +2487,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 111.76 78.74 0)
+			(at 121.92 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2565,7 +2532,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Crystal:Crystal_HC49-4H_Vertical"
+		(property "Footprint" "Crystal:Crystal_C38-LF_D3.0mm_L8.0mm_Horizontal_1EP_style2"
 			(at 92.71 111.76 0)
 			(effects
 				(font
@@ -2683,7 +2650,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a7b8c9d0-e1f2-3456-0123-567890123457")
-		(property "Reference" "D1"
+		(property "Reference" "D2"
 			(at 148.59 87.63 0)
 			(effects
 				(font
@@ -2735,7 +2702,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "D1")
+					(reference "D2")
 					(unit 1)
 				)
 			)
@@ -2769,7 +2736,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Battery:BatteryHolder_Keystone_3034_1x20mm"
+		(property "Footprint" "Battery:Battery_Panasonic_CR2032-HFN_Horizontal_CircularHoles"
 			(at 158.75 95.25 0)
 			(effects
 				(font
@@ -2866,7 +2833,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+		(property "Footprint" "Capacitor_SMD:C_Elec_4x5.4"
 			(at 138.43 95.25 0)
 			(effects
 				(font
@@ -3157,7 +3124,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm"
 			(at 142.24 119.38 0)
 			(effects
 				(font
