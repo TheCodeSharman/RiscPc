@@ -496,3 +496,11 @@ Suspect actual ROM degradation?!
 Apr 14
 
 Replaced the ROM sockets - unfortunately I managed to lift a pad on pin 37 of one of the ROMs. Added a bodge wire. Machine didn;'t get to he cyan screen anymore. Plug in POST dummy adapter and the POSt was failing the checksum and identified the 0x4000 as the ROM size. The bodge wire turned out to be accidentally touching the ground plane due to having scrapped away a tiny piece of solder mask. Reapplied solder mask and resoldered. Now I'm getting reliable Purple -> Cyan -> Black -> Red then eventually reboots and cycles. Suspect SRAM failing is stopping early Risc OS boot. So started designing a replace RTC reapir using the same technique used for the video bus damage.
+
+3rd May
+
+Got fabbed and RTC board there are a bunch of issues:
+- The footprint on the PCF8583 is too small - Calude suggests it is due to non standard SOIC8 footprints in the nineties. My hotair station was widly varying temperature due to a crak heating catridge so that got retired and a new higher quality one on order. In the meantime I bent the legs around the body of the PCF8583 - and manged to get the legs soldered bar the GND pin. So bridged pins 4 to 3 (GND to A0).
+- Becasue of the too big IC the C2 and C1 can't be soldered, I maanged to solder C1 to the leg of X1 and the exposed C2 pin (+5V)
+- The footrpint for the diodes was very small and my slavaged parts were too big, ratehr than hunt and loose more diodes I just soldered point to point given the appripriate pads were easily accssible.
+- The test pad needs a pull up resister so I soldered a 4k7 resister. Totally optional but makes the 1Hz signal clearly solid. Ok soldered a 0402 4k7 SMD resister to the test pad and to the +ve terminal on the 4.7uF cap. The 1Hz is now 5Vpp (actually a bit higher which is odd bu OK I think) 
