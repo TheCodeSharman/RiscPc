@@ -1,0 +1,31 @@
+** Drc report for RiscPcRtcRepair.kicad_pcb **
+** Created on 2026-05-05T01:31:35+1000 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 5 DRC violations **
+[silk_overlap]: Silkscreen overlap (Pad to Silkscreen clearance 0.1400 mm; actual 0.0000 mm)
+    Rule: Pad to Silkscreen; warning
+    @(103.8800 mm, 69.8000 mm): Segment of Y1 on F.Silkscreen
+    @(104.7500 mm, 69.8000 mm): PTH pad 1 [Net-(U1-OSCI)] of Y1
+[silk_overlap]: Silkscreen overlap (Pad to Silkscreen clearance 0.1400 mm; actual 0.0000 mm)
+    Rule: Pad to Silkscreen; warning
+    @(103.8800 mm, 71.7000 mm): Segment of Y1 on F.Silkscreen
+    @(104.7500 mm, 71.7000 mm): PTH pad 2 [Net-(U1-OSCO)] of Y1
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error (excluded)
+    @(93.0000 mm, 98.7500 mm): Segment on Edge.Cuts
+    @(93.0000 mm, 70.7500 mm): PTH pad 1 [GND] of GND
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error (excluded)
+    @(93.0000 mm, 98.7500 mm): Segment on Edge.Cuts
+    @(93.0000 mm, 81.2500 mm): PTH pad 1 [+5V] of +5V
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error (excluded)
+    @(93.0000 mm, 98.7500 mm): Segment on Edge.Cuts
+    @(93.0000 mm, 92.5000 mm): PTH pad 1 [+5V] of +5V1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** End of Report **

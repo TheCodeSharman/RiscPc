@@ -2195,7 +2195,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1cd84c29-c97c-429c-abc7-fdbd5a078766")
-		(property "Reference" "+5V1"
+		(property "Reference" "+5V2"
 			(at 147.32 71.6279 0)
 			(effects
 				(font
@@ -2247,7 +2247,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "+5V1")
+					(reference "+5V2")
 					(unit 1)
 				)
 			)
@@ -2263,7 +2263,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2459d66a-1462-4c46-bebe-f7e7b1336044")
-		(property "Reference" "#PWR01"
+		(property "Reference" "#PWR02"
 			(at 100.33 134.62 0)
 			(effects
 				(font
@@ -2313,7 +2313,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR01")
+					(reference "#PWR02")
 					(unit 1)
 				)
 			)
@@ -2395,7 +2395,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5ec74e6b-72b1-4de3-84cb-0e261b5bd76d")
-		(property "Reference" "C4"
+		(property "Reference" "C3"
 			(at 120.65 91.44 90)
 			(effects
 				(font
@@ -2447,7 +2447,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "C4")
+					(reference "C3")
 					(unit 1)
 				)
 			)
@@ -2613,7 +2613,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Crystal:Crystal_C38-LF_D3.0mm_L8.0mm_Horizontal_1EP_style1"
+		(property "Footprint" "Crystal:Crystal_C26-LF_D2.1mm_L6.5mm_Horizontal_1EP_style2"
 			(at 92.71 111.76 0)
 			(effects
 				(font
@@ -2667,7 +2667,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "824ad0f4-42cb-4b40-afda-0d3b25057ae1")
-		(property "Reference" "#PWR06"
+		(property "Reference" "#PWR01"
 			(at 92.71 123.19 0)
 			(effects
 				(font
@@ -2717,7 +2717,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR06")
+					(reference "#PWR01")
 					(unit 1)
 				)
 			)
@@ -3004,7 +3004,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a3b4c5d6-e7f8-9012-6789-123456789013")
-		(property "Reference" "#PWR02"
+		(property "Reference" "#PWR04"
 			(at 121.92 77.216 0)
 			(effects
 				(font
@@ -3054,7 +3054,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR02")
+					(reference "#PWR04")
 					(unit 1)
 				)
 			)
@@ -3071,7 +3071,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a5b6c7d8-e9f0-1234-8901-345678901235")
-		(property "Reference" "#PWR04"
+		(property "Reference" "#PWR06"
 			(at 158.75 104.14 0)
 			(effects
 				(font
@@ -3121,7 +3121,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR04")
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -3301,7 +3301,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "d4e5f6a7-b8c9-0123-7890-234567890123")
-		(property "Reference" "C3"
+		(property "Reference" "C4"
 			(at 135.89 92.71 0)
 			(effects
 				(font
@@ -3355,7 +3355,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "C3")
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -3526,7 +3526,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "dae1bf86-8fe7-4369-97f7-697af8698b9c")
-		(property "Reference" "+5V2"
+		(property "Reference" "+5V1"
 			(at 137.16 71.6279 0)
 			(effects
 				(font
@@ -3578,7 +3578,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "+5V2")
+					(reference "+5V1")
 					(unit 1)
 				)
 			)
@@ -3594,7 +3594,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "e3f4a5b6-c7d8-9012-6789-123456789013")
-		(property "Reference" "#PWR03"
+		(property "Reference" "#PWR05"
 			(at 138.43 104.14 0)
 			(effects
 				(font
@@ -3644,7 +3644,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR03")
+					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -3660,7 +3660,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "fa1dac19-9a3c-4035-b170-0e1e8940d647")
-		(property "Reference" "#PWR05"
+		(property "Reference" "#PWR03"
 			(at 110.49 99.06 0)
 			(effects
 				(font
@@ -3711,7 +3711,7 @@
 		(instances
 			(project "RiscPcRtcRepair"
 				(path "/7dd0612d-24f5-436a-9fd4-f1ef6c878b14"
-					(reference "#PWR05")
+					(reference "#PWR03")
 					(unit 1)
 				)
 			)
