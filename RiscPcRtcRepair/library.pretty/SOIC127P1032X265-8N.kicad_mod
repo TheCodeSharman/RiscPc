@@ -28,4 +28,9 @@
   (fp_line (start -5.93 4.025) (end 5.93 4.025) (layer F.CrtYd) (width 0.05))
   (fp_line (start -5.93 -4.025) (end -5.93 4.025) (layer F.CrtYd) (width 0.05))
   (fp_line (start 5.93 -4.025) (end 5.93 4.025) (layer F.CrtYd) (width 0.05))
+  (model "${KIPRJMOD}/library.3dshapes/PCF8583T.step"
+    (offset (xyz 0 0 0))
+    (scale (xyz 1 1 1))
+    (rotate (xyz -90 0 0))
+  )
 )
