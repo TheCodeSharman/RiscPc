@@ -21,7 +21,8 @@
       "Bash(convert /tmp/pcf-22.png -crop 1200x1200+0+400 /tmp/pcf_crystal2.png)",
       "Read(//home/msharman/.config/**)",
       "Read(//home/msharman/**)",
-      "Bash(wc -l /home/msharman/Projects/RiscPc/RiscPcRtcRepair/manufacture/*.gbr /home/msharman/Projects/RiscPc/RiscPcRtcRepair/manufacture/*.drl)"
+      "Bash(wc -l /home/msharman/Projects/RiscPc/RiscPcRtcRepair/manufacture/*.gbr /home/msharman/Projects/RiscPc/RiscPcRtcRepair/manufacture/*.drl)",
+      "Bash(pdfinfo /home/msharman/Projects/RiscPc/docs/PCF8583_5.pdf)"
     ],
     "additionalDirectories": [
       "/home/msharman/.var/app/org.kicad.KiCad/config/kicad/9.0",
