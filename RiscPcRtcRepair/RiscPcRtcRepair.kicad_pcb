@@ -1219,7 +1219,7 @@
 			(net 2 "GND")
 			(pinfunction "3")
 			(pintype "passive")
-			(uuid "2053e88a-683d-4e3e-a217-26afc571fa40")
+			(uuid "fd8033b0-415f-4176-bd05-e92d9ce1bb16")
 		)
 		(pad "3" thru_hole rect
 			(at 2.45 5.75 270)
@@ -1230,7 +1230,7 @@
 			(net 2 "GND")
 			(pinfunction "3")
 			(pintype "passive")
-			(uuid "2053e88a-683d-4e3e-a217-26afc571fa40")
+			(uuid "40b099e4-7ff9-4e7f-9201-8b219a29d961")
 		)
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/Crystal.3dshapes/Crystal_C26-LF_D2.1mm_L6.5mm_Horizontal_1EP_style2.step"

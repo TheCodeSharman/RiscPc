@@ -2068,7 +2068,7 @@
 				)
 			)
 		)
-		(property "Value" "BAT46W"
+		(property "Value" "TS4148"
 			(at 118.618 81.28 0)
 			(effects
 				(font
@@ -3144,7 +3144,7 @@
 				)
 			)
 		)
-		(property "Value" "BAT46W"
+		(property "Value" "TS4148"
 			(at 148.59 81.788 0)
 			(effects
 				(font
