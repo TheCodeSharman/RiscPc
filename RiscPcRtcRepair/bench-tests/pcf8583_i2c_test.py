@@ -13,8 +13,12 @@ Wiring (Bus Pirate v3.5/v3.6 rainbow ribbon -> PCF8583T SO-8):
     pin 4 (VSS) <- Brown  (GND)
     pin 5 (SDA) <- Grey   (MOSI)
     pin 6 (SCL) <- Purple (CLK)
-    pin 8 (VDD) <- Red    (3V3)
-    Tie Green (Vpu) to Red (3V3) so the on-board pull-ups are powered.
+    pin 8 (VDD) <- Orange (5V)
+    Tie Green (Vpu) to Orange (5V) so the on-board pull-ups are powered.
+
+    NOTE: run this chip at 5V. The PCF8583T is rated 1.0-6.0V, so 5V is in
+    spec. This Bus Pirate's on-board 3V3 regulator is damaged (the "3.3V"/Red
+    pin reads ~4.94V), so do NOT use Red as a 3.3V source.
 
 A successful scan ACKs at 7-bit 0x50 (A0 low) - Bus Pirate prints it as
 "0xA0(0x50 W) 0xA1(0x50 R)".

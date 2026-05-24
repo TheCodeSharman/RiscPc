@@ -504,3 +504,19 @@ Got fabbed and RTC board there are a bunch of issues:
 - Becasue of the too big IC the C2 and C1 can't be soldered, I maanged to solder C1 to the leg of X1 and the exposed C2 pin (+5V)
 - The footrpint for the diodes was very small and my slavaged parts were too big, ratehr than hunt and loose more diodes I just soldered point to point given the appripriate pads were easily accssible.
 - The test pad needs a pull up resister so I soldered a 4k7 resister. Totally optional but makes the 1Hz signal clearly solid. Ok soldered a 0402 4k7 SMD resister to the test pad and to the +ve terminal on the 4.7uF cap. The 1Hz is now 5Vpp (actually a bit higher which is odd bu OK I think) 
+
+## May 23 2026
+
+Bench-testing the PCF8583 RTC over I2C with the Bus Pirate v3.5 (CFW v7.0).
+
+Chips and fabbed board arroved. Got Calulde Code to write a quikc and dirty RAM test and i2c test. The first chip tested fine!! I went to test the second one but due to being late at night and not wearing my galsses (!) I managed to put the tset clip on the wrong way and it fried the spare PCF8583T. Live and learn I guess. We have one know good chip so we're good.
+
+# May 24 2026
+
+Solderd all the components onto the board - the footprints for hte dioes were abit larger than practical but I managed to get them solder neatly regardless.
+
+Ran Calude Codes scripts over the assmebled duaghterboards and everythnig passes. Claude Code also wrote a script to test the clock. And I can see a clean 1Hz 5V P-P signal on the test pad markd 1Hz.
+
+So 100% PASS!!
+
+Next time I'll wire up the repair board tot he motherboard and see if this resolves the boot issue.
