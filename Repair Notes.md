@@ -520,3 +520,64 @@ Ran Calude Codes scripts over the assmebled duaghterboards and everythnig passes
 So 100% PASS!!
 
 Next time I'll wire up the repair board tot he motherboard and see if this resolves the boot issue.
+
+## Jun 7 2026
+
+RTC daughterboard installed. Massive progress, multiple faults found and resolved.
+
+**I2C bus short:**
+- Measured 10 ohms between I2CC and I2CD on motherboard - too low for pull-ups, too high for clean copper short. Classic battery-damage signature (electrolyte conductive film).
+- Applied test current at 1V to confirm with thermal camera, but current cleared the short. Same self-healing-via-current mechanism as the Feb 24 flux residue incident.
+- Final reading 9.48k ohm = 2x 4.7k pull-ups in series = healthy I2C bus.
+- Lesson: thin conductive films (corrosion, flux residue, electrolyte) will fuse open under modest current. Also clears further over operating time as board self-heats and dries residual moisture.
+
+**Reset switch:**
+- The reset switch was broken (stuck open) so I couldn't manually reset the machine. Removed it.
+- This is unrelated to the cyan -> red cycling I'd been seeing - the cycling was actually RISC OS failing to boot and the machine auto-resetting. Cause of the auto-reset cycle is still unknown.
+
+**POST passes for the first time!**
+- Logic analyser captured full POST sequence via the decoder. Result: `PASS :0000011C`.
+- Decoded against `external/Kernel/TestSrc/Begin` bit definitions: 0x004 = R_TESTED, 0x008 = R_MEMORY, 0x010 = R_ARM3, 0x100 = R_CHKFAILBIT. All within R_STATUS mask (0x1FF), zero actual fault bits set.
+- DRAM 2 and 3 both report 4MB (8MB total), DRAM 0/1 empty as expected, IOMD D4E7 V.3, ARM ID 41047100.
+- `SRAM-C27` = CMOS checksum failure with computed checksum byte 0x27. Expected for a fresh PCF8583 with no battery backup - the RAM contents are random and don't sum to zero. Not a hardware fault.
+
+**Video monitor type:**
+- Initially seeing blank screen with HSYNC at 15.6kHz then blanking after 30s. Was TV/15kHz mode with composite sync on HSYNC pin.
+- RISC PC reads VGA pin 11 (ID0) at power-on - LOW = VGA mode (Type 3, Mode 27, separate sync), HIGH/floating = TV mode (Type 0). See Risc PC TRM table.
+- Connected monitor already pulls ID0 low but only if VGA cable is plugged in BEFORE power-on. Plugging in after power-on is too late; machine has already committed to TV mode.
+- With VGA cable plugged in pre-boot: full VGA picture, turquoise/cyan early-boot screen, then hang and reboot after ~30s.
+- The ~30s reboot interval is consistent across power cycles but the cause is unconfirmed. IOMD spec mentions general-purpose counter/timers but no explicit watchdog. Could be a RISC OS-level error handler, a ROM timeout, or something else - needs investigation.
+- Confirmed CPU bus activity continues during the visible turquoise screen so the machine is alive at that point.
+
+**Keyboard not responding:**
+- Acorn keyboard plugged in but no LED activity at power-on - normally LEDs flash during handshake.
+- Probed mini-DIN-6 PS/2 connector pinout: standard PS/2 (Pin 1=DATA, 2=NC, 3=GND, 4=VCC, 5=CLK, 6=NC).
+- Pin 4 (VCC) reading 0V instead of +5V - blown fuse on FusedVcc rail.
+- KCLK and KDATA at 3.2V (IOMD internal pull-ups powered from ~3.3V I/O voltage, working without VCC).
+
+**FS1 and FS2 fuses both blown:**
+- Found SMD fuses under microscope. Silkscreen ratings: FS1 = F2A (fast 2A), FS2 = F800mA.
+- FS1 is the shared fuse for keyboard AND mouse +5V (FusedVcc rail). Output has continuity to pin 4 of both PS/2 connectors. Top-left pin (viewed from underside of board) is pin 4.
+- FS2 protects VGA pin 9 (DDC +5V for monitor identification). RISC OS doesn't use DDC so FS2 blown has no functional impact - explains why VGA was working despite blown fuse.
+- Confirmed fuses are genuinely open: DMM in capacitance mode reads ~58nF across FS1 (the downstream FusedVcc decoupling network). A healthy fuse would read 0R and the cap measurement wouldn't engage.
+- FusedVcc rail downstream of FS1 measures 0L (very high resistance) to GND with keyboard plugged in - no short, keyboard is a healthy load. Brief beep on probe touch is just charging the decoupling capacitance through the DMM probes.
+- Why both blew: unknown historical event. Most likely the keyboard or mouse was once plugged in with damaged pins causing a momentary +5V short. FS2 (VGA pin 9) blown by some past monitor with a faulty DDC chip.
+- Repair plan: Replace FS1 with Littelfuse 0451 2A or Bourns MF-MSMF polyfuse (~1.5A hold). Replace FS2 with 800mA equivalent. Polyfuse is preferable - self-resetting.
+
+**Board revision (noting here for future reference - already knew this):**
+- My motherboard is silkscreened `1208000/S1 ISS 1 - 7949A07/1082`. The Risc PC TRM schematics I have are for the older "Medusa" drawing `0197,000/C` revision.
+- Component placement and reference designators differ. Circuit logic is identical so the schematic is still useful for understanding topology - just not for exact part references.
+
+**Diagnostic lesson - phantom continuity from test gear:**
+- When the logic analyser probes are attached, ALL probed signals share the analyser's common ground. This creates phantom continuity paths between every probed pin that have nothing to do with the actual PCB. Got tripped up by this while trying to find the keyboard VCC fault.
+- Habit: unplug ALL test equipment except the DMM when doing continuity/resistance tests.
+
+**Diagnostic lesson - VGA pinout mirroring:**
+- Standard VGA pinouts are referenced from the FRONT of the connector. Probing from the back/cable side mirrors everything left-right. Initially mis-identified RGB pins because of this, thought only blue was working when actually I was probing the wrong pins. Same trap as PCB pad layouts viewed from underside.
+
+**Next steps:**
+- Order F2A and F800mA SMD fuses (or polyfuse equivalents)
+- Replace FS1 - restores keyboard and mouse power. May or may not affect the boot hang; RISC OS waiting on a dead keyboard is one hypothesis but not confirmed.
+- Wire up backup battery to RTC daughterboard so CMOS persists across reboots
+- Investigate the cause of the boot reboot cycle (RISC OS failing for unknown reasons ~30s into boot)
+- Use !Configure to save proper monitor type to CMOS once we have a stable boot
