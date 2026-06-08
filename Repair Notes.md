@@ -581,3 +581,72 @@ RTC daughterboard installed. Massive progress, multiple faults found and resolve
 - Wire up backup battery to RTC daughterboard so CMOS persists across reboots
 - Investigate the cause of the boot reboot cycle (RISC OS failing for unknown reasons ~30s into boot)
 - Use !Configure to save proper monitor type to CMOS once we have a stable boot
+
+## Jun 8 2026
+
+Continued debugging. Removed both blown fuses with hot air, bridged FS1 with a wire link to restore keyboard/mouse +5V. This brought a new symptom: `Virq bad 5.FFFFF` POST failure (R_VIDFAILBIT).
+
+Decoded: VIDC test passes its first phase using Refclk (the 24MHz reference from X2 via IC4/R167), then switches VIDC to internal VCO mode (`VIDVCOFREQ` programmed to 24MHz), runs multiple iterations, times out on iteration 5 with no flyback signal detected.
+
+Mode-dependent failure pattern:
+- ID0 high (no monitor / VGA cable disconnected): Virq fails
+- ID0 low (monitor plugged in): Virq passes
+- POST programs VIDC identically in both cases via `TestVIDCTAB`, so the difference is hardware response
+
+Logic analyser captures of VIDC pin 1 (Flyback signal, routed through R167 330R to IOMD):
+- Failing case: VIDC emits exactly ONE flyback pulse early in test, then silence. Resumes pulsing after "Virq bad" text output (next POST stage reprograms VIDC).
+- Passing case: continuous 50Hz flyback pulses throughout the test.
+
+So VIDC's internal VCO is genuinely failing to sustain oscillation in the failing configuration. Tested several theories to isolate the mechanism:
+
+| Test | Result |
+|---|---|
+| Earth ground via cable shield (alligator clip) | Fails |
+| Cable plugged in but no monitor | Fails |
+| ID0 (VGA pin 11) grounded only | Fails (Mid0 register flipped to 0 as expected) |
+| 100k resistors from RGB to RGB-returns | Fails |
+| 45R resistors from RGB to chassis | Fails |
+| 4.7k from HSYNC/VSYNC to ground | Fails |
+| Powered-OFF monitor connected via VGA cable | **Passes** |
+
+Conclusion: only a real connected monitor (even unpowered) fixes it. The mechanism appears to be multi-factor - some combination of ID0 grounding, RGB termination, sync line loading, cable shield grounding, and perhaps capacitive loading that I couldn't replicate with individual passive components. Could also be VIDC chip degradation from hot air work pushing a marginal corner into a hard failure.
+
+Practical impact: zero in normal use. The machine boots fine with a monitor connected (which is the only realistic operating scenario). Virq bad is only visible when running POST diagnostic with no monitor attached. Documented as a known marginal behaviour, not worth chasing further - mechanism partially understood, workaround free and automatic.
+
+Note: VIDC's external VCO circuit (Q3, L10, IC32 etc near VIDC20) has LK10 "Not Fitted" which disconnects Vcostarpt from 0V, leaving the components powered but ungrounded. Acorn intentionally disabled the external VCO on this board revision - it's there for genlock provision but never activated. So the test failure is in VIDC's INTERNAL VCO, not the external circuit.
+
+Followup work for next session:
+- Remove the experimental loading resistors (45R on RGB, 4.7k on HSYNC/VSYNC) - they'd compromise real monitor signal levels if left in
+- Continue with the fuse replacement / battery / CMOS work from Jun 7 plan
+
+**Breakthrough: RISC OS is actually booting - the "boot hang" was a misdiagnosis.**
+
+After removing the experimental loading resistors, observed:
+
+1. SRAM-C checksum failure value varies each boot (e.g. SRAM-C27, SRAM-CFC etc) - expected behaviour with no backup battery on the PCF8583. Each power cycle gives random RAM contents, so the stored checksum vs computed sum mismatch is different every time. Once the backup battery is fitted, RISC OS writes a valid configuration and matching checksum, and this will stabilise.
+
+2. Tried Del-on-boot for full CMOS reset to ROM defaults - no observable difference. This rules out CMOS contents as the cause of the apparent "boot hang".
+
+3. **Caps Lock, Num Lock, and Scroll Lock all toggle correctly when pressed.** This is definitive proof that RISC OS has fully booted - the keyboard handler is processing keys, running through the OS scheduling/IRQ system, and sending LED-state commands back to the keyboard. Not just early init. Full interactive operation.
+
+So the "30s reboot cycle" with the turquoise screen we've been debugging was a **misdiagnosis** all along. RISC OS boots fine. The visible turquoise screen with no text is RISC OS running in a video mode that the monitor can't display (or with screen blanker engaged after 30s default timeout). The machine has been working the whole time - we just couldn't see it.
+
+This radically changes the next steps - no boot debugging needed, just video mode configuration.
+
+**Hypothesis: Vcd bus bodge wires are marginal under dynamic load**
+
+Pulled off the POST adapter to clean up signal capture. Observed strange behaviour: HSYNC starts at 30kHz, drops to 15.6kHz, then drops to ~8Hz (which is essentially "VIDC has stopped generating sync"). Confirmed Refclk (the 24MHz reference from X2 via IC4/R167) stays clean and stable on the scope, so X2 is fine.
+
+So VIDC's reference clock is good, but VIDC's output is becoming progressively wrong. The most likely explanation: **CPU is writing garbage values to VIDC registers**, causing it to be reprogrammed with bad data, leading to weird/unstable sync output.
+
+But the system data bus must be working correctly (Caps Lock works, RAM/ROM access works, all POST tests pass). So if VIDC is receiving garbage, the corruption must be happening on the Vcd bus specifically - the dedicated bus between the system data bus and VIDC's data input, which had extensive corrosion damage and bodge wire repairs earlier in this saga.
+
+Theory: The Vcd bus bodges are good enough for the static, simple VIDC programming POST uses, but fail under the dynamic, rapid-succession writes RISC OS uses when setting up real video modes. Could be crosstalk from adjacent data bus traces, marginal solder joints, or the bodge wires picking up coupling from the active system bus.
+
+The "triangle test" from Feb 26 verified individual bit transitions worked, but that's much gentler than continuous high-speed dynamic activity with realistic crosstalk patterns - the bus might pass walking-bit patterns and still fail under realistic load.
+
+Followup work for next session (updated):
+- Use logic analyser to capture Vcd bus during VIDC programming after POST handoff - see if data on the bus matches what CPU intended to write
+- Visual inspection of Vcd bus bodge wires under microscope - look for movement, parallel runs near data bus traces, or anything that could cause crosstalk
+- If marginal bodges are confirmed, consider rerouting/shortening or revisiting the daughterboard idea with proper ground plane
+- Once Vcd bus is reliable, video mode configuration will likely sort itself out and the machine should be usable
