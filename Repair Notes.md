@@ -650,3 +650,61 @@ Followup work for next session (updated):
 - Visual inspection of Vcd bus bodge wires under microscope - look for movement, parallel runs near data bus traces, or anything that could cause crosstalk
 - If marginal bodges are confirmed, consider rerouting/shortening or revisiting the daughterboard idea with proper ground plane
 - Once Vcd bus is reliable, video mode configuration will likely sort itself out and the machine should be usable
+
+---
+
+## Jun 13 — Vcd bus capture: bodges exonerated, real bus-wide bandwidth limit suspected
+
+Spent this session capturing the Vcd bus on the logic analyser to test the "marginal bodge" hypothesis from Jun 8. Method: probe a Vcd bit alongside its system-data-bus source bit (e.g. d0 vs vcd0) side by side, so the d-bus acts as the known-good reference for what a clean fast edge looks like.
+
+**Symptom observed:** on fast pulse bursts, vcd lags and *merges/drops* the fastest transitions ("first-edge-only" — the first edge gets through, rapid follow-on toggles smear into one level), while slow/settled content transfers fine. This matches the Jun 8 theory that static POST writes pass but rapid RISC OS writes fail.
+
+**Measurement artifacts systematically ruled out** (the symptom is real, not an instrument effect):
+
+| Suspected artifact | Test | Result |
+|---|---|---|
+| Undersampling / aliasing | Re-ran at 20 MHz then 100 MHz | **Identical** → not a sample-rate artifact |
+| Probe ground return | Moved individual probe ground to within 1 cm of the pin | **No change** → grounding is fine |
+| Flaky probe contact | Pattern is reproducible and *structured* (first-edge-only), not random dropout | Not a contact issue |
+| **Bodge-wire specific** | Compared vcd0 (bodged) vs **vcd1 (internally routed, NO bodges)** | **Both behave identically** → bodges exonerated; cause is common to the whole Vcd bus |
+
+**Key finding — genuine dropped bit on a clean line:** at one point d1 toggles twice but vcd1 captures only one pulse. That's a real missing transition (delay would shift the second pulse, not erase it), and it's on the *non-bodged* line. So the Vcd bus has a real bandwidth limit that is **not** caused by my soldering.
+
+**Reframe of the path:** the Vcd bus is *not* comparable to the raw system data bus. It sits behind a **74ACT244 buffer** (adds fixed prop delay ~5–8 ns), through a **series resistor pack** (deliberate edge damping — this RP is on my replacement board, fresh, but value not yet verified), feeding the **VIDC data inputs**. So *some* delay/slowing is normal and by design. The open question is whether it's bad enough to drop a bit **at the instant VIDC latches** — which is the only thing that matters functionally.
+
+**IMPORTANT correction re. the bus / "vcd doesn't mirror d":** this machine has **no VRAM** — a *supported* RISC PC config where video is sourced from DRAM. But this capture is **early boot, before the DRAM→video path is set up**, so there is **no video traffic on the Vcd bus at all** yet. Consequently the Vcd bus is **only driven during nPROG-low** (CPU register writes via the '244); the rest of the time it simply **tri-states / floats**. So vcd *not* mirroring d outside nPROG — and even appearing to *precede* d (a floating high-Z line coupling to neighbours) — is **expected float, not diagnostic**. The d-vs-vcd comparison is ONLY meaningful while nPROG is low. (Disregard the earlier "fit VRAM" idea and any "VRAM video traffic" framing — both wrong for this early-boot, VRAM-less condition.)
+
+**Working theory (plausible, untested):** the frequent tri-stating means transitions *out of* float start from an undefined voltage rather than a clean rail, so the first edge after a float can be marginal/slow. May matter only if a transition has to recover from float right at a latch edge; may also contribute to floating-input instability. Not yet shown to corrupt latched data.
+
+**The gating method to settle it — capture against nPROG (the VIDC write strobe):**
+- IOMD output `Nprog` = "Video controller write strobe" (IOMD Functional Spec).
+- VIDC20 input **`nPROG`, pin 140** — *"when this signal is low, data from DIN[32:0] is written to a register"* (VIDC20 datasheet). Data is committed around its rising edge.
+- VIDC register programming data rides the **lower half of the bus (DIN[15:0])**, so the damaged low byte (bits 0–7) carries the functionally-critical bits.
+- **bit 15 is the chosen control:** it's within the lower half (so actively exercised during writes) *and* in the undamaged 8–15 byte (notes: only bits 0–7 were disconnected by the leak). Likely a physically separate '244 / RP half from the low byte (board byte-split not yet confirmed — TRM circuit-diagram PDFs are vector graphics with no text layer, would need visual reading to trace).
+
+**Planned capture (next session):** channels = nPROG + d0/vcd0 + d1/vcd1 + vcd15. Sample clock stays on the 16 MHz memory clock (or async ~100 MHz for finer edge detail) — do **not** clock on nPROG (that throws away the intra-cycle dynamics). Use nPROG as **trigger (falling edge)** + a captured channel. VIDC programming is **batched** (control regs, then up to 256 auto-incrementing palette writes), so trigger on the first write and capture a deep buffer spanning the burst; the tightest-spaced writes have the least settling time and are the highest-yield place to catch a drop. Read the Vcd value at **every nPROG rising edge** across the batch.
+
+**Interpretation grid for the bit-15 control:**
+- vcd15 *also* drops/merges inside the nPROG window → whole Vcd bus is bandwidth-limited even on undamaged lines → suspect **RP value + total bus loading globally** (LCR-measure the RP — fresh ≠ correct value).
+- vcd15 clean while vcd0/vcd1 drop → the **damaged low-byte path** specifically (corrosion-zone vias / low-half RP / low-byte buffer) is the cause.
+
+**Bench access — nPROG pad LIFTED:** nPROG is only available at the fine-pitch QFP (no via/pad/series resistor on the net). Pin location is unambiguous: pins **136 and 144 are silk-screened**, and 140 is the dead-centre lead between them (symmetric midpoint, 4 pins in from either). On attempting to attach a probe wire, **the pad/lead lifted off the board.** Electrically still intact (verified continuity), and I sealed it with solder mask over the pads to stop it getting worse. This lead is now fragile — do **not** apply mechanical stress to it. Re-probing nPROG needs a no-stress approach (see next-session notes).
+
+**Session result — clean POST baseline established.** Got all probes hooked up (nPROG via the IOMD-end via, d0/vcd0, d1/vcd1, vcd15). Dummy POST adapter fitted to hold the machine in POST (prevents entry to RISC OS proper) — deliberately capturing a *baseline*. **Gated on nPROG, d and vcd are consistent — VIDC register programming looks correct.** This matches POST mostly passing (apart from the known "Virq bad") and borders displaying. Caveat: POST is the *easy* case (slow, static writes) — a clean result here is expected whether the bus is healthy OR marginal, so it's the reference point, not the verdict.
+
+Also this session: machine was briefly **movement-sensitive** (picking up / moving the board stopped a loop) — classic intermittent connection (lifted pad / bodge / probe tension). It settled and ran stable for the baseline capture, but flag it: do a flex/prod test and a probe-free stability check next time to localise.
+
+**Followup work for next session (supersedes Jun 8 list — bodges are no longer prime suspect; POST-baseline transport looks clean):**
+- **The diagnostic capture:** POST adapter **out**, let RISC OS run, trigger nPROG during the **video-mode-setup write burst**, and check whether gated d-vs-vcd stays consistent or starts dropping bits under RISC OS's dense, rapid-succession writes. This is the operating point that distinguishes "healthy bus" from "marginal under dynamic load" — the POST baseline can't.
+  - Gated data still clean under RISC OS writes → bus genuinely cleared; look elsewhere (VIDC programming sequence / clocks / chip).
+  - Gated data drops bits only under the fast bursts → the marginal-bus fault, caught at the latch instant.
+- Resolve the movement-sensitive intermittent (flex/prod test; probe-free stability check) — it could be confounding everything.
+- LCR-measure the RP element values (independent of the above)
+- nPROG probe is now established at the IOMD-end via (see below) — reuse it.
+
+(Reference) Initial nPROG access notes:
+- Probe nPROG at the **IOMD `Nprog` end (IOMD pin 117)** and leave the fragile VIDC pin 140 alone. **Net confirmed intact: VIDC20 pin 140 ↔ IOMD pin 117 reads continuity**, so the lifted pad is cosmetic only. **There is an accessible via on the Nprog net near IOMD 117 — tack the probe wire to the via** (robust plated-through, no pad-lift risk), not the pin. Verify the via→pin-117 continuity before committing, and strain-relieve the wire to a board anchor.
+- LCR-measure the RP element values (verify they're the intended ~tens of ohms, not drifted/wrong value) — this can be done independently of nPROG
+- Run the nPROG-gated batch capture; check Vcd at each nPROG rising edge; use bit 15 to decide whole-bus vs low-byte-specific
+- If data *is* corrupted at the latch instant, compare the latched sequence against the intended VIDC mode-setup sequence (code is in `external/Kernel/`) to pin which register got the wrong value
+- If the Vcd value is actually *correct* at every nPROG edge (slower edges but right data committed), then the bus is healthy and the video corruption is elsewhere — look at the VIDC programming sequence / VIDC clock inputs / VIDC chip health instead
