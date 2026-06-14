@@ -615,6 +615,13 @@ Practical impact: zero in normal use. The machine boots fine with a monitor conn
 
 Note: VIDC's external VCO circuit (Q3, L10, IC32 etc near VIDC20) has LK10 "Not Fitted" which disconnects Vcostarpt from 0V, leaving the components powered but ungrounded. Acorn intentionally disabled the external VCO on this board revision - it's there for genlock provision but never activated. So the test failure is in VIDC's INTERNAL VCO, not the external circuit.
 
+**Correction (Jun 14):** The above note is wrong on two counts and the "internal VCO" wording earlier in this entry should be read with the correction below.
+
+1. **VIDC20 has no internal VCO.** Datasheet (Clock Sources section) describes the VCO as fully *external*: VIDC outputs PCOMP (phase-detector), expects an external loop filter + external VCO (the recommended implementation is literally a 74AC04 inverter with PCOMP modulating its supply — which is exactly what IC32/Q3/L10/C140 do on this board). VCO output returns on VCLKIN. The only chip-direct clock options are RCLK (24 MHz) and HCLK — and **R187 is also NF**, so HCLK isn't used either. So the *only* path to a synthesised pixel clock on this board is via the external VCO.
+2. **LK10 NF does NOT disable the external VCO.** Sheet 5 of the TRM shows VIDC has four ground domains (`Vss_dn`, `Vss_an`, `Vss_Snd`, `Vcostarpt`) with multiple optional inter-domain bonding links — visible: **LK5 NF** (Vss_an ↔ Vss_dn), **LK8**, **LK10 NF** (Vcostarpt ↔ 0V), plus NF resistor pads (R170, R166). These are PCB-layout-tuning provisions left as not-fitted in production because the ground plane gives sufficient bonding without explicit jumpers. The VCO inverter (IC32) is grounded via the ground plane regardless of LK10 — which is consistent with the machine actually booting to fully-interactive RISC OS, since modes >24 MHz pixel clock *require* the external VCO to be running.
+
+What the "Virq bad" failure actually tells us is therefore most likely a marginal **PLL-loop / RGB-loading interaction** in the no-monitor case (cable shield + RGB termination + sync loading all subtly affect the VCO loop), not a missing/disabled VCO. The passing-monitor case proves the VCO loop works correctly when properly terminated.
+
 Followup work for next session:
 - Remove the experimental loading resistors (45R on RGB, 4.7k on HSYNC/VSYNC) - they'd compromise real monitor signal levels if left in
 - Continue with the fuse replacement / battery / CMOS work from Jun 7 plan
@@ -708,3 +715,89 @@ Also this session: machine was briefly **movement-sensitive** (picking up / movi
 - Run the nPROG-gated batch capture; check Vcd at each nPROG rising edge; use bit 15 to decide whole-bus vs low-byte-specific
 - If data *is* corrupted at the latch instant, compare the latched sequence against the intended VIDC mode-setup sequence (code is in `external/Kernel/`) to pin which register got the wrong value
 - If the Vcd value is actually *correct* at every nPROG edge (slower edges but right data committed), then the bus is healthy and the video corruption is elsewhere — look at the VIDC programming sequence / VIDC clock inputs / VIDC chip health instead
+
+---
+
+## Jun 14 2026 — VIDC architecture re-read, four-stage mode-set model, POST-baseline bus exonerated
+
+Re-read VIDC20 datasheet and TRM Sheet 5 schematic carefully after questioning the Jun 8 "internal VCO" claim. Big-picture shift: the bus marginality theory is no longer prime suspect, and the failing symptom (8 Hz sync at RISC OS handoff) is most plausibly a programming-side problem, not hardware. Full details below.
+
+**1. VIDC20 has no internal VCO — corrected.**
+
+Datasheet Clock Sources section explicitly: VIDC outputs PCOMP (phase detector), expects an *external* loop filter + external VCO (recommended implementation is literally a 74AC04 inverter with PCOMP modulating its supply — which is exactly what IC32/Q3/L10/C140 do on this board). VCO output returns on VCLKIN. Chip-direct clock options are RCLK (24 MHz) and HCLK only. **R187 is NF**, so HCLK isn't fitted either → on this revision the *only* path to synthesised pixel clocks is the external VCO. The Jun 8 entry's "internal VCO" framing is corrected inline (see correction stamp in that entry).
+
+**2. LK10 NF does not disable the external VCO — corrected.**
+
+TRM Sheet 5 visually inspected: VIDC has four ground domains (`Vss_dn`, `Vss_an`, `Vss_Snd`, `Vcostarpt`) with multiple optional inter-domain bonding links — **LK5 NF** (Vss_an ↔ Vss_dn), **LK8**, **LK10 NF** (Vcostarpt ↔ 0V), plus NF resistor pads (R170, R166). These are PCB-layout-tuning provisions left as not-fitted in production because the ground plane gives sufficient bonding without explicit jumpers. The VCO inverter is grounded via the ground plane regardless of LK10. Consistent with the machine reaching fully-interactive RISC OS — modes >24 MHz pixel clock *require* the external VCO to be running.
+
+**3. POST does four VIDC reprogrammings, not three. The Jun 8 "30 kHz → 15.6 kHz → 8 Hz" capture missed the third stage.**
+
+`external/Kernel/TestSrc/Begin` line ~1240 (label `20`, after the Sirq test): full VIDC reload via `TestVIDCTAB` (or `TestVVIDCTAB` for TV) before writing `C_ARMOK` as the initial border colour. So the actual sequence is:
+
+| Stage | Programmed | Expected HSYNC |
+|---|---|---|
+| 1 | POST initial mode-set (VGA if ID0 low) | ~30 kHz |
+| 2 | TV mode for flyback test (`TestVVIDCTAB`) | ~15.6 kHz |
+| 3 | POST restore to VGA before pass/fail border | ~30 kHz |
+| 4 | RISC OS hand-off mode-set | observed sync collapse |
+
+**Diagnostic value of stage 3 being a thing:** if a future capture shows a brief return to 30 kHz between the 15.6 kHz dwell and the failure state, that single transition proves the VCO can re-lock to the VGA target after being yanked to TV mode and back — i.e. the VCO loop is *healthy*. It also proves the bus can carry two more table-write bursts cleanly. If we don't see the 30 kHz return, stage 3 itself is broken, and the suspect list re-opens.
+
+**4. Pin 14 was VGA-side, not VIDC-side — the "8 Hz HSYNC" Jun 8 reading may actually be VSYNC.**
+
+VIDC20 pin 14 is `DIN[13]` (system data bus), not sync. Almost certainly the probe was on **VGA connector pin 14 (VSYNC)** rather than VIDC pin 14. VGA pin 13 = HSYNC, pin 14 = VSYNC; easy to swap probing from the back of the connector (same mirroring trap as the Jun 7 VGA pinout issue). Composite-sync configurations also make HSYNC and VSYNC pins look similar at the probe (HSYNC pin carries NOR-composite, VSYNC pin carries XOR-composite, with similar edge shapes).
+
+If the failing signal is actually **VSYNC at 8 Hz with HSYNC still in the normal kHz range**, the interpretation changes completely:
+- 8 Hz HSYNC = master clock essentially stopped (pathological, points at VCO or clock-source selection).
+- 8 Hz VSYNC with healthy HSYNC = VIDC's VCR register programmed with a very large value (~3750 lines at 30 kHz HSYNC). Master clock and counters are working — VIDC has been told to draw extremely tall frames. Maps to "RISC OS programmed an unsupported or junk mode" rather than to hardware failure.
+
+**Next session priority: simultaneous HSYNC + VSYNC capture at the VGA connector through all four stages** — that single capture picks between two completely different investigation branches.
+
+**5. POST-stage bus baseline (extended).** Reran the nPROG-gated capture with two protocol decoders (one on d-bus, one on Vcd-bus) stacked, so d/vcd values for each register write line up visually. Also ran with the synchronous clock-trigger off and async sample rate raised to 100 MHz to expose intra-cycle dynamics.
+
+Results:
+- At every nPROG rising edge in the POST bursts, **d-bus and Vcd-bus values agree** — the bus delivers what the CPU wrote, on every committed write.
+- Between bursts, both buses look "messy" — undefined potential during tri-state. Expected per the Jun 13 tri-state theory; this is just the floor of CMOS bus behaviour exposed at 100 MHz, not pathology.
+- Concern: "doesn't 100 MHz async sampling obscure real glitches?" — functionally moot. The only glitches that matter for VIDC programming are ones inside the nPROG-low window (the latch is open). Those would manifest as d≠vcd at the decoder sampling point. They don't.
+
+→ **Vcd bus is exonerated for POST-rate writes.** The Jun 13 "marginal under dynamic load" hypothesis still has to be tested against stage 4 (RISC OS writes are higher density than POST), but it's no longer prime suspect.
+
+**6. Sharper plan for stage 4 capture.**
+
+Goal: catch what's actually written during the RISC OS hand-off VIDC reprogramming and observe VCO behaviour at the same time. Using the LA + scope as a poor-man's MSO: LA does the digital-domain discrimination, fires DSLogic trigger-out (the "O" pin) → scope captures analog VCO traces at the right moment.
+
+Trigger plan — **nPROG burst counting** via DSLogic multi-stage trigger:
+- Detect burst boundaries by nPROG idle gaps (`nPROG high for ≥50 ms` → burst-end, next falling edge → burst-start).
+- Set repeat-counter to N to land on the Nth burst. N=2 catches the flyback test (stage 2), N=4 catches the RISC OS handoff (stage 4).
+- Fallback if "pattern stable for time X" isn't supported: count cumulative nPROG falling edges (table sizes derivable from `TestVIDCTAB`/`TestVVIDCTAB` and the RISC OS mode table).
+
+Channel re-allocation — swapping `vcd15`/`d15` for `HSYNC`/`VSYNC` at the VGA connector. Rationale: with the bus exonerated for POST, the "whole-bus vs low-byte" discriminator (vcd15) was always going to be uninformative; HSYNC+VSYNC at VGA gives the much more important sync-rate timeline through all four stages.
+
+Final LA channels (8):
+- nPROG (trigger source)
+- d0, vcd0 (low-byte pair 1)
+- d1, vcd1 (low-byte pair 2)
+- HSYNC (VGA pin 13)
+- VSYNC (VGA pin 14)
+- (one spare for TO loop-back or extra probe)
+
+Scope channels via DSLogic TO → EXT trigger:
+- VCLKIN (probe at IC32 output, easier than VIDC pin 26) — is the master clock alive?
+- Vcc_04 (at the L10 / C140 node) — is the PCOMP loop converging or hunting?
+- FLYBK (existing R167 probe) — what VIDC produced for the test.
+
+For each captured stage, three independent reads:
+1. Was the bus correct (LA: d vs vcd at each nPROG edge).
+2. Did the VCO respond correctly (scope: VCLKIN + Vcc_04 transient).
+3. Did the resulting sync output look right (LA: HSYNC/VSYNC periods).
+
+**Verify DSLogic Trigger-Out (TO / "O" pin) first:** never used before. Wiring is signal to scope EXT trigger centre, DSLogic GND to scope ground (shared reference essential); 3.3 V CMOS is well above any scope's EXT threshold so no level-shifting. Quick smoke test: trigger DSLogic on any trivial channel, scope in single-shot — force the channel and confirm scope captures. Once known-good, gate the real experiments on it.
+
+**Followup work for next session (supersedes Jun 13 list):**
+- Confirm DSLogic Trigger-Out works end-to-end (smoke test).
+- HSYNC + VSYNC at VGA connector through all four stages — resolves the 8 Hz on HSYNC vs VSYNC question. If 8 Hz is on VSYNC with HSYNC normal, the diagnosis collapses to "RISC OS programmed bad VCR value / unsupported mode" and the fix is fitting the backup battery + `*Configure`-ing a known-good monitor mode, not hardware.
+- Burst-counting trigger nailed down (LA), TO routed to scope.
+- Stage 2 capture: scope on VCLKIN + Vcc_04 + FLYBK during the flyback test. Distinguishes "VCO loop unable to retarget" vs "POST programmed wrong values" vs "downstream symptom only".
+- Stage 4 capture: same scope config, LA decoders running, read out what RISC OS actually wrote and compare against a known-good RISC OS mode table.
+- Possible Stage 4 outcome that ends the chase: bus clean, register values look plausible, but VCLKIN is silent or hunting → either RISC OS picked a mode the VCO can't reach (default-CMOS / no-battery problem), or there's late-emerging VCO damage. The Vcc_04 transient shape distinguishes these.
+- Still on the list (low priority): LCR-measure RP element values, resolve the movement-sensitive intermittent if it reappears.
