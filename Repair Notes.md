@@ -801,3 +801,136 @@ For each captured stage, three independent reads:
 - Stage 4 capture: same scope config, LA decoders running, read out what RISC OS actually wrote and compare against a known-good RISC OS mode table.
 - Possible Stage 4 outcome that ends the chase: bus clean, register values look plausible, but VCLKIN is silent or hunting → either RISC OS picked a mode the VCO can't reach (default-CMOS / no-battery problem), or there's late-emerging VCO damage. The Vcc_04 transient shape distinguishes these.
 - Still on the list (low priority): LCR-measure RP element values, resolve the movement-sensitive intermittent if it reappears.
+
+---
+
+## Jun 14 2026 (session 2) — POST baseline byte-verified d≡vcd against source table; intermittent resolved
+
+Bench session executing the Jun 14 plan. Three outcomes, all positive.
+
+**1. Movement-sensitive intermittent — resolved.** The early-crash-on-touch behaviour (flagged Jun 13) was the board sitting on the microscope base. Moved the board off the base and the intermittent stopped. So it was tension/flex through the base, not a board-level fault (lifted pad / bodge). Watch it stays gone once probing resumes, but treat as fixed.
+
+**2. nPROG burst trigger working.** Advanced trigger set to **30 nPROG rising edges** → fires as the 30th rising edge completes the 29-write burst, leaving the whole table load in the pre-trigger buffer. 29 writes pins the burst as the **VIDC20 `TestVIDCTAB`** (28 table entries + the post-sentinel VDER re-enable; the `&FFFFFFFF` sentinels aren't written). Captured/decoded list saved to `firstprog.txt`.
+
+**3. POST baseline byte-verified clean — d≡vcd.** Decoded the captured low byte at every nPROG commit and compared **against the actual `external/Kernel/TestSrc/Vidc` source table** (not just internal consistency). After fixing a channel gotcha (below), all 28 commits match `TestVIDCTAB` exactly: `02 02 01 00 00 00 7F 00 00 00 F8 6A EA 74 34 CA F3 37 02 15 25 24 35 25 25 03 85 00` (#29 `C0` at the odd 1450 ns gap = post-sentinel boundary artifact, ignored). On the vcd bus, bits **0,2,3,5,6,7** were paired against the system bus and **match cleanly on every commit**. Bit 0 (corrosion-zone, the critical one) tracks perfectly.
+
+- Coverage note: this run couldn't pair **vcd1/vcd4** (those decoder channels were repurposed to carry system-bus d1/d4, and ran out of probes). Not chased: bits 1 and 4 have **intact traces** (outside the corrosion zone) so were never suspects, and vcd1 was already verified clean Jun 13. **Every corrosion-damaged low-byte bit is now confirmed d≡vcd through a full table burst.**
+- **Channel gotcha (logged so it doesn't bite again):** first capture read `10 10 01 …` instead of `02 02 01 …`. Cause was **d1 and d4 probes transposed** (both wires brown). The signature is a clean bit-1↔4 swap on every value — diagnostic, not a bus fault. Re-seated and re-captured clean.
+
+**Net:** the Jun 13/14 conclusion holds and is now byte-proven against source — **Vcd bus carries POST-rate writes perfectly; bus exonerated for the easy case.** The marginal-under-dynamic-load question still belongs to stage 4 only.
+
+**Followup work for next session (unchanged target — go straight to stage 4):**
+- **Stage-4 RISC OS handoff capture:** POST adapter **out** so RISC OS runs; trigger count **past ~86 edges** (stage1 VGA 28 + stage2 TV 29 + stage3 VGA 28 ≈ 85) or count to the **4th nPROG burst**. Read out what RISC OS writes — especially **VCR** — and compare against a known-good RISC OS mode table. This is the dense rapid-write burst the POST baseline can't stress.
+- If channels free up, add **HSYNC + VSYNC at the VGA connector** to settle the 8 Hz-on-HSYNC-vs-VSYNC question in the same capture (8 Hz VSYNC + healthy HSYNC ⟹ junk VCR / unsupported mode ⟹ battery + `*Configure` fix, not hardware).
+- Optional/low priority: a quick vcd1/vcd4 pairing run for airtight low-byte coverage; LCR-measure RP element values.
+
+---
+
+## Jun 14 2026 (session 3) — Stage-4 captured: bus fully exonerated, fault is garbage CMOS (leading), VCO not 100% excluded
+
+Big session. Got the full POST→RISC OS boot on the LA, byte-verified the bus end to end, and the symptom is now firmly post-handoff (mode/clock), not transport. Leading conclusion: **no-battery garbage CMOS** drives both the bad video and the variable boot.
+
+**1. Vcd bus — fully exonerated (upgraded from "easy case only").**
+- Re-captured POST init with the monitor connected: it switches to the VGA table (`TestVVIDCTAB`) as predicted (`10 54 80 80 00 00 80`, VCR low byte `0B` = `0x20B` = sane VGA) and decodes byte-perfect.
+- Captured the **RISC OS mode-set** itself — the unmistakable ~256-entry palette wall (~514 writes; POST maxes at ~31). The bus carried it cleanly; every apparent d≠vcd this session turned out to be a probe-wiring error, never the silicon. **d≡vcd holds across POST and RISC OS-rate writes.** The "marginal under dynamic load" hypothesis (Jun 8) is closed.
+
+**2. What RISC OS actually programs at handoff (low byte, structural).** Full boot trace (`risc os boot .txt`, t=201 ms→1.1 s):
+- POST ends in a *displayable* VGA mode (HCR low byte `10`/VCR `0B` = `0x310`/`0x20B`).
+- ~67 µs later **RISC OS takes over and immediately reprograms to the `F8`/`37` family** (HCR `0x5F8`, VCR `0x13x`) — the **~15 kHz line/frame counts, not VGA**. You can see the screen handed from the good mode to the bad one.
+- RISC OS then keeps running (periodic VIDC writes to end of trace) → genuinely alive, just in a mode the VGA monitor can't show.
+- Caveat: still **low-byte only** — exact HCR/VCR/FSYNREG (bits 0–12) not yet read, so "exactly 15.6 kHz/50 Hz" vs a junk value is unconfirmed. Either way it's a wrong mode, not a bus fault.
+
+**3. Probe-free reproduction of the classic symptom.** With all probes removed, the original behaviour returns: sync steps **60 → 15.6 → 8.8 (Hz), ~5 s per transition**. The ~5 s timescale = a timeout-driven *sequence* (mode cycling / retry, or progressive lock-loss), not a single mode-set. Non-uniform steps look more like different modes being tried than a clock smoothly collapsing.
+
+**4. Boot-to-boot variability = the garbage-CMOS tell.** Keyboard (Caps Lock) **works on some boots, dead on others**; SRAM-C checksum varies every boot; sync collapse differs run to run. A *hard* hardware fault would be consistent — this isn't. Strongly points to random CMOS each power-up (no battery) → different bad mode + different boot outcome each time. (Does **not** fully exclude a *marginal* VCO, which can also be intermittent.)
+
+**5. Intermittent crash — root-caused and fixed.** The movement-sensitive crashing (flagged Jun 13, "fixed" by moving off the microscope base Jun 14 s2) was a **scratch on the microscope base shorting against the board**. Covered with **Kapton tape** → board can sit on the base again, no crashing. Earlier "lifted pad / bodge tension" guesses were wrong.
+
+**6. Process note — the brown-wire trap.** ~3× this session an apparent d≠vcd was just transposed probes (multiple brown leads). Guardrail adopted: before trusting any capture, check write #1=`02`, #3=`01` in the lead-in; a clean bit-permutation signature = wiring, not silicon.
+
+**Conclusion / state:** transport definitively out. The post-handoff fault is **either garbage-CMOS mode-cycling (leading) or a marginal VCO**, and the battery+config test discriminates them.
+
+**Followup (the discriminating test, then done):**
+- **Fit the backup battery**, then `*Configure MonitorType` to the VGA value + `*Configure Mode` to a VGA mode; reboot.
+  - Stable 60 Hz, cycling stops, consistent boots → **confirmed garbage CMOS; investigation closed.**
+  - Still steps 60→15.6→8.8 with valid config → **VCO hardware**; reopen scope plan (VCLKIN at IC32 + Vcc_04 at loop filter to watch the PLL hunt).
+- Optional confirmation: one short capture of a RISC OS timing cluster (trace items 80–97 or 613–620) at **bits 0–12** to read exact HCR/VCR/FSYNREG and pin the actual scan rate.
+
+---
+
+## Jun 14 2026 (session 4) — Battery fitted; VCO loop scoped and exonerated; fault is CMOS monitor/mode config
+
+Fitted the backup battery and scoped the VCO loop directly to settle the config-vs-VCO question from session 3. **Every hardware path is now individually verified healthy — the fault is purely CMOS configuration (wrong monitor type/mode).**
+
+**Battery in → machine fully boots, keyboard alive.** Caps Lock toggles on press (full round-trip: key→IOMD→OS handler→LED command→keyboard), proving RISC OS reaches full interactive operation. With the battery persisting CMOS, behaviour is now stable/repeatable instead of varying boot-to-boot. Final operating state: sync collapsed (HSYNC ~4.6–5 kHz, VSYNC ~8.8 Hz), screen undisplayable on the VGA monitor — but the OS underneath is running fine.
+
+**VCO loop scoped — healthy and locking (a near-miss false alarm corrected mid-session):**
+- **VCO output = IC32 pin 6** (74AC04 output → VIDC VCLKIN). Reads **~26 MHz at POST**, then **rock-steady 14 MHz** at the RISC OS mode. Initially read as a "sag" (suspected leaky loop-filter cap C134) — **wrong.** The 26→14 MHz is RISC OS *reprogramming* to its mode's clock, and the steady lock proves the VCO is fine. (Tell: rock-steady output = locked to a commanded setpoint, not a failing oscillator.)
+- **PCOMP** (phase-comparator out): at a good probe point shows a clean **periodic sawtooth** = charge pump actively pumping. (An earlier "solid 5 V" reading was a bad probe point — discount it.)
+- **Vcc_04** (VCO control voltage / 74AC04 supply): **steady 1.17 V** at the 14 MHz lock (low supply = low freq, normal for this supply-modulated VCO). On boot it sits at **~2 V (≈26 MHz), drops suddenly at the mode change, then ramps back up and settles at 1.17 V** — a textbook **PLL acquisition transient** re-locking to the new commanded frequency. Directly correlated with the mode change = commanded, not drift.
+
+**Conclusion (hardware fully exonerated):** bus byte-clean (sessions 2–3), VCO output locks rock-steady, PCOMP pumps a clean sawtooth, Vcc_04 stable and re-acquires lock on mode changes, and the VCO **parks at ~2 V/26 MHz at POST** (so VGA's 25.175 MHz is well within reach). The whole chain is healthy and simply **commanded into a low-clock non-VGA mode by CMOS config.** Root cause = monitor-type/mode misconfiguration (no-battery garbage CMOS historically; now whatever the default/persisted CMOS holds).
+
+**Why the keypad-`3` MonitorType trick failed (kernel-source confirmed):** [s/NewReset:801-816](external/Kernel/s/NewReset#L801-L816) — RISC OS waits only **2 s** for the keyboard at reset (`KeyWait`, 10×0.2 s) before reading held config keys. This machine's keyboard handshakes *late* (LED flash coincides with the final mode at ~5 s in), past the window, so the held key is never seen. Keypad config is unusable here; use F12 + `*Configure` at the keyboard-alive stage instead. (Keypad-`3` = internal key 108 → MonitorType3, [NewReset:2017-2027](external/Kernel/s/NewReset#L2017-L2027).)
+
+**`*Configure` syntax (confirmed from PRM Vol 1, pp.1-729/1-731):** `*Configure MonitorType 3` = VGA; `*Configure Mode 27` = VGA 16-colour (Mode 28 = 256-colour). MonitorType `Auto` senses the lead.
+
+**Scope probe points (for next time):** VCO output = **IC32 pin 6**; PCOMP sawtooth = at the loop-filter node (find the live probe point, not the railed one); Vcc_04 = the 74AC04 supply rail. Reference = 24 MHz refclk (X2/IC4), rock-solid.
+
+**Remaining action (PENDING on-bench confirmation — do NOT mark resolved until verified):**
+- At the keyboard-alive stage: **F12 → `*Configure MonitorType 3` → `*Configure Mode 27` → Ctrl-Reset.** Battery now persists it.
+- **Verify on the scope (independent of the screen):** Vcc_04 should settle **high (~2–3 V)** instead of ramping to 1.17 V; VCO pin 6 should lock **~25 MHz**; HSYNC ~31 kHz. Monitor should then display.
+- If it stays at 1.17 V / 14 MHz → the `*Configure` didn't take (blind typo / not being read) — re-enter; still not a hardware fault.
+
+---
+
+## Jun 14 2026 (session 5) — I2C/PCF8583 communicates; CMOS persists — but root cause still NOT established
+
+**Status: NOT resolved, root cause NOT proven.** Earlier "it worked" was a misread — it only meant the I2C bus showed activity, not that the display came up or that a `*Configure` executed. The display is **still in the impossible mode (8 Hz / 4.9 kHz).** We also could **not confirm any `*Configure` actually ran** (the writes seen are routine boot writes, not demonstrably from typing — see below), and **F12 didn't get a command line.** The CMOS-config explanation is still just a hypothesis.
+
+**I2C/PCF8583 capture (`i2cboot.txt`) — CMOS access works.** Probed SDA/SCL, decoded I2C. PCF8583 at addr **0xA0/0xA1** (7-bit 0x50). RISC OS sets the RAM pointer (write `A0`, data = offset) then reads sequentially; 491 reads + 14 writes, **all ACKed**. Routine boot writes seen at offsets `0x13←0x51` (looks like the combined **VduCMOS** byte — MonitorType + sync bitfields, cf. [s/NewReset:908](external/Kernel/s/NewReset#L908)) and `0x3F←0xF0` (checksum), plus RTC-register writes at `0x01`/`0x05`. So the chip and bus are healthy and RISC OS reads *and* writes CMOS fine — clears the "can't access CMOS / dead RTC" branch.
+
+**No confirmed `*Configure` execution; display unchanged.** Typing blind produced no I2C activity *distinguishable from routine boot writes* — `0x13←0x51` + `0x3F←0xF0` appear on every boot (incl. Ctrl-Break reboots) with the same value, so they're boot housekeeping, not a demonstrable config write. F12 didn't yield a command line, and the post-reset boot destination is itself a CMOS setting (`*Configure Language`), so we can't even be sure where the machine lands. Net: we have **not** shown a `*Configure` ran, let alone fixed anything. (MonitorType is stored as bitfields, not a literal `0x03`, so it won't show as a raw `03` write.) Note the CMOS read at offset 0x40–0x5F differs substantially between `i2cboot.txt` and `config monitor.txt` — ambiguous (could be same-session evolution, or non-persistence across boots); not yet diagnostic.
+
+**Why every power-on shortcut had failed:** Del/R/keypad-3 are all read in the early-boot 2 s `KeyWait` window ([NewReset:801-816](external/Kernel/s/NewReset#L801-L816)); this machine's keyboard handshakes *late* (LED flash / Caps-Lock-alive coincide with the final mode, ~5 s in), so the held keys were never seen. The F12 route works because the keyboard is alive (if late) by then. **This keyboard-timing quirk is what masked a simple config fix for the whole saga.** (Worth a follow-up someday: why does the keyboard handshake so late? Not chased — cosmetic to the fix.)
+
+### Root cause — UNRESOLVED. Leading hypothesis only, NOT demonstrated.
+Working hypothesis: a non-VGA **MonitorType** in CMOS makes RISC OS command VIDC to a low pixel clock → collapsed sync → undisplayable. It's *consistent* with the evidence but **unproven**, and importantly **every attempt to fix it via `*Configure` has failed** (could be that we never successfully entered the command blind, or that config is the wrong explanation — we can't tell yet). Do **not** treat "config will fix it" as established; it hasn't.
+
+**Critical unobserved gap:** we have **never captured the actual VIDC reprogramming event (~10 s into boot)** that takes sync from its initial state down to 8 Hz / 4.9 kHz — the trace windows have been too short to span it. That reprogramming *is* the fault mechanism, and it's unseen. Until we catch it, we don't actually know what gets written to VIDC at that moment or why. Everything else (bus clean, VCO locking in the states we *did* catch, I2C working, CMOS persisting) is real but is around the edges of the actual failure, not the failure itself.
+
+### What was exonerated along the way (the long arc)
+- **Vcd bus** — byte-verified d≡vcd through POST *and* the RISC OS palette load (sessions 2–3). The months-long "marginal bus / bad bodges" suspicion was wrong.
+- **VCO / PLL loop** — healthy: VCO output locks rock-steady (26 MHz at POST, re-locks to commanded targets), PCOMP pumps a clean sawtooth, Vcc_04 shows a textbook acquisition transient (~2 V → drop → ramp to 1.17 V) on mode changes (session 4). The 26→14 MHz was *reprogramming*, not sag — caught a false "leaky cap" call before committing.
+- **PCF8583 / I2C** — reads and writes ACK (session 5).
+
+Every hardware path *we've tested in the states we captured* looks healthy — but note we've tested them at the settled states, not during the ~10 s reprogramming transition that actually causes the bad mode (see "Critical unobserved gap" below). So "it's not the bus/clock/CMOS-store" is well-supported for what we observed, but the failure mechanism itself remains uncaptured.
+
+### End-of-night state (Jun 14) — the blocker is *entering* the config blind, not the config itself
+
+Captured several I2C boot traces (`i2cboot.txt`, `config monitor.txt`, `i2ctst.txt`). Key findings tonight:
+
+- **CMOS persists — battery works.** `0x13←0x51` and `0x3F←0xF0` (checksum) are written **identically on every boot**, including across Ctrl-Break reboots in `i2ctst.txt`. Same value every time → the PCF8583 is retaining state. So persistence is **not** the problem (earlier worry retired).
+- **Those writes are ROUTINE boot activity, not `*Configure`.** They appear on every boot regardless of typing. So we have **no confirmed evidence any `*Configure` has actually executed** — the I2C activity that looked like "it responded to my typing" was the routine boot writes coinciding with keystrokes.
+- **Why the config never ran: the typing isn't reaching the `*` prompt.** `*Configure` is written to **VduCMOS** (confirmed: [s/Arthur3:2382](external/Kernel/s/Arthur3#L2382), `Config_MonitorType` → VduCMOS, masked `MonitorTypeBits`/shift `MonitorTypeShift`), so a real `*Configure MonitorType` would produce a distinct interactive write — we never see one. Likely cause: **Ctrl-Break is a full reset** (reboots to the desktop, *not* a command line), so after it you're typing into nowhere. You must press **F12 after each boot** to get the `*` prompt. Blind, there's no way to confirm you're there — which is the core difficulty.
+- Current stored monitor byte `0x51` decodes to a **non-VGA** type (exact decode pending `MonitorTypeBits`/`MonitorTypeShift` from the external `Hdr:CMOS`; `0x51 = 0101 0001`).
+
+So: hardware fixed/exonerated, CMOS persists, but we **can't reliably enter the one `*Configure` command blind.**
+
+**Interactive blind config is doubly blocked.** Tried **F12 — didn't work** (no command line). And the boot destination after a reset/Ctrl-Break is *itself* a CMOS setting (`*Configure Language` — the configured boot module/app), so with garbage/wrong CMOS the machine may not land somewhere F12 even gives a `*` prompt. So: can't see the screen, F12 doesn't get a prompt, and we can't be sure what app the machine boots into. Blind interactive `*Configure` is effectively unworkable in the current state.
+
+### Plan for next session — bypass blind entry (preferred), keyboard trace to diagnose
+
+A different monitor won't help here — the output is **8 Hz VSync / 4.9 kHz HSync**, below any monitor's sync range (multisync floors ~50 Hz / ~15 kHz). And the blind terminal (no display, F12 didn't work, boot-Language unknown) makes interactive `*Configure` unworkable.
+
+**TOP priority — catch the thing we've never seen:**
+1. **Capture the ~10 s VIDC reprogramming event** (the transition into 8 Hz / 4.9 kHz). Every prior capture had too small a window to span it. Use stream mode / a much deeper buffer / a trigger placed at the right time, on the VIDC bus (d/vcd) **gated on nPROG**, to read out *exactly what registers get written* at the moment sync collapses — and watch Vcc_04 / pin 6 simultaneously. **This is the actual fault mechanism and it is still unobserved.** Until we have it, the CMOS-config story is just a hypothesis.
+
+**To get config in without the screen (if the hypothesis holds):**
+2. **Write the PCF8583 directly with the Bus Pirate** (machine OFF). Set **VduCMOS** for MonitorType 3 (+ Mode byte) and **recompute the checksum** (`MakeChecksum`/`ValChecksum` in `s/NewReset`). Bypasses keyboard, display, F12, boot-Language. Need: exact VduCMOS/Mode offsets + type-3 value + checksum algorithm. **But this only matters if config is actually the cause — which #1 should confirm or refute first.**
+
+**Diagnostic support:**
+3. **Trace the keyboard data alongside I2C** — see what's actually typed and whether keystrokes reach the OS (does F12 even register?).
+4. Decode `0x51` once `MonitorTypeBits`/`MonitorTypeShift` are known (external `Hdr:CMOS`).
+
+**Bottom line (honest):** Solid results — the **Vcd bus is byte-clean** (well established), and in the states we captured the VCO locks, the I2C/PCF8583 works, and CMOS persists. But the **root cause is NOT established**: we have never captured the VIDC reprogramming that actually causes the bad mode, and **the CMOS-config hypothesis remains unconfirmed — every `*Configure` fix attempt has failed.** Next session must catch that ~10 s reprogramming event before drawing conclusions; the Bus-Pirate config write is a *candidate* fix to test, not a known one.
