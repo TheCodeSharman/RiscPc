@@ -1,0 +1,17 @@
+{
+  "files.associations": {
+    "**/external/Kernel/s/**": "aasm",
+    "**/external/Kernel/hdr/**": "aasm",
+    "**/external/Kernel/TestSrc/**": "aasm",
+    "**/external/Kernel/OldTestSrc/**": "aasm",
+    "**/external/Kernel/NewModes/**": "aasm",
+    "**/external/Kernel/Changes": "plaintext",
+    "**/external/Kernel/Version": "plaintext",
+    "**/external/HdrSrc/hdr/**": "aasm"
+  },
+  "[aasm]": {
+    "editor.tabSize": 8,
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "off"
+  }
+}

@@ -1,0 +1,253 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Acorn AASM",
+  "scopeName": "source.aasm",
+  "fileTypes": [],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#local-label-refs" },
+    { "include": "#macro-params" },
+    { "include": "#operators" },
+    { "include": "#directives" },
+    { "include": "#conditional" },
+    { "include": "#data-ops" },
+    { "include": "#mnemonics" },
+    { "include": "#registers" },
+    { "include": "#labels" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.aasm",
+          "match": ";.*$"
+        },
+        {
+          "name": "comment.line.shebang.aasm",
+          "match": "^#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.aasm",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.aasm",
+              "match": "\\|\\|"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.aasm",
+          "match": "&[0-9A-Fa-f]+\\b"
+        },
+        {
+          "name": "constant.numeric.based.aasm",
+          "match": "\\b\\d+_[0-9A-Fa-f]+\\b"
+        },
+        {
+          "name": "constant.numeric.char.aasm",
+          "match": "'[^']'"
+        },
+        {
+          "name": "constant.numeric.decimal.aasm",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "local-label-refs": {
+      "patterns": [
+        {
+          "name": "variable.other.label.reference.aasm",
+          "match": "%(FT|BT|F|B|T)?\\d+\\b"
+        }
+      ]
+    },
+    "macro-params": {
+      "patterns": [
+        {
+          "name": "variable.parameter.macro.aasm",
+          "match": "\\$[A-Za-z_?][A-Za-z0-9_?]*"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.colon.aasm",
+          "match": ":(AND|OR|NOT|EOR|LAND|LOR|LEOR|LNOT|SHL|SHR|MOD|LEFT|RIGHT|LEN|STR|CHR|UPPERCASE|LOWERCASE|DEF|BASE|INDEX|REQUIRE|FATTRIBUTE|FEXEC|FLOAD|FSIZE|FATTR):"
+        },
+        {
+          "name": "keyword.operator.arith.aasm",
+          "match": "[+\\-*/<>!]"
+        },
+        {
+          "name": "keyword.operator.comma.aasm",
+          "match": ","
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.directive.title.aasm",
+          "match": "(?<=^|\\s)(?i:TTL|SUBT|OPT|END|LTORG)\\b"
+        },
+        {
+          "name": "keyword.directive.include.aasm",
+          "match": "(?<=^|\\s)(?i:GET|INCLUDE|INCBIN)\\b"
+        },
+        {
+          "name": "keyword.directive.macro.aasm",
+          "match": "(?<=^|\\s)(?i:MACRO|MEND|MEXIT)\\b"
+        },
+        {
+          "name": "keyword.directive.scope.aasm",
+          "match": "(?<=^|\\s)(?i:ROUT|ENTRY|EXIT|FNSTART|FNEND|FRAME)\\b"
+        },
+        {
+          "name": "keyword.directive.area.aasm",
+          "match": "(?<=^|\\s)(?i:AREA|CODE|DATA|READONLY|READWRITE|NOINIT|EXPORT|IMPORT|EXTERN|KEEP|GLOBAL|COMMON)\\b"
+        },
+        {
+          "name": "keyword.directive.var.aasm",
+          "match": "(?<=^|\\s)(?i:GBLA|GBLL|GBLS|LCLA|LCLL|LCLS|SETA|SETL|SETS|EQU|RN|CN|CP|FN|FIELD)\\b"
+        },
+        {
+          "name": "keyword.directive.layout.aasm",
+          "match": "(?<=^|\\s)(?i:ALIGN|SPACE|ASSERT|INFO|WARN|NOFP|REQUIRE|REQUIRE8|PRESERVE8)\\b"
+        },
+        {
+          "name": "keyword.directive.control.aasm",
+          "match": "(?<=^|\\s)(?i:WHILE|WEND|IF|ELSE|ENDIF|ELIF)\\b"
+        }
+      ]
+    },
+    "conditional": {
+      "patterns": [
+        {
+          "name": "keyword.control.conditional.aasm",
+          "match": "(?<=\\s)(\\[|\\||\\])(?=\\s|$)"
+        }
+      ]
+    },
+    "data-ops": {
+      "patterns": [
+        {
+          "name": "keyword.directive.data.aasm",
+          "match": "(?<=^|\\s)(?i:DCB|DCW|DCD|DCQ|DCFS|DCFD|DCI|DCWU|DCDU)\\b"
+        },
+        {
+          "name": "keyword.operator.equ-shorthand.aasm",
+          "match": "(?<=\\s)\\*(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.dataword.aasm",
+          "match": "(?<=^|\\s)&(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.datastring.aasm",
+          "match": "(?<=^|\\s)=(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.spacecounter.aasm",
+          "match": "(?<=^|\\s)#(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.layout-mark.aasm",
+          "match": "(?<=^|\\s)\\^(?=\\s)"
+        }
+      ]
+    },
+    "mnemonics": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.dataproc.aasm",
+          "match": "(?<=\\s)(?i:MOV|MVN|ADD|ADC|SUB|SBC|RSB|RSC|AND|EOR|ORR|BIC|TST|TEQ|TEQP|CMP|CMN)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?S?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.branch.aasm",
+          "match": "(?<=\\s)(?i:B|BL|BX|BLX)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.memory.aasm",
+          "match": "(?<=\\s)(?i:LDR|STR)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?(B|H|SB|SH|D|T|BT)?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.multi.aasm",
+          "match": "(?<=\\s)(?i:LDM|STM)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?(FA|FD|EA|ED|IA|IB|DA|DB)?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.multiply.aasm",
+          "match": "(?<=\\s)(?i:MUL|MLA|UMULL|UMLAL|SMULL|SMLAL|UMUL|SMUL)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?S?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.swap.aasm",
+          "match": "(?<=\\s)(?i:SWP)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?B?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.swi.aasm",
+          "match": "(?<=\\s)(?i:SWI|SVC|X?SWI)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.coproc.aasm",
+          "match": "(?<=\\s)(?i:MRS|MSR|MCR|MRC|CDP|LDC|STC|MCRR|MRRC)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?L?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.adr.aasm",
+          "match": "(?<=\\s)(?i:ADR|ADRL)(EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.misc.aasm",
+          "match": "(?<=\\s)(?i:NOP|CLZ|BKPT|PLD|YIELD|WFE|WFI|SEV)(?=\\s|$)"
+        },
+        {
+          "name": "keyword.mnemonic.shift-op.aasm",
+          "match": "(?<=,\\s*)(?i:LSL|LSR|ASR|ROR|RRX|ASL)\\b"
+        },
+        {
+          "name": "keyword.mnemonic.macro.acorn.aasm",
+          "match": "(?<=\\s)(?i:Push|Pull|MOV_fiq|VDWS|FAULT|EXIT|ENTRY|addr|ADDR|XError|MakeErrorBlock|MakeInternatErrorBlock|Debug)\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "name": "variable.language.register.numbered.aasm",
+          "match": "\\b(?i:[rR]1[0-5]|[rR][0-9])\\b"
+        },
+        {
+          "name": "variable.language.register.special.aasm",
+          "match": "\\b(?i:pc|lr|sp|fp|ip|wr|cpsr|spsr)\\b"
+        },
+        {
+          "name": "variable.language.register.fpa.aasm",
+          "match": "\\b(?i:f[0-7])\\b"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "name": "entity.name.label.local.aasm",
+          "match": "^\\d+\\b"
+        },
+        {
+          "name": "entity.name.function.aasm",
+          "match": "^[A-Za-z_$?][A-Za-z0-9_$?]*"
+        }
+      ]
+    }
+  }
+}

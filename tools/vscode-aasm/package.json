@@ -1,0 +1,34 @@
+{
+  "name": "aasm-riscos",
+  "displayName": "Acorn AASM (RISC OS)",
+  "description": "Syntax highlighting for Acorn AASM assembly source (RISC OS Kernel, HdrSrc, etc.)",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "aasm",
+        "aliases": [
+          "Acorn AASM",
+          "aasm",
+          "ARM Assembler (Acorn)"
+        ],
+        "extensions": [],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "aasm",
+        "scopeName": "source.aasm",
+        "path": "./syntaxes/aasm.tmLanguage.json"
+      }
+    ]
+  }
+}
