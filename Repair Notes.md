@@ -942,3 +942,12 @@ Observation: a brief **15 kHz composite-sync** mode is seen during boot. RISC OS
 Caveats (don't over-read): the 15 kHz comp-sync mode might be **POST's `TestVIDCTAB`** (it *is* a ~15.6 kHz composite-sync mode), not the RISC OS text screen — distinguish by *when* it appears (~1 s = POST; several seconds = RISC OS text mode). Still a hypothesis until the reprogramming is actually captured.
 
 How to use it: it gives the ~10 s capture a concrete target — the text→desktop transition. Catch it by (a) stream-mode capture spanning the whole boot, nPROG-gated; (b) an LA channel on **HSYNC**, trigger on the 15 kHz→bad-rate edge, read the VIDC writes just before it; or (c) trigger on the **desktop's** palette-reload burst (a *second* palette wall after the one already captured). Bonus: if that 15 kHz mode is genuinely composite-sync, a **TV/SCART/composite-capable display might show the RISC OS text screen** directly — could reveal boot messages / OS state.
+
+**Refinement (web-verified facts + reasoning):**
+- **Banner is real:** RISC OS prints a text banner (`RISC OS <mem>`, version) in a **text mode** before the desktop — confirmed, not misremembered.
+- **`!Boot` is disc-based and probably does NOT run here.** `!Boot` is an application in the *hard-disc root* (its `BootRun` sets up the desktop/`!System`/`!Fonts`). On a ROM-only / no-disc machine it won't execute; the desktop/WIMP is in **ROM** and is started by the configured **Language** instead. So the earlier "`!Boot` runs then desktop" was wrong for this setup.
+- **The ~10 s delay is more likely a boot/disc *search* timeout** (`*Configure Boot`/`FileSystem`/`Drive` looking for an absent/slow drive), after which the ROM Language/desktop starts and sets the (bad) mode — *not* `!Boot` running. (Unconfirmed — and those boot settings are CMOS, which is suspect.)
+- **Keyboard-alive coincides with the final mode-set** (observed) and corroborates the above: the OS appears blocked through the boot/disc-search and only reaches "go interactive" once — at which it *both* enables the keyboard *and* sets the desktop/Language mode. One cause, two effects.
+- **Therefore: use "keyboard comes alive" as the trigger marker for the mode-set.** The planned keyboard trace does double duty — trigger the VIDC capture on the first keyboard activity and the bad mode-set should fall in the same window, sidestepping the trace-window-size problem.
+
+Sources: PRM Vol 5a Ch.128 (boot applications); riscos.org boot structure; Acorn AN 251 (RiscPC HD/network config).
