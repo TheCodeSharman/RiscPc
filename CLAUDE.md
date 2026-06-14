@@ -10,7 +10,9 @@ This repository documents the repair and diagnostics of a vintage Acorn RISC PC 
 - **Logic analyzer captures** (DSLogic `.dsl` format) of various boot scenarios
 - **KiCAD PCB design** for a repair board (`RiscPcPcbRepair/`)
 - **RISC OS ROM source** as a git submodule (`external/Kernel/` — RISC OS 3.6.0)
+- **RISC OS shared headers** as a git submodule (`external/HdrSrc/` — master; the RO_3_60 tag is missing `hdr/CMOS` and other registry headers, added publicly in 2008)
 - **Technical documentation** in `docs/` (CPU datasheets, RISC OS programmer manuals)
+- **VS Code aasm syntax extension** (`tools/vscode-aasm/`) for browsing the RISC OS assembly sources
 
 The POST protocol is documented in `ACORN_POST.md`. Repair history is in `Repair Notes.md`.
 
@@ -45,10 +47,22 @@ python3 ROMS/find_alias.py          # Search for byte sequences in ROM files
 
 ROM images: `ROMS/RO_3_7_1.BIN`, `ROMS/RO_3_7_2.BIN` (1MB each, individual chips); `ROMS/merged.bin` (2MB, combined).
 
-## External Submodule
+## External Submodules
 
-`external/Kernel/` contains the RISC OS 3.6.0 source (ARM assembly, from gitlab.riscosopen.org). Initialize with:
+Two submodules pulled from gitlab.riscosopen.org:
+
+- `external/Kernel/` — RISC OS 3.6.0 kernel source (tag `RO_3_60`). The `TestSrc/` subdirectory contains the POST test code relevant to decoding POST sequences.
+- `external/HdrSrc/` — Shared `Hdr:*` headers (`master` branch). The Kernel references `Hdr:CMOS`, `Hdr:Services`, `Hdr:FSNumbers`, etc. via the `Hdr:` search path; these registry headers weren't in the public HdrSrc release at the `RO_3_60` tag (added 2008 in commit `403c6dd`), so we track `master` instead — the CMOS allocation layout has been stable for decades.
+
+Initialize both with:
 ```bash
 git submodule update --init
 ```
-The `TestSrc/` subdirectory within the kernel contains the POST test code relevant to decoding POST sequences.
+
+## VS Code aasm syntax highlighting
+
+`tools/vscode-aasm/` is a local VS Code extension providing a TextMate grammar for Acorn's AASM dialect. Install via:
+```bash
+./tools/vscode-aasm/install.sh
+```
+Then reload VS Code. See `tools/vscode-aasm/README.md` for details.

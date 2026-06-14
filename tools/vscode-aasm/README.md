@@ -17,8 +17,18 @@ Syntax highlighting for Acorn's AASM assembly dialect as used in the RISC OS Ker
 
 ## Install
 
+From the repo root:
+
 ```sh
-ln -s "$(pwd)/tools/vscode-aasm" ~/.vscode/extensions/local.aasm-riscos-0.1.0
+./tools/vscode-aasm/install.sh
+```
+
+The script creates a symlink at `~/.vscode/extensions/local.aasm-riscos-0.1.0` pointing back at this folder, so edits to the grammar are picked up on the next VS Code reload (no rebuild step). Idempotent — safe to re-run.
+
+For non-standard installs (Code-OSS, Flatpak, code-server, ...) pass the extensions directory explicitly:
+
+```sh
+./tools/vscode-aasm/install.sh --target ~/.var/app/com.visualstudio.code/data/vscode/extensions
 ```
 
 Then reload VS Code (Ctrl-Shift-P → "Developer: Reload Window"). The workspace's `.vscode/settings.json` maps the RISC OS source directories to this language, so files in `external/Kernel/s/`, `external/Kernel/hdr/`, `external/Kernel/TestSrc/`, `external/Kernel/NewModes/`, and `external/HdrSrc/hdr/` will pick it up automatically.
@@ -26,7 +36,7 @@ Then reload VS Code (Ctrl-Shift-P → "Developer: Reload Window"). The workspace
 ## Uninstall
 
 ```sh
-rm ~/.vscode/extensions/local.aasm-riscos-0.1.0
+./tools/vscode-aasm/install.sh --uninstall
 ```
 
 ## Scope
