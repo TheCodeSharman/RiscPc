@@ -934,3 +934,11 @@ A different monitor won't help here — the output is **8 Hz VSync / 4.9 kHz HSy
 4. Decode `0x51` once `MonitorTypeBits`/`MonitorTypeShift` are known (external `Hdr:CMOS`).
 
 **Bottom line (honest):** Solid results — the **Vcd bus is byte-clean** (well established), and in the states we captured the VCO locks, the I2C/PCF8583 works, and CMOS persists. But the **root cause is NOT established**: we have never captured the VIDC reprogramming that actually causes the bad mode, and **the CMOS-config hypothesis remains unconfirmed — every `*Configure` fix attempt has failed.** Next session must catch that ~10 s reprogramming event before drawing conclusions; the Bus-Pirate config write is a *candidate* fix to test, not a known one.
+
+### Lead to test next session — which transition sets the bad mode? (hypothesis, unconfirmed)
+
+Observation: a brief **15 kHz composite-sync** mode is seen during boot. RISC OS boot steps through several video states — POST modes → a **pre-desktop text/banner screen** (`*Configure Mode`) → the **desktop** (WimpMode, set when the Wimp loads). Hypothesis: the collapse to 8 Hz / 4.9 kHz happens at the **text→desktop transition** (desktop/WimpMode load), which would fit the ~10 s timing. If so, the suspect narrows to the **desktop mode-set / WimpMode**, not the early MonitorType path.
+
+Caveats (don't over-read): the 15 kHz comp-sync mode might be **POST's `TestVIDCTAB`** (it *is* a ~15.6 kHz composite-sync mode), not the RISC OS text screen — distinguish by *when* it appears (~1 s = POST; several seconds = RISC OS text mode). Still a hypothesis until the reprogramming is actually captured.
+
+How to use it: it gives the ~10 s capture a concrete target — the text→desktop transition. Catch it by (a) stream-mode capture spanning the whole boot, nPROG-gated; (b) an LA channel on **HSYNC**, trigger on the 15 kHz→bad-rate edge, read the VIDC writes just before it; or (c) trigger on the **desktop's** palette-reload burst (a *second* palette wall after the one already captured). Bonus: if that 15 kHz mode is genuinely composite-sync, a **TV/SCART/composite-capable display might show the RISC OS text screen** directly — could reveal boot messages / OS state.
