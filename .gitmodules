@@ -1,3 +1,7 @@
 [submodule "external/Kernel"]
 	path = external/Kernel
 	url = https://gitlab.riscosopen.org/RiscOS/Sources/Kernel.git
+[submodule "external/HdrSrc"]
+	path = external/HdrSrc
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/Programmer/HdrSrc.git
+	branch = master

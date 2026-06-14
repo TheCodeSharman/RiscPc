@@ -951,3 +951,116 @@ How to use it: it gives the ~10 s capture a concrete target — the text→deskt
 - **Therefore: use "keyboard comes alive" as the trigger marker for the mode-set.** The planned keyboard trace does double duty — trigger the VIDC capture on the first keyboard activity and the bad mode-set should fall in the same window, sidestepping the trace-window-size problem.
 
 Sources: PRM Vol 5a Ch.128 (boot applications); riscos.org boot structure; Acorn AN 251 (RiscPC HD/network config).
+
+---
+
+## Jun 15 2026 (session 6) — CMOS decoded end-to-end; LA capture plan for VIDC reprogramming
+
+Analytical session, no bench work. Decoded the existing `i2cboot.txt` against the actual CMOS layout (which turned out to live in a separate ROOL repo we'd missed), verified the chip is healthy/consistent, and built a concrete LA capture plan that should resolve the "intentional vs corrupted" question for the FreqSynth write that drops the VCO to 15 MHz. Plan is laid out here; execution next session.
+
+### Missing companion source — now added: `external/HdrSrc` submodule
+
+The Kernel submodule's [s/GetAll](external/Kernel/s/GetAll) does `GET Hdr:CMOS` (and many other `Hdr:*` includes); these resolve to a separate component on ROOL's GitLab, `RiscOS/Sources/Programmer/HdrSrc`. The `RO_3_60` tag of HdrSrc is **missing** `hdr/CMOS` (added later in 2008 commit `403c6dd`); without HdrSrc you can't resolve `VduCMOS`, `MonitorTypeBits`, `MonitorTypeShift`, `CountryCMOS`, `Misc1CMOS`, `CMOSxseed` — they're referenced in Kernel source but never defined locally.
+
+**Added as a second submodule this session**, tracking `master` (stable CMOS layout — values haven't changed since RO 3.x): see [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS).
+
+### CMOS logical↔physical addressing (the trap that wasted hours)
+
+RISC OS exposes CMOS via **logical** byte numbers; the PCF8583 is accessed at **physical** register addresses. The translation lives in [s/PMF/i2cutils:467](external/Kernel/s/PMF/i2cutils#L467) (`MangleCMOSAddress`): `physical = logical + &40`, with wrap from `&C0..&EF` back to `&10..&3F`. POST bypasses this and uses **physical** addresses directly (POST's `LDR r0,=(ts_BBRAM + &FC00)` at [TestSrc/Begin:847](external/Kernel/TestSrc/Begin#L847) reads physical `&FC` = the same byte the OS calls `Misc1CMOS` at logical `&BC`). Same byte, different addressing convention — they don't contradict.
+
+### CMOS verified: chip healthy, checksum valid, every value is "AUTO"
+
+Decoded `i2cboot.txt` against [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS):
+
+| Symbol | Logical | Phys | Value | Meaning |
+|---|---|---|---|---|
+| `VduCMOS` | `&85` | `&C5` | **`&FD`** | `MonitorType = (FD AND 7C) >> 2 = &1F = 31 = MonitorTypeAuto`; SyncBits = `&81` = `Sync_Auto`; bit 4 = "no longer used" comment |
+| `TimeZoneCMOS` | `&8B` | `&CB` | `&00` | UTC |
+| `ScreenSizeCMOS` | `&8F` | `&CF` | `&00` | no DRAM allocation; uses VRAM |
+| `LanguageCMOS` | `&B9` | `&F9` | `&0A` | language module 10 |
+| `CountryCMOS` | `&BA` | `&FA` | `&01` | UK |
+| `Misc1CMOS` | `&BC` | `&FC` | `&00` | memory-test-disable clear → full RAM test runs (and that bit also matches POST's direct read of `&FC`) |
+| `Mode2CMOS` / `SystemSpeedCMOS` | `&C3` | `&13` | **`&51`** | bit 4 (`WimpModeAutoBit`) = 1 → Wimp mode AUTO; bit 0 ANT ROMBoot enabled; bit 6 broadcast loading disabled |
+| `WimpModeCMOS` | `&C4` | `&14` | `&00` | mode 0 — but overridden by the AUTO bit above |
+| `DBTBCMOS` | `&10` | `&50` | `&90` | bit 4 = **`BootEnable=1`** → `!Boot` will run; bits 5-7 = serial baud (4 = 19200) |
+| `StartCMOS` | `&0B` | `&4B` | `&54` | boot drive 4, no caps, no directory load |
+| `FileLangCMOS` | `&05` | `&45` | `&08` | filing system 8 (ADFS) |
+| `PhysChecksum` | — | `&3F` | `&F0` | matches computed |
+
+**Checksum verified:** 192 bytes from `&40..&FF` + 47 bytes from `&10..&3E`, seed `CMOSxseed = &01`, sum mod 256 = `&F0` ≡ stored byte at `&3F`. CMOS is intact and the values above are legitimately what RISC OS sees.
+
+`VduCMOS=&FD` and `Mode2=&51` are the **post-CMOS-reset defaults** from [s/NewReset:1006-1034](external/Kernel/s/NewReset#L1006-L1034) — every screen-relevant field is **AUTO**, exactly the state after a Del/R or T/Copy power-on reset.
+
+**Boot target = Desktop, not Supervisor.** `BootEnable=1` + Language=10 + filing=ADFS drive 4 → kernel runs `ADFS::4.$.!Boot` (which on this no-disc machine errors into `Boot$Error`) then enters Language module 10. Keypad-`*` at reset enters the Supervisor `*` prompt directly via [NewReset:2089-2091/2113](external/Kernel/s/NewReset#L2089-L2091) (`KeypadStar_key` → `DoStartSuper`). Shift alone only suppresses `!Boot`, doesn't bypass language entry. **Both routes need a live keyboard at reset; the kernel's 2 s `KeyWait` window means this machine's late-handshaking keyboard is missed on every shortcut** ([NewReset:801-816](external/Kernel/s/NewReset#L801-L816)) — same root cause that broke the keypad-3 attempt earlier.
+
+### Why POST sees VGA but RISC OS doesn't (concrete answer)
+
+POST and RISC OS read the **same** `IOMD_MonitorType` register but use it differently:
+- **POST** at [TestSrc/Begin:594](external/Kernel/TestSrc/Begin#L594) does `ANDS r0,r0,#IOMD_MonitorIDMask` — a **single-bit** test, picks `TestVIDCTAB` vs `TestVVIDCTAB`. Easy to pass: our monitor (when cable connected pre-power-on) pulls **ID0** low and POST happily takes the VGA branch.
+- **RISC OS** runs `OS_ReadSysInfo R0=1` → `Service_MonitorLeadTranslation` — builds an **8-bit encoding** from **all 4** ID pins (each contributes 2 bits encoding 0v/+5v/Hsync/indeterminate per [Doc/MonLead](external/Kernel/Doc/MonLead)). Only **5 specific patterns** match anything in the table; everything else falls to **MonitorType 0 (TV standard)**.
+
+Colour VGA needs `0 1 1 X` = ID0→0v, ID1→+5v, ID2→Hsync. We have ID0 only; ID1/ID2 aren't right.
+
+**No DDC on RO 3.60.** From [hdr/CMOS](external/HdrSrc/hdr/CMOS): `16 => EDID (invalid pre RISC OS 5.23, taken as 'AUTO')`. RO 3.60 reads only the static analog ID encoding, no I²C from the monitor connector. So the **FS2-blown / pin-9-no-+5V** condition is irrelevant for DDC purposes here — but it *does* break any monitor cable that needs host +5V to drive the ID pin encoding (likely contributing to the ID-pin pattern not being recognised).
+
+### Refined fault model: kernel deliberately drops VCO from POST's ~26 MHz to ~15 MHz at mode handoff
+
+Combined with the clean 26→15 MHz transition observed in session 4 and the PLL behaviour now fully understood:
+
+- VCO target = `24 MHz × (v/r)`. `15 MHz = 24 × 5/8` → kernel writes **`r=8, v=5`** to the FreqSynth register (or an equivalent ratio).
+- 26 MHz POST value ⇒ `v/r ≈ 13/12`.
+- Observed 5 kHz HSync × ~625-line frame ⇒ ~3 MHz at the pixel mux ⇒ Control Register pixel-rate prescaler set to **÷4 or ÷5** (15 MHz / 4 = 3.75 MHz pixel ⇒ 4.7 kHz HSync ⇒ ~7.8 Hz VSync — matches).
+
+**Single failure path:** CMOS is all-AUTO (factory-default state) → RISC OS reads IOMD ID pins → 4-pin pattern doesn't match any in MonLead → falls to **MonitorType 0 (TV)** → kernel programs FreqSynth + Control Reg for TV-rate timing → VCO commanded to ~15 MHz, prescaler to ÷4-÷5 → sync collapses to 5 kHz/8 Hz, undisplayable.
+
+Hardware is exonerated; the remaining question is **prove what gets written to FreqSynth and Control at the handoff**.
+
+### LA capture plan — state-mode, nPROG as sample clock, 16 channels for data
+
+VIDC20 register-write semantics (from `docs/VIDC20.pdf`, section 4.1):
+- `nPROG` low ⇒ data on DIN[31:0] is latched into the register selected by upper address bits
+- **Top 4 bits (D28-D31)** uniquely identify register *group* per Table 2 (page 16-17). For our targets:
+  - `1101` = group **D** = Frequency Synthesizer (PLL — r in `data[5:0]`, v in `data[13:8]`, test bits at `[7:6]` and `[15:14]`)
+  - `1110` = group **E** = Control Register (pixel source `data[1:0]`, prescaler `data[4:2]`, bpp `data[7:5]`, etc.)
+- The lower 4 bits of the register address only matter *within* a group (e.g. HCR vs HSWR inside group 8). Not needed for the FreqSynth/Control diagnostic.
+
+**Use `nPROG` as DSLogic's external sample clock** (CLK pin on the header, **rising edge** = end-of-write / latch instant). This switches the analyser to state-mode sampling — every captured sample is one register-write latch — and frees all 16 data channels for the bus. Pattern triggers (rather than edge triggers) work in this mode if narrowing to specific groups is needed.
+
+**Channel mapping for slice 1 (the critical slice):**
+
+| Channels | Bits | Purpose |
+|---|---|---|
+| ext CLK | nPROG ↑ | sample latch (free, doesn't count) |
+| 4 | D28-D31 | register group → filter D/E from palette/timing |
+| 6 | D0-D5 | full `r` (FreqSynth) — or pixel source+prescaler+bpp (Control) |
+| 6 | D8-D13 | full `v` (FreqSynth) |
+| = 16 | | |
+
+This gives instant decode: every captured sample becomes `(group, r, v)` or `(group, control_bits)`. The fault hypothesis predicts one FreqSynth row at POST showing 26 MHz coefficients (~`r=12, v=13`) and a later one at handoff showing 15 MHz coefficients (`r=8, v=5` or equivalent). The Control Reg row(s) should show the divisor and pixel source.
+
+**Second slice (only if needed) — test bits:** drop the register-address channels (already known from slice 1) and remap to `D6-D7` (r-test) + `D14-D15` (v-test) to verify the kernel isn't accidentally asserting the phase-comparator-force or modulus-clear test bits during programming. Determinism (already confirmed by the clean 26→15 MHz transition) means slice-by-slice capture stitches together into a full 16-bit data field per write. Include 1-2 overlapping bits between slices as a determinism sanity check.
+
+### Discrimination test (what each capture outcome means)
+
+| Captured FreqSynth `(r, v)` | VCO measured | Conclusion |
+|---|---|---|
+| Sensible ratio for ~15 MHz, e.g. `r=8, v=5` | 15 MHz ✓ | **Kernel intentionally commanded slow.** Fault is in mode-selection logic. Confirms the AUTO → MonitorType 0 path. Fix is CMOS-write (Bus Pirate) or monitor ID-pin bodge. |
+| Sensible ratio for VGA, e.g. `r=12, v=13` | 15 MHz ✗ | **Bus corruption between IOMD and VIDC.** Bytes left correct but VCO ended up wrong → something in the write path mangled bits despite the prior ~100-write validation. Re-investigate Vcd integrity at the specific moment of the FreqSynth write. |
+| Different ratio implying yet another frequency | depends | Decode → compute → understand why the kernel asked for that. |
+| Values change run-to-run on identical cold boots | varies | Marginal bus despite earlier checks — the FreqSynth write happens under different load conditions than the palette writes that were validated. |
+
+The 26→15 MHz transition is observed deterministic across multiple cold boots, so a single capture should be enough to resolve the top row vs row 2. Multiple cold-boot captures still worth doing as cheap insurance.
+
+### Plan for next session
+
+1. **Wire up the LA**: nPROG → DSLogic CLK input (short lead, 22-100 Ω series at probe tip if any ringing); 16 channels onto the system data bus per slice 1 mapping above. Probe at VIDC's pins, not IOMD's outputs, so we read "what VIDC saw".
+2. **DSView state-mode capture** spanning cold boot through the 26→15 MHz transition. Save as `vidc_writes_slice1_regaddr_rv.dsl` next to existing captures.
+3. **Decode** the captured `(group, r, v)` rows. Look for the FreqSynth (group `D`) writes and the Control Reg (group `E`) writes; match against the table above.
+4. If slice 1 doesn't fully resolve, run slice 2 for the test bits.
+5. Once root cause is confirmed: **fix path is one of two**:
+   - **CMOS direct write via Bus Pirate** (machine off, chip on bench or in-circuit): set `VduCMOS = &0C` (MonitorType 3 = VGA, Sync_Separate), clear `WimpModeAutoBit` in `Mode2CMOS` (`&13` write `&41`), set `WimpModeCMOS` (`&14`) to 27 (VGA Mode 27 = 640×480×16), recompute checksum (8-bit sum of `&40..&FF` + `&10..&3E` with seed `&01`, store at `&3F`).
+   - **Monitor ID-pin bodge** at the VGA connector: ID0→0v (have already), ID1→+5v (need restored host +5V — re-flow/bridge FS2), ID2→Hsync. Then `OS_ReadSysInfo R0=1` finds `0 1 1 X` → claims service → `MonitorType 3 + Sync_Separate + Mode 27` set by `Service_MonitorLeadTranslation` directly, no CMOS reliance.
+
+Either fix should mean the kernel never reprograms VIDC away from a VGA-rate clock and the screen comes up.
+
+Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1 (register map and write format); [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS); [external/Kernel/s/PMF/i2cutils](external/Kernel/s/PMF/i2cutils), [s/NewReset](external/Kernel/s/NewReset), [s/Arthur3](external/Kernel/s/Arthur3), [Doc/MonLead](external/Kernel/Doc/MonLead), [TestSrc/Begin](external/Kernel/TestSrc/Begin).
