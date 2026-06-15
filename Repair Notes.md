@@ -1064,3 +1064,75 @@ The 26→15 MHz transition is observed deterministic across multiple cold boots,
 Either fix should mean the kernel never reprograms VIDC away from a VGA-rate clock and the screen comes up.
 
 Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1 (register map and write format); [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS); [external/Kernel/s/PMF/i2cutils](external/Kernel/s/PMF/i2cutils), [s/NewReset](external/Kernel/s/NewReset), [s/Arthur3](external/Kernel/s/Arthur3), [Doc/MonLead](external/Kernel/Doc/MonLead), [TestSrc/Begin](external/Kernel/TestSrc/Begin).
+
+---
+
+## Jun 15 2026 (session 7) — FreqSynth capture decoded: RISC OS programs a CORRECT VGA mode; root cause splits into VCO-vs-bus; bench drama (ran late into Jun 16)
+
+Big session. Executed the session-6 LA plan, decoded the captures end-to-end, and the result **overturns the leading hypothesis**: RISC OS is *not* commanding a bad/TV clock — it programs a textbook VGA mode. That re-opens the root cause into two candidates, and the decisive test (Vcd bus at the VIDC end) is wired but not yet captured because of bench mishaps. Captures saved: [videofreqtrace.txt](videofreqtrace.txt) (slice A, system bus), [videofreqtrace2.txt](videofreqtrace2.txt) (slice B), DSView configs in [ds-view/](ds-view/) (`video-freq-writes.dsc`, `video-freq-writes-slice2.dsc`, `videobustracevcd.dsc`).
+
+### Capture method — two-slice stitch, determinism, pattern trigger
+
+nPROG-as-external-clock didn't work, so capture is timed/transition-sampled with **nPROG on a data channel used as the parallel decoder's clock**. All 16 channels spoken for, so the FreqSynth data field (needs D0–D15 + group + nPROG = 18+) was taken in two slices and stitched, relying on determinism:
+- **Slice A** ([videofreqtrace.txt](videofreqtrace.txt)): group D28–D31 + D0–D5 + D8–D12. (D13 dropped.)
+- **Slice B** ([videofreqtrace2.txt](videofreqtrace2.txt)): group D28–D31 + **D8–D15** (full v-field + v-test bits) + D0–D2 overlap.
+- **Pattern trigger** on `group=1101 (D) AND D0=low` fires precisely on the RISC OS FreqSynth write and skips POST (POST writes `…05`, D0=1; handoff writes `…04`, D0=0). Same trigger in both slices → identical anchor → trivial alignment. **This worked** — both slices land on the same write.
+- **Determinism confirmed**: overlap bits (D0,D1,D2 + group nibble) match across slices at the handoff write; both RISC OS mode-sets (t≈712 ms and t≈11.66 s) are byte-identical.
+
+**Gotcha caught:** Slice A's upper byte (D8–D12) read `0` for *every* write, including timing registers that must use those bits — i.e. those probes weren't reading (floating low). That's why slice A's "v=0" never reconciled with the measured frequency; it was an artifact. **Slice B's upper byte is live and was validated against source** (below), so slice B supersedes slice A for bits 8–15.
+
+### Decode — validated against datasheet AND kernel source
+
+[docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25: **fsynreg (addr DH)** — `r` (ref-clock modulus) = bits[5:0], `v` (VCO modulus) = bits[13:8], r-test bits[7:6], v-test bits[15:14]. **Programmed field = modulus − 1.** PLL locks at ref/r = VCO/v ⇒ **F_vco = 24 MHz × (v+1)/(r+1)**.
+
+Cross-validated against [TestSrc/Vidc](external/Kernel/TestSrc/Vidc): the POST table literal is `&D000C385 ; FSYNREG, clk = (3+1)/(5+1)*24MHz = 16MHz`. Slice B's POST FreqSynth write read `D000C305` — **upper byte `C3` matches the source `C3` exactly** (v-field 3 + test bits), proving slice B's D8–D15 mapping is correct.
+
+Stitched handoff values (low byte from A, upper byte from B):
+
+| | fsynreg | r | v | F_vco | conreg | pixel source | prescale | **pixel clock** |
+|---|---|---|---|---|---|---|---|---|
+| POST | `D0000305` | 6 | 4 | (synth idle) | `02` | **RCLK (24 MHz)** | ÷1 | **24 MHz** — synth unused |
+| Handoff | `D0001404` | 5 | 21 | **100.8 MHz** | `0C` | **VCLK (the synth)** | **÷4** | **25.2 MHz** |
+
+**25.2 MHz = the standard VGA 640×480@60 pixel clock.** Handoff timing registers are VGA-consistent too (HCR upper byte `03` ≈ 0x320 ≈ 800 htotal; VCR `02`/`…3` ≈ 0x20B ≈ 525 vtotal) → 31.5 kHz HSync / 60 Hz VSync. **RISC OS programs a fully correct VGA mode at handoff.** (POST always displayed because its conreg selects RCLK — the raw 24 MHz reference — bypassing the synth entirely; only RISC OS routes pixel clock through the VCO.) The handoff is a proper two-write PLL load: first write asserts v-test bits (D14/D15), second clears them.
+
+### What this overturns
+
+1. **"Garbage CMOS → MonitorType 0 (TV) → kernel commands a slow clock" (sessions 5–6) is contradicted.** The digital command is VGA, not TV. So a CMOS MonitorType write is **not** the fix — RISC OS already asks for VGA.
+2. **"VCO healthy" (session 4) is reinterpreted.** Session 4 measured the VCO sitting at ~14 MHz with Vcc_04 low (1.17 V) and read it as a healthy lock — *without knowing the commanded value*. The command is **100.8 MHz**; a loop told 100.8 and delivering ~14–16 MHz is **not locked, it's pegged low**. The arithmetic closes: observed ~5 kHz HSync × ~800 htotal ⇒ ~4 MHz pixel ⇒ VCO ≈ 16 MHz, exactly where session 4 found it.
+
+### Root cause now splits into two hypotheses
+
+| | What VIDC receives | VCO behaviour | Verdict |
+|---|---|---|---|
+| **A** | correct: r=5, v=21 → 100.8 MHz target | can't reach it, pegged ~16 MHz | bus good, **VCO/analog-loop fault** |
+| **B** | corrupted low byte → r mangled → low-freq command | **healthily locks** to the wrong target | **Vcd bus corrupts this write** |
+
+**Hypothesis B fits session 4 better** (a loop correctly locked to a corrupted setpoint explains the "rock-steady, clean PCOMP sawtooth, textbook acquisition" observations without calling session 4 wrong). Marginal/corrupting bus is therefore back as top theory.
+
+### The decisive test — and why the system-bus trace can't settle it
+
+Both captures above are on the **system data bus** — they show what IOMD *sends*, not what VIDC *receives*. The FreqSynth low byte (r-field, D0–D5) sits in the **corrosion/bodge zone**, so the open question is whether the bodges deliver it intact to the VIDC DIN pins. Must trace **at the VIDC end**.
+
+**New probing technique (works well):** stick a small wire loop into the (empty) fine-pitch **VRAM socket** and clip the LA probe to that. The VRAM socket data pins *are* the VIDC `DIN[31:0]` bus — downstream of the bodges, on the VIDC side of the RP, the actual node VIDC latches from. No VRAM fitted, so the socket is free and the bus only carries CPU register writes (nPROG-low). This **closes the earlier "RP→pin segment could be missed" caveat** — same net as the DIN pins. Got vcd0–5 probed; machine still boots to Caps-Lock-toggle, so the loops aren't perturbing the bus.
+
+**Bodge map (for the VIDC-end check):** bodged lines = **vcd0, 2, 3, 5, 6, 7**; intact native traces = **vcd1, vcd4** (built-in good reference). Plan: probe full **vcd0–7** (8 ch) + group D28–D31 (4) + vcd10 (1, trigger discriminator — handoff v-field bit, undamaged) + nPROG (1) = 14 of 16, room to spare. Verdict: vcd0–5 = `04` at the FreqSynth latch ⇒ bus delivers r-field intact ⇒ **bus exonerated, hypothesis A (VCO)**; anything else ⇒ **hypothesis B (bus corrupts the write)**. The surrounding burst (and POST FreqSynth `D000C385`, which drives vcd0/vcd2/vcd7 high) stress-tests the bodges across many transitions.
+
+### Bench drama (the reason the decisive capture isn't done yet)
+
+- **nPROG strain relief failed.** While restripping a bodge wire, slipped and **ripped the nPROG trace off at the IOMD-end via** (it stayed attached at the VIDC/chip end). Pushed it back down, re-soldered to the via, sealed with solder mask. **Continuity VIDC pin 140 ↔ IOMD pin 117 re-confirmed.** This net has now had ~3 incidents (pin-140 pad lift, this via rip) — it's fragile; needs proper strain relief (anchor the wire so the dupont pin/via carries zero load).
+- Verified the repair as a *clock*, not just a wire: scoped nPROG idle-HIGH (deasserted state, rules out stuck-low), and scoped **VSync cycling 60 Hz → 8 Hz** = the exact prior symptom reproduced ⇒ **nPROG repair sound, board back to baseline** (60 Hz = correct early/POST rate, 8 Hz = post-handoff bad mode; literally watching the handoff transition).
+- **Then bridged some pins on the IOMD** during further work; removed the solder, re-soldered the pins down. Machine boots (keyboard LED pattern unchanged through boot — the usual late-handshake quirk), eventually reaches Caps-Lock-toggleable = full boot.
+
+### New POST failure — `Sirq bad` (was `Virq bad`)
+
+With the LA in POST mode + POST adapter fitted, POST now fails at **`Sirq bad`** instead of `Virq bad` — i.e. it **passes the Virq (video IRQ/flyback) test but fails the Sirq (sound IRQ) test**. New failure mode, appeared after the IOMD pin re-solder. Could be a side effect of the IOMD pin work (a sound-related line disturbed) or another marginal-bus manifestation. **Marginal bus remains top theory.** Cause not yet established — flag for next session.
+
+### State / next session
+
+- **Decisive VIDC-end capture still PENDING.** Finish wiring vcd0–7 at the VRAM socket per the mapping above; do the POST clock-sanity capture first (must decode `02 02 01…`) to confirm the repaired nPROG clocks cleanly, then the handoff run. Read vcd0–5 at the FreqSynth latch to pick hypothesis A vs B.
+- Chase the new `Sirq bad`: is it the IOMD pin re-solder, or marginal bus? Re-check the IOMD pins just re-soldered (shorts/continuity to neighbours), and whether `Sirq bad` is stable across boots.
+- Redo nPROG strain relief properly (board anchor) before relying on the next capture.
+- If hypothesis B confirmed (bus corrupts the FreqSynth write): fix the low-byte path (LCR-measure the RP, re-check corrosion-zone vias / low-byte buffer). If A confirmed (bus clean): reopen the VCO/PLL analog loop (VCLKIN at IC32 pin 6 + Vcc_04 at loop filter — does Vcc rail trying to reach 100.8 MHz, or stay stuck low?).
+
+Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25 (fsynreg), §4.1.26 (conreg/pixel clock); [external/Kernel/TestSrc/Vidc](external/Kernel/TestSrc/Vidc) (TestVIDCTAB literal validates the decode); [external/Kernel/TestSrc/Begin](external/Kernel/TestSrc/Begin) (Sirq/Virq test order).
