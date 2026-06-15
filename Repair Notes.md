@@ -1176,3 +1176,152 @@ Root-cause mechanics if hypothesis B holds:
 **Testable prediction:** if loop-area/length is the mechanism, the **physically longest bodge should be the most marginal.** Map the soft bit(s) onto the wire-length ranking: soft bit = longest wire ⇒ confirms mechanism (fix = routing/length + paired ground); soft bit ≠ longest ⇒ look local (that bit's via / plane defect / RP) instead. So the trace identifies the bit *and* tests the theory.
 
 Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25 (fsynreg), §4.1.26 (conreg/pixel clock); [external/Kernel/TestSrc/Vidc](external/Kernel/TestSrc/Vidc) (TestVIDCTAB literal validates the decode); [external/Kernel/TestSrc/Begin](external/Kernel/TestSrc/Begin) (Sirq/Virq test order).
+
+---
+
+## Jun 16 2026 — UNTESTED LEAD: VCO needs +12V rail, never hooked up on bench
+
+**Status: NOT YET TESTED.** Acting on a casual mention from a stardot forum post: "don't forget the VCO needs 12V hooked up." On this bench setup we've only been supplying +5V; the +12V rail to the main board has been floating. **This takes priority over any further tracing of the video bus / Vcd path** — if it pans out, the bus may have been fine all along and the long arc of bus-corruption suspicion was chasing a symptom of a missing rail, not a fault.
+
+### Schematic analysis (sheet 5 of 7, VCO Circuitry block, bottom-left)
+
+The VCO is a discrete current-starved oscillator, NOT a VCO that runs off its own logic Vcc. Topology:
+
+- **+12V → R193 (1K0) → R196 (3K3) → Vcostarpt** — voltage divider biasing **Q3's base** (BC849C NPN). With proper 12V: Q3 base sits at ~9.2V, Q3 emitter (= **Vcc_04**) at ~8.5V.
+- **Q3 collector** → L10 (33μH RF choke) → **+5V**. Q3 is the oscillator transistor.
+- **Q3 emitter = Vcc_04** node, which **powers the two 74AC04 inverters (IC32)** that buffer the oscillator to Vclk1. Inverters are labelled `Vcc=Vcc_04, GND=Vcostarpt` — they ride on the VCO's internal rail, not on system +5V.
+- **Q2 (BC859 PNP)** — emitter on the +12V rail (top of R193), base driven by **Pcomp** (VIDC's phase-comparator output, via R187 100K / R183 680R). Q2 is the **current-steering element** the loop uses to push the bias around. C134 (1μF) is the loop integrator on Q2 collector / Q3 base.
+
+### Why a missing 12V rail would explain the symptoms
+
+If +12V is missing (or being held at ~5V parasitically through some clamp/leakage path):
+
+1. **Bias divider output collapses.** Q3 base = 5 × 3.3/(1+3.3) ≈ 3.83V instead of 9.2V; Vcc_04 settles at ~3.18V instead of ~8.5V. Q3 still switches on, but in a starved, low-headroom regime.
+2. **Q2's compliance is destroyed.** Q2 is PNP — its emitter must sit above its base for it to source current. With emitter at ~5V instead of 12V, the loop simply cannot push Pcomp to a value that gives the collector current needed for high frequency. The phase-comparator loop saturates trying. **The upper tuning range is clamped shut.** This fits the observed 15 MHz lock-target far better than the simple "lower bias = lower freq" intuition would.
+3. **Vcc_04 ramping to 1.17V (session 4 observation) becomes a starvation symptom, not a "VIDC commanded slow"** — the loop is pushing as hard as it can but has no headroom. The "textbook acquisition transient" reading may have been wrong: it could have been the loop hitting its (artificially reduced) ceiling.
+
+### Why this is now the leading explanation (not just an alternative)
+
+Most of the digital side is **already exonerated by direct measurement**, with one specific unverified link remaining:
+
+- **CMOS contents traced via I²C and decoded** (sessions 5–6): `VduCMOS=&FD` → **MonitorType = AUTO**, `Mode2CMOS` → WimpMode AUTO. AUTO means RISC OS reads the IOMD monitor-ID pins and picks a mode; ID0 is pulled low so it should land on VGA. **The CMOS is doing the right thing.**
+- **VIDC register-programming traffic captured on the system bus (pre-buffer)** — the FreqSynth / Control writes the kernel emits are **sensible values for the commanded mode**, not garbage. The kernel-side computation is doing the right thing.
+- **Vcd data bus** byte-verified clean during POST and the RISC OS palette load (sessions 2–3).
+
+The one digital link **not yet verified** is the **post-buffer Vcd path at the VRAM socket** during the VIDC reprogramming event — i.e. confirming that the sensible system-bus-side writes arrive un-garbled at the VIDC pins. That was the planned next capture (re-run the same trace with the probes moved to the VRAM socket to validate the full system-bus → Vcd pathway through the buffer).
+
+The previously leading hypothesis was that *this specific link* — the buffer / Vcd path — was corrupting bits between the (verified-clean) system-bus writes and the VIDC's register latches. The missing +12V rail offers an alternative that **doesn't require the buffer to be corrupting anything at all**: the kernel writes correct values, the buffer passes them cleanly, VIDC latches them correctly, the digital programmed-frequency is exactly what was asked for — but the analog VCO stage can't oscillate at the commanded target because Q2's PNP current source has no compliance and Q3's bias divider is collapsed. **Same observable outcome (commanded high, locks low), totally different fault location.**
+
+**By Occam: a missing external rail (verifiable in 30 seconds with a multimeter) > a buffer / Vcd-path corruption that we'd still need to capture to confirm.** Test the rail first. If 12V fixes it, the post-buffer Vcd capture becomes unnecessary; if not, the post-buffer capture is the next thing to do and the bus-corruption story is back on.
+
+### IOMD accident/repair and the returning "sirq bad" POST report — separate issue, IOMD repair correlation is real
+
+What reappeared after the IOMD accident/repair was the **"sirq bad" POST failure report** (decoded from the POST serial protocol), not the sync collapse directly. After reading [TestSrc/Vidc](external/Kernel/TestSrc/Vidc), these are genuinely two separate issues with two separate fault domains — and the IOMD repair correlation is most likely **real**, not coincidence.
+
+**SIRQ is not VCO-dependent.** The POST SIRQ test (`ts_SIRQ_period`, [TestSrc/Vidc:222](external/Kernel/TestSrc/Vidc#L222)) programs `VIDSCR = &B1000005` with the explicit Acorn comment "VIDC10 mode, 24Mhz clock" — i.e. VIDC20's sound subsystem is configured to run off the **24MHz reference clock**, NOT the VCO clock. `VIDVCOFREQ` and the vcoclk switch are never touched by this test. The mode-init tables ([TestSrc/Vidc:448](external/Kernel/TestSrc/Vidc#L448), [:495](external/Kernel/TestSrc/Vidc#L495)) reinforce this: `& &B1000001 ; SCR: sound disabled (+use 24MHz clock)`. So a starved VCO from a missing +12V rail wouldn't fail SIRQ — the sound system is decoupled from the VCO entirely.
+
+(For contrast, the **VIRQ** test [TestSrc/Vidc:80](external/Kernel/TestSrc/Vidc#L80) explicitly *does* test the VCO: first pass runs on refclk, second pass switches to vcoclk at 24MHz target — failure code "bits 20+ show fail loop - 0 for refclk, 1 for vcoclk" at [:201](external/Kernel/TestSrc/Vidc#L201). VIRQ is the VCO-dependent IRQ test; SIRQ is not.)
+
+**What SIRQ does exercise — and why the IOMD repair correlation is suspicious.** The SIRQ test programs and polls the IOMD sound DMA hardware intensively:
+- `IOMD_SD0CR` (sound DMA control) — set during init and re-set when enabling DMA
+- `IOMD_SD0CURA` / `SD0ENDA` / `SD0CURB` / `SD0ENDB` — double-buffer DMA pointers
+- `IOMD_SD0ST` — polled for `IOMD_DMA_O_Bit | IOMD_DMA_I_Bit` in the completion loop ([TestSrc/Vidc:318-322](external/Kernel/TestSrc/Vidc#L318-L322))
+- IOC IRQ-status registers, into which IOMD routes the sound IRQ
+
+That's exactly the IOMD sound DMA path. If the IOMD repair disturbed any pin / trace / via in that path, SIRQ would fail immediately and consistently — which is what we see. The "appeared right after the IOMD repair" timing is then **not coincidence**: it's a direct downstream symptom of whatever the repair perturbed.
+
+**Net:**
+- "sirq bad" and the sync collapse are **independent**. +12V won't fix "sirq bad" and a working VCO won't matter for it.
+- "sirq bad" needs its own investigation focused on the **IOMD sound DMA registers / channel** and the IOMD pins/traces affected by the repair.
+- The earlier coincidence framing was wrong; the IOMD repair really is the most plausible cause of the SIRQ failure returning.
+
+**Practical implication for the test plan:** treat the two as parallel threads. Applying +12V should clear the display issue if the VCO hypothesis holds; "sirq bad" will still need a separate dig into the IOMD sound DMA hardware (continuity-check the SD0CR / SD0CURA-B pins against IOMD/RAM/audio paths, look for cold joints or damaged traces from the repair area).
+
+### Pin map near the IOMD repair site — XNsndrq / XNsndak are the specific suspects
+
+From [IOMD Functional Specification](docs/IOMD Functional Specification.pdf) sheet 37 (208 SQFP, 0.5 mm pitch, east side):
+
+| Pin | Signal | Notes |
+|---|---|---|
+| 110 | Xflybk | flyback |
+| 111 | Xvnc | |
+| **112** | **XNsndrq** | **IOMD ↔ VIDC sound DMA REQUEST — critical for SIRQ** |
+| **113** | **XNsndak** | **IOMD ↔ VIDC sound DMA ACKNOWLEDGE — critical for SIRQ** |
+| 114 | XNvidrq | video DMA req |
+| 115 | XNvidak | video DMA ack |
+| 116 | XNcdoe | CD output enable |
+| 117 | XNprog | nPROG — VIDC register write strobe |
+| **118** | **Xra[0]** | RAM addr — pin shorted during repair |
+| **119** | **Xra[1]** | RAM addr — pin shorted during repair |
+| 120 | Xra[2] | RAM addr |
+
+### Repair history at this site (recorded after the fact, Jun 16)
+
+What happened during the IOMD work:
+1. **Pins 118 and 119 were accidentally shorted** during the original work.
+2. **Desoldering braid was used to clear the short.** This worked, but after braid removal the pins felt loose — suggesting the braid wicked too much solder out, leaving thin / cold / mechanically weak joints not just on 118/119 but plausibly on the adjacent pins in the same block.
+3. **Pins 112–117 / 120 etc. were never reflowed** after the desolder-braid pass.
+
+That sequence puts every pin in the block 112–120 at risk of cold-joint damage from braid over-wicking, with **112 (XNsndrq) and 113 (XNsndak) being the most-likely casualties given the SIRQ POST failure**. They're four-to-five pins back from the repair site, on the same package side at 0.5 mm pitch, well within the braid's wicking footprint, and the SIRQ failure points directly at this signal path.
+
+What we can and *can't* exonerate among the pins in the affected block — being careful here, because the display being unusable means we have no direct observation of video DMA:
+
+| Pin | Signal | Status |
+|---|---|---|
+| 112 | XNsndrq | **Suspect** — SIRQ POST fails, consistent with broken handshake |
+| 113 | XNsndak | **Suspect** — same |
+| 114 | XNvidrq | **Unconfirmed** — display is in bad-sync state; we can't tell whether video DMA is actually pumping pixels or just producing garbage at the wrong clock. Was earlier (wrongly) called "working" on the basis of "display works" — but the display doesn't work in any verifiable way. |
+| 115 | XNvidak | **Unconfirmed** — same |
+| 116 | XNcdoe | Untested (no CD activity in current boot path) |
+| 117 | XNprog | **Working post-repair** — the VIRQ POST test passes, which requires VIDC to receive register writes (including `VIDVCOFREQ` and the mode-set sequence) and the VCO is observably locking (at the wrong frequency, but locking). Both demand nPROG to be reaching VIDC after the accident. (The session 2–3 palette byte-verification predates the IOMD repair so doesn't count as evidence here — VIRQ pass + VCO active are the real post-repair indicators.) |
+| 118 | Xra[0] | **Working** — POST RAM tests pass, so this is making contact (possibly mechanically loose but electrically OK). |
+| 119 | Xra[1] | **Working** — same |
+| 120 | Xra[2] | **Working** — same logic |
+
+So the honest suspect set is **112, 113 (most likely), plus 114, 115 (can't rule out)**. The reflow should cover all of them at the same time — it's the same operation and they're physically adjacent, so there's no cost to widening the repair scope.
+
+### Repair plan for "sirq bad" (and the unconfirmed video DMA pins)
+
+1. **Visual inspection of pins 112–120** under magnification before doing anything else — look for cold-joint convex meniscus, lifted heel, hairline crack, or visible solder bridges. Pay particular attention to 112/113 (SIRQ-relevant) and 114/115 (video DMA, can't observe from display).
+2. **Reflow pins 112–120 as a block** with fresh flux and a small amount of fresh solder added — the loose feel after braid use is a clear indicator the joints are under-filled and need replenishing, not just re-melting. Reflowing the full block costs nothing extra and addresses both the confirmed SIRQ problem and the unconfirmed video DMA pins in one operation.
+3. **Continuity check 112 / 113 / 114 / 115 to their destinations on the VIDC20 side** (find the corresponding VIDC sndrq / sndak / vidrq / vidak pins on the schematic sheet, buzz IOMD pin to VIDC pin). Open after reflow ⇒ trace damaged, needs a bodge wire.
+4. **Re-test POST** — "sirq bad" should clear if 112/113 are the issue. POST is a complete display-independent diagnostic for this (the whole point of the protocol).
+5. **Verify video DMA on the LA after reflow** — probe pin 114 (XNvidrq) and 115 (XNvidak) during boot to confirm they're actually toggling in the expected handshake pattern. This is the only way to be sure since we can't observe the display.
+6. If "sirq bad" persists after a clean reflow + good continuity → suspect the IOMD die itself, or look further afield (audio amp, VIDC sound subsystem). But this is the residual after the obvious fix has been tried.
+
+This is independent of the +12V VCO work — both can be done in the same session, in either order. They address different symptoms.
+
+### Verifying SIRQ / DMA without a working display
+
+Since the display is unusable, we can't visually confirm that DMA is healthy from RISC OS behaviour. Two display-independent paths cover this:
+
+- **POST itself reports SIRQ pass/fail** via the serial POST protocol — the existing `decoders/acorn_post` is the complete diagnostic for "did the test pass?" If "sirq bad" disappears from the POST stream, the test passed.
+- **LA on pins 112/113 (and 114/115) during boot** directly observes the handshake. With `VIDSFR + 8 = 10 μs/byte`, **XNsndrq (112)** should pulse roughly every 10 μs during the SIRQ test window; **XNsndak (113)** should pulse in response. The test runs ~10 ms total (1024 bytes × 10 μs) before either completing or timing out at 20 ms. Similar reasoning for the video DMA pair 114/115 during normal video DMA activity.
+
+Capture outcomes:
+- Both pins idle / never assert → cold joint confirmed, repair worked or didn't.
+- One pulses but the other doesn't → identifies the specific broken pin.
+- Both pulse correctly but POST still says "sirq bad" → handshake healthy, fault is downstream (IOC IRQ routing, timer, IOMD internal).
+
+### Caveats (don't overcommit)
+
+- **Untested.** Everything above is schematic-reasoned, not measured. Confidence: medium-high on the mechanism, but the actual parasitic path supplying ~5V to the "12V" net is unidentified — could be wrong about the exact voltage at the divider.
+- **Variability doesn't fit perfectly.** The earlier observation that VCO behaviour varies between boots isn't obviously explained by a static missing rail. Possible explanations: (a) the parasitic conduction path is itself a non-linear / marginal junction whose effective voltage drifts with nearby switching activity; (b) variability was a measurement artefact; (c) something else.
+- This eliminates the *digital* CMOS/kernel/bus hypotheses (they're verified clean) but doesn't eliminate a possible second analog fault — e.g. a damaged R193/R196/L10/Q2/Q3 — that would survive applying 12V. If Vcc_04 doesn't come up to ~8.5V *with* 12V applied, suspect components in the VCO block itself.
+
+### Test plan — do this before any further bus tracing or LA captures
+
+1. **Identify +12V on the main power connector** (PSU header). Check sheet 5 (or sheet 1 power-distribution) for the pin assignment.
+2. **Hook a bench PSU's +12V to that rail; share GND with the board's existing 5V supply** (common ground, not floating). Set ~500 mA current limit as insurance.
+3. **Power up. Measure Vcc_04 on the scope.** Expected: jumps from the previously-observed ~1–3V to **~8–9V**. This is the immediate confirmation that the analysis is right *before* even looking at frequency.
+4. **Measure VCO output frequency** (Vclk1 or Q3 collector). Expected: now reaches programmed target (e.g. 25–35 MHz for VGA modes) instead of pinning at ~15 MHz.
+5. **Boot through to the text→desktop transition** and see if the display now syncs. If yes — the entire "kernel programming wrong mode" / CMOS investigation may have been a red herring.
+6. **If Vcc_04 jumps but the display still doesn't sync** — VCO is healthy now but the kernel really is commanding a bad mode. Reverts to the session-5/6 plan: capture the VIDC reprogramming event and pursue the Bus-Pirate CMOS write.
+7. **Don't undo any of the bus repairs.** Even if 12V is the root cause, the lifted-pad bodges and reflowed buffers are real fixes for real damage — leave them in.
+
+### What to commit after the test (whichever way it goes)
+
+- If 12V fixes it: this is the headline finding. Update the top of this file to flag "+12V required" loudly. (Reason 12V was never connected: the bench setup only ever had +5V hooked up — assumed +5V was sufficient, no further mystery there.)
+- If 12V doesn't fix it: still useful — Vcc_04 should at least reach proper voltage, ruling this out cleanly and refocusing on the session-6 LA capture plan.
+
+Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1 (register map and write format); [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS); [external/Kernel/s/PMF/i2cutils](external/Kernel/s/PMF/i2cutils), [s/NewReset](external/Kernel/s/NewReset), [s/Arthur3](external/Kernel/s/Arthur3), [Doc/MonLead](external/Kernel/Doc/MonLead), [TestSrc/Begin](external/Kernel/TestSrc/Begin).
