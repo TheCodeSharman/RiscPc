@@ -894,6 +894,8 @@ Fitted the backup battery and scoped the VCO loop directly to settle the config-
 
 **Why every power-on shortcut had failed:** Del/R/keypad-3 are all read in the early-boot 2 s `KeyWait` window ([NewReset:801-816](external/Kernel/s/NewReset#L801-L816)); this machine's keyboard handshakes *late* (LED flash / Caps-Lock-alive coincide with the final mode, ~5 s in), so the held keys were never seen. The F12 route works because the keyboard is alive (if late) by then. **This keyboard-timing quirk is what masked a simple config fix for the whole saga.** (Worth a follow-up someday: why does the keyboard handshake so late? Not chased — cosmetic to the fix.)
 
+> **[Superseded — see "keyboard-late theory was built on bad evidence" at end of file]** This paragraph compounds three errors: keypad-3 isn't a boot key in the kernel source; Caps-Lock-LED-late is wrong evidence for "scan codes not arriving" (different driver paths); and R/Del write the same MonitorTypeAuto+Sync_Auto values already in CMOS, so "shortcut had no visible effect" doesn't imply "shortcut wasn't detected."
+
 ### Root cause — UNRESOLVED. Leading hypothesis only, NOT demonstrated.
 Working hypothesis: a non-VGA **MonitorType** in CMOS makes RISC OS command VIDC to a low pixel clock → collapsed sync → undisplayable. It's *consistent* with the evidence but **unproven**, and importantly **every attempt to fix it via `*Configure` has failed** (could be that we never successfully entered the command blind, or that config is the wrong explanation — we can't tell yet). Do **not** treat "config will fix it" as established; it hasn't.
 
@@ -992,6 +994,8 @@ Decoded `i2cboot.txt` against [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMO
 `VduCMOS=&FD` and `Mode2=&51` are the **post-CMOS-reset defaults** from [s/NewReset:1006-1034](external/Kernel/s/NewReset#L1006-L1034) — every screen-relevant field is **AUTO**, exactly the state after a Del/R or T/Copy power-on reset.
 
 **Boot target = Desktop, not Supervisor.** `BootEnable=1` + Language=10 + filing=ADFS drive 4 → kernel runs `ADFS::4.$.!Boot` (which on this no-disc machine errors into `Boot$Error`) then enters Language module 10. Keypad-`*` at reset enters the Supervisor `*` prompt directly via [NewReset:2089-2091/2113](external/Kernel/s/NewReset#L2089-L2091) (`KeypadStar_key` → `DoStartSuper`). Shift alone only suppresses `!Boot`, doesn't bypass language entry. **Both routes need a live keyboard at reset; the kernel's 2 s `KeyWait` window means this machine's late-handshaking keyboard is missed on every shortcut** ([NewReset:801-816](external/Kernel/s/NewReset#L801-L816)) — same root cause that broke the keypad-3 attempt earlier.
+
+> **[Superseded — see "keyboard-late theory was built on bad evidence" at end of file]** "Both routes share the 2 s KeyWait constraint" is wrong: R/T/Del/End use the raw PS/2 IRQ path; Keypad-* uses `OS_Byte 129` in a *much* later 100 ms loop after `!Boot` ([NewReset:2089](external/Kernel/s/NewReset#L2089)) and requires the full OS keyboard handler. They don't share a timing constraint.
 
 ### Why POST sees VGA but RISC OS doesn't (concrete answer)
 
@@ -1325,3 +1329,53 @@ Capture outcomes:
 - If 12V doesn't fix it: still useful — Vcc_04 should at least reach proper voltage, ruling this out cleanly and refocusing on the session-6 LA capture plan.
 
 Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1 (register map and write format); [external/HdrSrc/hdr/CMOS](external/HdrSrc/hdr/CMOS); [external/Kernel/s/PMF/i2cutils](external/Kernel/s/PMF/i2cutils), [s/NewReset](external/Kernel/s/NewReset), [s/Arthur3](external/Kernel/s/Arthur3), [Doc/MonLead](external/Kernel/Doc/MonLead), [TestSrc/Begin](external/Kernel/TestSrc/Begin).
+
+---
+
+## Jun 16 2026 follow-on — keyboard-late-handshake theory was built on bad evidence
+
+While reading [s/KbdResPC](external/Kernel/s/KbdResPC) and [s/NewReset](external/Kernel/s/NewReset) directly, found that the "this machine's keyboard handshakes late and misses every reset shortcut" framing from sessions 5–6 is **not supported by the actual code** and needs correcting on multiple counts.
+
+### Wrong evidence: Caps-Lock LED late ≠ scan codes not arriving
+
+The session 5/6 notes inferred "keyboard misses KeyWait" from the observation "Caps-Lock LED only toggles after the final mode is set." But these are two unrelated paths through the PS/2 driver:
+
+- **Capslock LED toggling** = host can send commands TO the keyboard. Requires the full RISC OS keyboard handler module to be installed.
+- **Scan code reception** = host receives bytes FROM the keyboard. Only requires the IOC PS/2 IRQ handler from [s/KbdResPC](external/Kernel/s/KbdResPC) — a much smaller path that runs from very early in boot.
+
+A PS/2 keyboard runs its BAT (Basic Assurance Test) and starts sending scan codes within ~500 ms of power-up, regardless of whether the host has got around to setting LEDs. So "Capslock LED is late" tells us about the LED-control / outbound path being initialised late — it tells us nothing about whether the early `KeyWait` window at [NewReset:801-816](external/Kernel/s/NewReset#L801-L816) was seeing held-key scan codes via the IRQ inbound path.
+
+### Wrong claim: "keypad-3 is a reset shortcut"
+
+Sessions 5/6 mention `Del/R/keypad-3` as reset-window keys. **Keypad-3 is not in the kernel's boot-key tables.** [s/KbdResPC:55-68](external/Kernel/s/KbdResPC#L55-L68) lists only `Ctrl`, `Shift`, `R`, `T`, `Del`, `End/Copy` in `KeyData`/`SpecialData`. The reset code at [NewReset:843](external/Kernel/s/NewReset#L843) only consumes the corresponding `R_Down_Flag` / `T_Down_Flag` / `Del_Down_Flag` / `Copy_Down_Flag` bytes. Keypad-3 was most likely a misremembering — possibly confused with Acorn-era documentation that referenced different shortcuts.
+
+### Conflated timings: Keypad-* and R/T/Del/End are NOT the same mechanism
+
+Session 6 said "*Both routes [Keypad-* and R/T/Del/End] need a live keyboard at reset; the kernel's 2 s `KeyWait` window means this machine's late-handshaking keyboard is missed on every shortcut.*" That's wrong — the two routes go through completely different code:
+
+- **R / T / Del / End** — scanned by the **raw IOC PS/2 IRQ handler** in [s/KbdResPC](external/Kernel/s/KbdResPC). It matches scan codes against `KeyData`/`SpecialData` tables and sets the `*_Down_Flag` bytes. The reset code reads these flags at [NewReset:843](external/Kernel/s/NewReset#L843), gated by the `KeyWait` window which waits up to 2 s for `KB_There_Flag` (set on receipt of the keyboard's BAT-pass `AA` byte) and then grants a further 1/5 s for scan codes to come in. **No OS keyboard handler is needed for this path.**
+- **Keypad-*** — checked **much later**, at [NewReset:2089](external/Kernel/s/NewReset#L2089), in a 100 ms `MetroGnome` delay loop **after** the kernel has already tried to run `!Boot`. The check goes through [`IsKeyPressedAtReset`](external/Kernel/s/NewReset#L2153), which uses `OS_Byte 129` (INKEY) — a high-level call that requires the **full RISC OS keyboard subsystem to be installed and running.**
+
+The Capslock-LED-late observation IS relevant to the Keypad-* path (both depend on the OS handler being up). It is **not** relevant to the R/T/Del/End path. Session 6 conflated them.
+
+### Cleaner alternative explanation for "R/Del did nothing"
+
+R and Del both write `MonitorTypeAuto + Sync_Auto` to VduCMOS. From session 6's CMOS decode, **VduCMOS is already `&FD` = `MonitorTypeAuto + Sync_Auto`** — that's the post-reset default. So even if R or Del were being detected (which we can no longer cleanly rule out), the resulting CMOS write would write back the same bytes already in CMOS — visibly indistinguishable from "shortcut wasn't detected."
+
+So we may have been concluding "the key wasn't read" from evidence that's actually consistent with "the key was read and produced a no-op write." This doesn't prove KeyWait *is* reading scan codes; it just removes one of the supports for the claim that it isn't.
+
+### Cheap diagnostic test — does the early KeyWait window actually read scan codes?
+
+**T and End write `MonitorTypeAuto + Sync_Separate`** — a different VduCMOS byte from the current state. So:
+
+1. **Cold-boot with T held** (or End held).
+2. **Capture I²C with the LA** spanning boot.
+3. **Decode the VduCMOS write** at offset `&C5` / logical `&85`.
+   - Sync_Separate write → **KeyWait IS reading scan codes**. The late-keyboard theory is wrong. (Bonus: CMOS is now in a Sync_Separate state, which is what modern VGA monitors expect anyway.)
+   - Still `&FD` (Sync_Auto) → KeyWait is **not** reading scan codes during the boot window. The late-keyboard theory survives, but the supporting evidence has been replaced with something direct.
+
+Either outcome is informative. The test takes ~10 minutes given the I²C decoder is already automated.
+
+### Important: this doesn't fix the display
+
+If the +12V VCO hypothesis is right, the display will still be in bad-sync after the CMOS sync byte is corrected — the VCO can't reach the commanded pixel clock regardless of what the kernel asks for. This test only resolves the months-old question about the keyboard / KeyWait timing and gets the CMOS into a cleaner state for when the VCO IS fixed. Do it in parallel with the +12V test; the two threads are independent.
