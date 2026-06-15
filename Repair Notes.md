@@ -1135,4 +1135,44 @@ With the LA in POST mode + POST adapter fitted, POST now fails at **`Sirq bad`**
 - Redo nPROG strain relief properly (board anchor) before relying on the next capture.
 - If hypothesis B confirmed (bus corrupts the FreqSynth write): fix the low-byte path (LCR-measure the RP, re-check corrosion-zone vias / low-byte buffer). If A confirmed (bus clean): reopen the VCO/PLL analog loop (VCLKIN at IC32 pin 6 + Vcc_04 at loop filter — does Vcc rail trying to reach 100.8 MHz, or stay stuck low?).
 
+### Decisive capture — experimental design + observer effect
+
+Goal: prove **video bus (Vcd at VIDC end) ≠ system bus (now-known-good)**. This is the first time we *have* a known-good reference (the decoded handoff values), so the comparison is finally meaningful.
+
+**Capture config (16 ch):** nPROG (decode clock) + **vcd0–7** at VRAM socket (8) + group D28–D31 (4) + vcd10 (1, trigger discriminator). Trigger: `group=1101 (D) AND vcd10=high` → handoff FreqSynth write, skips POST. Deep buffer to grab the surrounding burst.
+
+**Compare against known-good system-bus values:**
+
+| Write | system-bus low byte | vcd0–7 should read |
+|---|---|---|
+| Handoff FreqSynth | `04` | `00000100` — only **vcd2** high |
+| POST FreqSynth | `85` | **vcd0, vcd2, vcd7** high (3-bit cross-check, free in the sanity capture) |
+| Handoff Control (grp E) | `0C` | vcd2, vcd3 high |
+
+- vcd0–5 = `04` → bus delivers intact → hypothesis A (VCO).
+- vcd0–5 ≠ `04` → **video bus ≠ system bus = the proof** → hypothesis B (bus). Note which bit(s).
+
+**Observer-effect caveat (it cuts the wrong way):** connecting the LA to the VRAM-socket "antennas" adds capacitance to the very lines we suspect are marginal, so the test is asymmetric — a **clean** read is strong proof the bus is robustly good (survived even the extra load); a **corrupted** read is ambiguous (native marginality *or* probe-loading artifact). Two guards keep a corrupted read interpretable:
+1. **vcd1 / vcd4 are the intact native lines** (never bodged) — they carry the same added probe load, so if they stay clean while bodged bits (0,2,3,5,6,7) corrupt, the difference is the bodges, not the probe.
+2. **Log the symptom across load states** (antennas out / antennas in, LA off / antennas + LA on). If `Sirq bad` or the sync behaviour tracks the loading, that itself demonstrates a perturbation-sensitive marginal bus.
+
+This also explains the new `Sirq bad`: the dangling antennas add C to the Vcd bus, and **VIDC's sound registers are programmed over the same Vcd/DIN bus as the video registers** — so a clipped *sound*-register write fails Sirq exactly as a clipped video write fails Virq. Failure migrating Virq→Sirq (rather than staying put) + intermittent (seen before, stopped) = textbook marginal-bus fingerprint.
+
+### Marginal-bus / grounding analysis (fix candidates, deferred until the trace says which)
+
+Root-cause mechanics if hypothesis B holds:
+- **The loop driver is the vertical board-to-board transition, not the horizontal run.** Bodges lying flat on the ground plane minimise *loop height* (good, probably why POST passes), but each signal also makes a vertical excursion **up to the daughterboard buffer and back down**. That up-and-back loop is set by **where the daughterboard ground reconnects to the motherboard plane relative to where each signal crosses up** — flat-on-plane does nothing for it.
+- **Why the system bus is fine with the same grounds:** its buffer-input crossings have close returns (internal routing / header), so tiny crossing loops; the vcd *outputs* fly out to scattered drilled-out vias = big crossing loop each. Same plane, same grounds — different transition geometry. (Only one *short* system-bus bodge vs six *long* video bodges.)
+- **Ground plane looks visually intact**, but the corrosion zone (battery leak + multiple drilled vias) is exactly where it's most likely pitted/discontinuous under the bodges — a wire flat on a *damaged* plane doesn't get a clean image return.
+- **Non-ground factors:** RP series value (a wrong/high value slows every edge bus-wide = the "fast toggles merge" symptom — LCR-measure it, cheap); crosstalk between the six parallel bodges (the plane under them doesn't stop wire-to-wire coupling).
+- **Grounding nuance:** at bus edge-rates the concern is return-loop *area/inductance*, not analog-style ground loops — multiple *short* ties to the plane only help; a single *long* ground wire is the harmful case. The unused star-ground point is an analog concept; use it as one more tie, not as a star topology.
+
+**Fix candidates (scale to evidence):**
+- Re-thread each marginal signal through its **original drilled-out via hole** (restores the z-axis path, drops a joint vs the current two-stage thin-link-then-bodge) **+ a paired ground** down the same widened hole or stitched right beside it → near-coaxial return, tiny crossing loop. This is the thing the system bus has and the flying bodges don't.
+- Or a couple of short ground stitches near where the wires cross up.
+- Or twisted-pair (signal + its own ground) on the worst bodges.
+- **One or two bits soft → targeted per-wire fix; bus-wide → grounding rework + RP.** Don't rework all six on theory.
+
+**Testable prediction:** if loop-area/length is the mechanism, the **physically longest bodge should be the most marginal.** Map the soft bit(s) onto the wire-length ranking: soft bit = longest wire ⇒ confirms mechanism (fix = routing/length + paired ground); soft bit ≠ longest ⇒ look local (that bit's via / plane defect / RP) instead. So the trace identifies the bit *and* tests the theory.
+
 Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25 (fsynreg), §4.1.26 (conreg/pixel clock); [external/Kernel/TestSrc/Vidc](external/Kernel/TestSrc/Vidc) (TestVIDCTAB literal validates the decode); [external/Kernel/TestSrc/Begin](external/Kernel/TestSrc/Begin) (Sirq/Virq test order).
