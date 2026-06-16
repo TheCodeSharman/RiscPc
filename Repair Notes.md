@@ -1482,3 +1482,33 @@ The display works but shows a **green colour cast with fine, regular light verti
 **Narrowing:** green ⇒ fault in **Red (D0–7)** or **Blue (D16–23)** lane (not Green); **stripe period** ⇒ which pixel/nibble ⇒ which 4 data lines; intersect the two for the single suspect line.
 
 **Next steps:** use the now-booted RISC OS to run palette/fill tests (set known colours, observe which bit is wrong) to pinpoint Red-vs-Blue and the bit position in minutes — faster than blind tracing — then compare that one line **system-side vs post-buffer Vcd**. Suspect a bus bodge wire on that line.
+
+### Refinement — it's ONE shared-bus fault, two symptoms (not separate)
+
+A solid-fill test (desktop background) settled the positional-vs-palette question: the fill is **uniform green base + a yellow stripe every 8 pixels**. So *both* effects are present:
+
+- **Bulk green** = palette/colour corruption. In 4 bpp a single data line can only hit one pixel-in-eight, so it *cannot* colour all pixels uniformly → the bulk error must be **palette**, not a pixel-data line.
+- **Yellow stripe every 8 px** = the positional pixel-data effect (period 8 = pixels per 32-bit word).
+
+**Unifying insight (key):** this machine has **no VRAM**, so VIDC video-DMA reads come from DRAM over the **same buffered system bus** the CPU uses to write the VIDC palette. One faulty buffered bus line therefore corrupts **both** palette writes (bulk colour) **and** pixel DMA (stripe). So it's a single root — the buffered video bus / the bus bodges — with two visible symptoms. (Earlier "purely positional D7 on DMA" and "purely palette" were each half the picture.)
+
+**Bit count:** grey→green means **Red and Blue both suppressed** — different byte lanes, so a single line can't do it ⇒ expect **≥2 stuck bits**, consistent with the multiple bus bodges in the repair history. The every-8px stripe is just the most *visible* of them. (Consistent example: background colour 1 → base reads green, stripe = colour 1+8 = colour 9 = yellow, rendered correctly.)
+
+Why timing/geometry still works: the bad bits land in the R/G/B and pixel-nibble fields; the timing/control register writes don't depend on those exact bit positions, so sync/size stay correct while colour and pixels don't.
+
+### Diagnostic tools added: `tools/risc-pc-diag/`
+
+RISC OS BASIC tools to map a wrong colour bit straight to a bus data line:
+- `oneliners.txt` — type `MODE27` once, then `VDU19,0,16,R,G,B` per test (screen recolours instantly, no CLS). Annotated with the bit→D-line map.
+- `VIDCpoke.bas` — 1-line interactive: `RUN`, then type R,G,B per test.
+- `VIDCbits.bas` — guided walk of all 24 R/G/B bits on a full-screen fill.
+- `README.md` — how to run (F12 → `BASIC`) + interpretation.
+
+Bit→line map (palette lanes D0–7=Red, D8–15=Green, D16–23=Blue): **R bit b → D[b], G bit b → D[8+b], B bit b → D[16+b]**.
+Read: White-not-white ⇒ bit stuck low; Black-not-black ⇒ bit stuck high.
+
+### Plan for next session
+1. Run the palette test (`VIDCpoke.bas` or the one-liners) — record which R/G/B bits are wrong and stuck high vs low.
+2. Map the wrong bits to D-lines (table above).
+3. **Inspect/trace those specific bodge wires** (system-side vs post-buffer Vcd) — fixing them should clear both the colour cast and the every-8px stripe (shared bus).
+4. Expect ≥2 lines (green = Red + Blue suppressed). Cross-check the bits against the VIDC timing-register layout to confirm why geometry survives them.

@@ -1,0 +1,61 @@
+VIDC palette / video-bus bit test - immediate-mode one-liners
+=============================================================
+No program needed. Type each line at the BASIC > prompt and press Return.
+
+Type this ONCE (clears the whole screen to logical colour 0):
+
+    MODE27
+
+After that, each test is just a re-poke of colour 0's palette. The whole
+screen recolours INSTANTLY - no CLS needed:
+
+    VDU19,0,16,R,G,B        (R,G,B = 0-255)
+
+--- Sanity checks ---
+    VDU19,0,16,255,255,255      white   (should be white)
+    VDU19,0,16,0,0,0            black   (should be black)
+    VDU19,0,16,255,0,0          red
+    VDU19,0,16,0,255,0          green
+    VDU19,0,16,0,0,255          blue
+
+--- Walk RED bits (D0..D7) ---
+    VDU19,0,16,128,0,0          R bit7  -> data line D7
+    VDU19,0,16,64,0,0           R bit6  -> D6
+    VDU19,0,16,32,0,0           R bit5  -> D5
+    VDU19,0,16,16,0,0           R bit4  -> D4
+    VDU19,0,16,8,0,0            R bit3  -> D3
+    VDU19,0,16,4,0,0            R bit2  -> D2
+    VDU19,0,16,2,0,0            R bit1  -> D1
+    VDU19,0,16,1,0,0            R bit0  -> D0
+
+--- Walk GREEN bits (D8..D15) ---
+    VDU19,0,16,0,128,0          G bit7  -> D15
+    VDU19,0,16,0,64,0           G bit6  -> D14
+    VDU19,0,16,0,32,0           G bit5  -> D13
+    VDU19,0,16,0,16,0           G bit4  -> D12
+    VDU19,0,16,0,8,0            G bit3  -> D11
+    VDU19,0,16,0,4,0            G bit2  -> D10
+    VDU19,0,16,0,2,0            G bit1  -> D9
+    VDU19,0,16,0,1,0            G bit0  -> D8
+
+--- Walk BLUE bits (D16..D23) ---
+    VDU19,0,16,0,0,128          B bit7  -> D23
+    VDU19,0,16,0,0,64           B bit6  -> D22
+    VDU19,0,16,0,0,32           B bit5  -> D21
+    VDU19,0,16,0,0,16           B bit4  -> D20
+    VDU19,0,16,0,0,8            B bit3  -> D19
+    VDU19,0,16,0,0,4            B bit2  -> D18
+    VDU19,0,16,0,0,2            B bit1  -> D17
+    VDU19,0,16,0,0,1            B bit0  -> D16
+
+Interpretation
+--------------
+- White not white  -> a bit STUCK LOW (the dim/missing channel).
+- Black not black   -> a bit STUCK HIGH (note the tint -> which channel).
+- A walking-bit line that shows BLACK when set -> that bit STUCK LOW.
+- A tint that appears where it shouldn't (esp. in the Black test) -> STUCK HIGH.
+
+Palette write byte lanes:  D[7:0]=Red,  D[15:8]=Green,  D[23:16]=Blue.
+A wrong bit maps straight to the data line shown above = the system-bus
+line to trace/fix. Because video DMA shares this buffered bus (no VRAM),
+fixing those lines also clears the every-8-pixel stripe.
