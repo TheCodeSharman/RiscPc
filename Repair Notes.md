@@ -1379,3 +1379,106 @@ Either outcome is informative. The test takes ~10 minutes given the I²C decoder
 ### Important: this doesn't fix the display
 
 If the +12V VCO hypothesis is right, the display will still be in bad-sync after the CMOS sync byte is corrected — the VCO can't reach the commanded pixel clock regardless of what the kernel asks for. This test only resolves the months-old question about the keyboard / KeyWait timing and gets the CMOS into a cleaner state for when the VCO IS fixed. Do it in parallel with the +12V test; the two threads are independent.
+
+---
+
+## Jun 16 2026 — decoded POST fault codes + IOMD pin 119 lifted, repair in progress
+
+### Decoded POST captures (actual readings, not just the encoding)
+
+Two real POST fault strings were decoded this session:
+
+- **`Virq bad 5.FFFFF`** — decodes to `r0 = &5FFFFF` from the failure path at [TestSrc/Vidc:120-122](external/Kernel/TestSrc/Vidc#L120-L122) (`LDR r0,=&fffff` then `ORRS r0,r0,r7,LSL #20`). Low 20 bits `FFFFF` = **vsync pulse never appeared** (the ~200 ms polling timeout). Top nibble `5` = `r7` = `VIDVCOWAIT` (=`&5`, [Vidc:49](external/Kernel/TestSrc/Vidc#L49)) = the **VCO clock loop**. Since the test only reaches the VCO loop if the reference-clock pass already succeeded ([Vidc:181-190](external/Kernel/TestSrc/Vidc#L181-L190)), this reads as: **24 MHz reference clock → correct 20 ms vsync → PASS; switch to VCO clock → no vsync at all → FAIL.** Direct functional confirmation of the starved-VCO / missing-+12V hypothesis from the POST side.
+- **`Sirq bad 0017D`** — decodes to `r0 = r2 = &17D = 381 µs` (returned at [Vidc:371](external/Kernel/TestSrc/Vidc#L371)) vs the expected 10,030–10,290 µs ([Vidc:351-356](external/Kernel/TestSrc/Vidc#L351-L356)). Crucially this is **not** the timeout path (that returns `r2 = 0` → `00000`, [Vidc:335-337](external/Kernel/TestSrc/Vidc#L335-L337)); it reached the completion path ([Vidc:343-349](external/Kernel/TestSrc/Vidc#L343-L349)), meaning the `SD0ST` completion bits asserted — but the DMA "completed" ~26× too fast.
+
+**Refined SIRQ discriminator:** the observed signature is "DMA reports complete almost immediately," NOT the "handshake never fires → timeout" that the earlier repair plan predicted. This points at a spurious/stuck `SD0ST` completion read rather than a dead `req`/`ack`. When re-testing after the 112/113 reflow, the discriminator is: value moves toward `~02710` (10 ms, passing) = fixed; drops to `00000` (timeout) = fault *changed*, not fixed.
+
+### POST cannot test low-order RAM address lines — 118/119/120 were never actually exonerated
+
+The only POST test that checks address-line *uniqueness* is `ts_LineTest` in [Mem1IOMD](external/Kernel/TestSrc/Mem1IOMD), and it walks **only A18–A25** ([Mem1IOMD:119-130](external/Kernel/TestSrc/Mem1IOMD#L119-L130), `MOV r8,#A19` … `TEQ r8,#A26 ; only test up to A25`) plus a min-size check at A18. Its purpose there is memory sizing / bank detection, not low-line integrity. The Mem2 pattern test writes checkerboard-style data, which aliases silently and can't detect a doubled-up address either.
+
+Pins **118/119/120 = `Xra[0..2]`** are the **low** multiplexed address lines — exactly the bits POST never uniqueness-tests. So a damaged low Xra line passes POST; a damaged *high* Xra line (carrying A18–A25) would fail. This explains why all three "passed" the RAM test despite being in the braid-damaged block. **Downgrade the earlier "118/119/120 — Working, RAM POST passes" rows to "untested by POST (line test covers A18–A25 only)."** (The "not populated" idea trims only the *top* of the tested range; `Xra[1]` is at the bottom and is never reached regardless of RAM fitted.)
+
+Caveat keeping "lifted ≠ open" alive: a *cleanly* open `Xra[1]` would corrupt RAM on nearly every access, yet the machine has done plenty of RAM-dependent work across sessions (CMOS I²C reads, VIDC reprogramming capture, full POST). So before repair it was most likely **intermittently contacting**, not truly open — consistent with the flaky "comes and goes" history.
+
+### IOMD pin 119 — visually confirmed lifted, now repaired
+
+- **Pin 119 (`Xra[1]`) found visibly lifted under magnification.** First *direct visual* confirmation of the braid-over-wicking damage theory for the 112–120 block (previously inference only). Raises the prior that adjacent pins (esp. 112/113) are also compromised.
+- **Pin 119 now has confirmed continuity** (meter) after rework. Since POST can't verify a low address line, meter continuity *is* the verification for this pin.
+- **Pin 117 (`XNprog`, VIDC register-write strobe)** — lifted trace re-secured by re-adding UV solder mask to hold it in place. 117 is a known-good path (VIRQ passes + VCO locks ⇒ nPROG reaching VIDC), so this is protecting an existing good joint. **Status: solder mask curing under UV at time of writing.**
+
+### Workshop lesson learned
+
+The rework was *much* easier under higher magnification using the **L lens** on the microscope. Default to the L lens for fine-pitch (0.5 mm) SQFP work from now on rather than struggling at lower magnification.
+
+### Still outstanding after cure
+
+- **SIRQ:** reflow/inspect **112 (`XNsndrq`) / 113 (`XNsndak`)** — the actual sound-DMA handshake pins. 119/117 do not address SIRQ.
+- **VIRQ / display:** the **+12 V rail** to the VCO (still never connected on the bench) — confirmed as the leading explanation by the decoded `Virq bad 5.FFFFF` above.
+- Re-run POST after cure to check for regressions (won't validate 119 itself — see blind-spot note).
+
+---
+
+## Jun 16 2026 — RESOLVED: working VGA display. Both root causes found and fixed.
+
+**The machine boots to a stable VGA desktop.** After a multi-session hunt, the two POST failures resolved to two *independent* faults — which is why their monitor-dependence looked like one baffling anti-correlated symptom.
+
+### Root cause #1 — SIRQ: solder bridge IOMD 112↔113 (`XNsndrq`↔`XNsndak`)
+
+A **hairline solder bridge between IOMD pin 112 (XNsndrq) and 113 (XNsndak)**, created during the earlier braid rework, shorted the sound-DMA **request to its own acknowledge**. That ties a VIDC output (nSNDRQ) to an IOMD output (nSNDAK) → the two drivers fight → the net sits at an indeterminate ~1 V → the handshake is destroyed → the erratic, *varying* SIRQ failures (`0017D`/`00053`/`00179` = 83–381 µs, all far short of the expected ~10,030 µs).
+
+- **Found by:** scope showed ~1 V (not a valid logic level) on the sound-handshake net at the correct ~30 kHz-ish activity; identical waveform on two pins ⇒ shared node ⇒ bridge. Only **visible under high magnification** (L lens). (Note: an initial pin-miscount pointed at VIDC 134/135; the real bridge was IOMD 112–113. The two nets are the same — VIDC 135↔IOMD 112, VIDC 138↔IOMD 113 — so a meter reads the short at either end; *location* requires visual inspection.)
+- **Fixed by:** a touch-up with the iron melted the bridge and cleared it.
+- **Why it eluded the earlier checks:** the prior "112/113 reflowed, continuity good" test was **pin → destination**, which only finds *opens* — a bridge between adjacent pins is invisible to it (both pins still reach their destinations). This ties the failure straight to the documented "SIRQ appeared after the IOMD repair" timeline: the braid work made the bridge.
+
+### Root cause #2 — VIRQ: missing +12 V rail (starved VCO) — NOT a board fault
+
+`Virq bad 5.FFFFF` = the VCO loop produced no vsync. The VCO (discrete current-starved oscillator, sheet 5) is biased from **+12 V**, and the **bench bring-up only ever supplied +5 V** — the +12 V rail was never connected. So the VCO was starved (`Vcc_04` ~1.17 V instead of ~8.5 V) and couldn't lock.
+
+- **Confirmed by:** powering the +12 V rail → **VIRQ passes with the monitor unplugged** (no more monitor-propping). The VCO circuit is healthy; it just needed its rail. **No board repair was required for VIRQ.**
+- The "few hundred ohms" the rail showed when back-fed was the VCO's normal operating draw, not a leakage/short.
+
+### The monitor-dependence, fully explained
+
+The original baffling symptom — *VIRQ bad unplugged / SIRQ bad plugged* — was **two independent faults**, each correlating with monitor state for unrelated reasons:
+- **VIRQ:** the starved VCO sat right at its locking threshold; plugging the monitor propped it just over via grounding (cable shield/returns) + a 1.6 V back-feed (monitor's DDC +5 V → VGA pin 12 → board's 1 kΩ → floating 12 V rail). A *trickle*, enough to tip a knife-edge oscillator. Powering the real rail removes the dependence entirely.
+- **SIRQ:** the 112–113 bridge, with the failure mode interacting with TV-vs-VGA mode selection (monitor ID on **pin 11**).
+
+### Supporting fixes this session
+- **140↔141 short cleared:** a tacked wire had bridged VIDC **pin 140 (nPROG)** to **pin 141 (SINK)**. SINK is the genlock vertical-reset input, tied low → this shorted the active-low nPROG write-strobe toward ground → VIDC continuously latched garbage → produced the transient `both bad` capture (refclk VIRQ `0.00006` + fast SIRQ). Rerouting it restored normal nPROG.
+- **Pin 119 (`Xra[1]`) lift:** visually-confirmed lifted, continuity restored. (POST can't validate a low Xra line — `ts_LineTest` only walks A18–A25 — so meter continuity was the verification.)
+
+### Reference findings (not faults)
+- **VGA pin 12 = +12 V via 1 kΩ (SCART function-switching signal)**, per the RPC TRM — Acorn's non-standard pinout (monitor ID is on **pin 11**, pin 9 = +5 V). A plain VGA monitor clamps pin 12 to ~5.5 V and harmlessly sinks the current-limited ~6 mA into its own 5 V rail — which is why decades of Acorn+VGA use show no monitor damage. (Risk only with *active* inline devices — KVMs, splitters, scan converters.)
+
+### Final step to a picture
+Held **R at reset** → CMOS rewritten to **MonitorType=Auto / Sync=Auto** → VGA mode selected → **stable VGA display.** Side note: a successful R-reset proves the **keyboard IS read during the early reset window**, disproving the sessions-5/6 "late keyboard / KeyWait misses scan codes" theory.
+
+### Lessons captured
+- **Post-rework continuity = TWO passes:** (1) each pin → its destination (catches opens/cold joints), and (2) each pin → its immediate neighbours (catches bridges). **Braid over-wicking produces *both* failure modes** — opens (pin 119) *and* bridges (112–113) — so one pass misses half. The missing pass-2 is exactly what hid the SIRQ bridge.
+- High magnification (L lens) was essential for the hairline bridge — default to it for 0.5 mm SQFP work.
+- A meter reads a net-to-net short at *either* end; **locating** a bridge requires visual inspection, not the meter.
+
+### To lock in / confirm
+- **+12 V permanence:** ensure the real power setup supplies +12 V every boot (bench had only +5 V). No board fix needed.
+- **CMOS persistence:** confirm Auto config survives a power cycle without holding R (depends on RTC/CMOS battery — see [[pcf8583-control-register-bit-order]]).
+- **Display stability** across a few modes (VCO now has real headroom).
+
+### Follow-on (same session) — video data-path corruption: green cast + vertical stripes
+
+The display works but shows a **green colour cast with fine, regular light vertical stripes** (see `DisplayPutputCorruption.jpeg`). The boot reaches the desktop and throws a harmless "Disc error 21" (empty drive — expected). So this is a *remaining* video-data-path fault, not a regression.
+
+**Mode:** default WimpMode for a Colour VGA monitor (MonitorType/Mode = Auto after the R-reset) is **Mode 27 = 640×480, 16 colours = 4 bpp** ([Doc/MonLead](external/Kernel/Doc/MonLead#L92): Colour VGA → default mode 27).
+
+**Leading diagnosis — ONE Vcd data line stuck low explains both symptoms:**
+- **White-ish vertical stripes** = some pixels forced *toward colour 0 (white)* periodically → a data bit pulled low corrupting the same nibble position in every word.
+- **Green cast** = a **Red or Blue** palette component bit forced low when the palette is programmed over the *same* Vcd bus → R & B suppressed → grey reads green. **Green survives, so the Green lane (D8–15) is intact.**
+- The palette *and* the pixel data both travel the Vcd bus, so a single bad line does both. This is exactly the **post-buffer Vcd path** flagged earlier as the one never-verified link — now finally observable on a working display.
+
+**Bit mapping (to locate the line):**
+- 4 bpp pixel packing within a 32-bit fetch: pixel n = **D[4n .. 4n+3]** (p0=D0–3, p1=D4–7, … p7=D28–31).
+- VIDC20 palette write layout ([VIDC20.pdf §1.2.3](docs/VIDC20.pdf)): **D[7:0]=Red, D[15:8]=Green, D[23:16]=Blue, D[27:24]=ext**.
+
+**Narrowing:** green ⇒ fault in **Red (D0–7)** or **Blue (D16–23)** lane (not Green); **stripe period** ⇒ which pixel/nibble ⇒ which 4 data lines; intersect the two for the single suspect line.
+
+**Next steps:** use the now-booted RISC OS to run palette/fill tests (set known colours, observe which bit is wrong) to pinpoint Red-vs-Blue and the bit position in minutes — faster than blind tracing — then compare that one line **system-side vs post-buffer Vcd**. Suspect a bus bodge wire on that line.
