@@ -23,7 +23,7 @@
       "lockedItems": false,
       "otherItems": true,
       "pads": true,
-      "text": true,
+      "text": false,
       "tracks": true,
       "vias": true,
       "zones": true
@@ -59,7 +59,7 @@
     "ssh_key": ""
   },
   "meta": {
-    "filename": "RiscPCVideoBusRepair.kicad_prl",
+    "filename": "RiscPcVideoBusRepair.kicad_prl",
     "version": 5
   },
   "net_inspector_panel": {
