@@ -1092,6 +1092,14 @@ nPROG-as-external-clock didn't work, so capture is timed/transition-sampled with
 
 [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25: **fsynreg (addr DH)** — `r` (ref-clock modulus) = bits[5:0], `v` (VCO modulus) = bits[13:8], r-test bits[7:6], v-test bits[15:14]. **Programmed field = modulus − 1.** PLL locks at ref/r = VCO/v ⇒ **F_vco = 24 MHz × (v+1)/(r+1)**.
 
+[docs/Application Note 17 - VIDC20 clock sources.pdf](docs/Application%20Note%2017%20-%20VIDC20%20clock%20sources.pdf) §3 spells out what the test bits actually do:
+- **bit 6** = force pcomp HIGH and driven
+- **bit 7** = clear r-modulus counter
+- **bit 14** = force pcomp LOW and driven
+- **bit 15** = clear v-modulus counter
+
+AN17 §4 ("Phase Comparator Reset") prescribes the power-up sequence: program bits 15, 14, 7 HIGH and bit 6 LOW, with `r > v`, to force the VCO low. Decoding POST's `D000C385`: bit15=1, bit14=1, bit7=1, bit6=0; r-modulus 6, v-modulus 4 (r > v). **POST is executing the AN17 reset procedure verbatim** — the "16 MHz" the formula gives is incidental; the actual purpose of these bits is to bring the loop up safely from power-on. The handoff write `D0001404` then *clears* the test bits, releasing PCOMP to its normal tristate operation. This is AN17's two-step "program the moduli with test bits asserted, then clear test bits" prescription executed exactly as documented.
+
 Cross-validated against [TestSrc/Vidc](external/Kernel/TestSrc/Vidc): the POST table literal is `&D000C385 ; FSYNREG, clk = (3+1)/(5+1)*24MHz = 16MHz`. Slice B's POST FreqSynth write read `D000C305` — **upper byte `C3` matches the source `C3` exactly** (v-field 3 + test bits), proving slice B's D8–D15 mapping is correct.
 
 Stitched handoff values (low byte from A, upper byte from B):
@@ -1207,6 +1215,8 @@ Topology (Q2 pin 1 = emitter, pin 2 = base, pin 3 = collector; Q3 pin 1 = emitte
 - **Vcc_04 powers the two 74AC04 inverters (IC32)** — labelled `Vcc=Vcc_04, GND=Vcostarpt`. INV1 (pin 9→8) self-oscillates with R197 (68R) feedback + C141 (5p6) input cap; frequency set by inverter propagation delay, which depends on Vcc_04 (low Vcc_04 = slow tpd = low frequency, high Vcc_04 = fast tpd = high frequency). INV2 (pin 5→6) buffers the output to Vclk1 via C128 (33n10T) AC-coupling cap.
 
 With +12V supplied, the loop drives Vcc_04 from ~1V (low frequency, ~15–20 MHz floor) up to ~4.3V (high frequency, ~135 MHz ceiling), covering all VIDC pixel-clock targets.
+
+**Canonical reference:** [docs/Application Note 17 - VIDC20 clock sources.pdf](docs/Application%20Note%2017%20-%20VIDC20%20clock%20sources.pdf) — ARM's December 1994 application note documents this exact topology as the recommended reference design (§3 Figure 3-4: "Suggested VCO/PLL Circuit"). Confirms the supply-modulated 74AC04 inverter approach, the AC-coupled output with mid-rail bias on VCLKI, and the tristate PCOMP behavior ("for most of the time is at the tri-state value"). Acorn's actual implementation **elaborates on** the AN17 reference design in two key ways: (1) **two transistors instead of one** (Q2 PNP transconductance amp ahead of Q3 NPN emitter follower) for better loop linearity; (2) **+12V supply instead of Vdd (+5V)** to give Q2 enough emitter headroom to stay in active mode across the full control range. The +12V requirement that confused us isn't in AN17 — it's a consequence of Acorn's specific elaboration. Our schematic-derived analysis correctly identified both the function and the purpose of these elaborations from first principles.
 
 ### Why a missing 12V rail would explain the symptoms
 
