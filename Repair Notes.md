@@ -1512,3 +1512,75 @@ Read: White-not-white ⇒ bit stuck low; Black-not-black ⇒ bit stuck high.
 2. Map the wrong bits to D-lines (table above).
 3. **Inspect/trace those specific bodge wires** (system-side vs post-buffer Vcd) — fixing them should clear both the colour cast and the every-8px stripe (shared bus).
 4. Expect ≥2 lines (green = Red + Blue suppressed). Cross-check the bits against the VIDC timing-register layout to confirm why geometry survives them.
+
+---
+
+## Jun 17 2026 — RESOLVED: video corruption was Vcd14↔Vcd15 short on the series RP. Display clean.
+
+**The machine now displays a clean desktop with the correct palette.** The "green cast + vertical stripes" symptom turned out to be **one fault, not two** — a single solder bridge shorted **Vcd14 to Vcd15** on the series resistor pack between IC26 and VIDC20. The Vcd0–7 bodges were a red herring; the actual fault lived on the upper-byte bus path the prior repair never touched.
+
+### The wrong theory(ies) we ran first
+
+The session opened by chasing several wrong/incomplete theories before landing on the right test:
+
+1. **Bus RC slew** — pattern-dependent corruption (4-col broken, 2-col fine, solid fills OK) is consistent with edges not settling at higher word rates. Predicted: 256-col mode should be worst. Result: MODE 28 was *visually cleanest*. Theory looked dead.
+2. **Inside-VIDC20 bit fault** — but the "second pixel always wrong" → "third pixel always wrong" → "pixel 3" recounting kept shifting which bit-range to suspect (4-7, 8-11, 12-15). Direct walking-bit tests over each of these came up clean.
+3. **CPU-write-path corrupting specific bits** — desktop background stripes appear without any text writes, so write-path-only theories are dead.
+4. **Font/character-ROM corruption** — desktop background stripes happen without any glyphs, so font-only theories are dead.
+
+The decisive observation: **the desktop background showed corruption** (so it's a read-path issue affecting bulk video DMA, not a write-time or font issue) **but walking-bit tests with quiet neighbours showed nothing wrong on any individual bit**. That combination only fits a fault that needs the two bits to be set differently — i.e. **a short between two lines**, not a stuck bit.
+
+### The test that finally worked
+
+`tools/risc-pc-diag/Walk27.bas` (parameterised walking-bit + PATTERN selector) run with:
+- `SCRMODE% = 0` (BBC MODE 0, not VGA — different timing, walks the bit range we hadn't tested)
+- `FIRSTBIT% = 0, LASTBIT% = 30` (wide range — covers bits never tested before)
+- `PATTERN% = 1` (INVERT — wordA = mask, wordB = NOT mask, so all bits toggle every word)
+
+Result: **stripes 14 and 15 were corrupt and identical**. When bit 14 was set, bit 15 came along; when bit 15 was set, bit 14 came along. Classic two-line short signature.
+
+**Why narrower or single-bit-walking tests missed it:** with PATTERN=0 (mask/0), walking bit 14 sets D14 in wordA and clears it in wordB; D15 is *always* 0. The two lines never need to differ, so the short stays invisible. PATTERN=1 (mask/~mask) forces D14 and D15 to be set *oppositely* — that's when the short produces wrong values.
+
+### The diagnostic chase that localised it
+
+1. **Bit pair identified** as D14/D15 from the visible stripe corruption pattern in MODE 0.
+2. **TRM look-up** found four 74ACT244 buffers on the video bus (IC22, IC26, IC30, IC33). Michael located **IC26 pins 3 (2Y4) and 5 (2Y3)** as the buffer outputs driving Vcd14 and Vcd15 from the schematic.
+3. **Multimeter measured 1 Ω** between IC26 pin 3 and pin 5 — short confirmed.
+4. **No visible bridge at IC26** under magnification. But a 1 Ω reading *constrained* the location — a series resistor pack (RP) sits between IC26 and VIDC20, and any short on the VIDC20 side would have added the series-R values (typically ~50–66 Ω total for 22–33 Ω damping resistors). 1 Ω therefore means the short is **before the RP**.
+5. **Visual inspection of the RP** revealed a solder bridge across two of its pins on the IC26-facing side.
+6. **Flux + wick** cleared the bridge. Continuity post-clean: open.
+7. **Re-test:** Walk27.bas MODE 0 PATTERN=1 → stripes 14 and 15 now independent. Boot into MODE 27 desktop → clean grey background, no green cast, no stripes, palette renders correctly.
+
+### One fault, all symptoms
+
+The "two phenomena" theory (mode-dependent comb + mode-independent colour tint) collapsed to one root:
+
+- **Green cast on the desktop background** = the dither pattern uses palette indices whose lookup depends on D14/D15 being independent; the short forced them equal → wrong palette index → green tint instead of grey.
+- **"Pixel 3" corruption near text** = D14/D15 are the upper nibble of byte 1 = pixel 3 in 4-bpp packing; data that should set D15 without D14 (or vice versa) gets corrupted by the short.
+- **Mouse-cursor purple line** = same mechanism on cursor palette entries.
+- **Mode-dependence** (MODE 26/27 obviously broken, MODE 28 superficially cleaner) was a *visibility* artifact: MODE 28's byte-per-pixel packing hides bit-position-in-word faults as subtle per-pixel tint instead of as a comb pattern, but the underlying fault is identical.
+
+### Tools added: `tools/risc-pc-diag/Walk27.bas`
+
+Parameterised walking-bit pattern generator. Three knobs at the top:
+- `SCRMODE%` — VGA modes 25/26/27/28 or BBC modes (MODE 0 was the decisive one here).
+- `FIRSTBIT% / LASTBIT%` — range of data bits to walk; each stripe walks one bit.
+- `PATTERN%` — 0 = SINGLE (mask/0, quiet bus), 1 = INVERT (mask/~mask, max SSO), 2 = AGGRESSOR_HI (target stays high while others switch), 3 = AGGRESSOR_LO. Includes a memory-readback debug PRINT to verify writes are landing (we needed this to rule out a BBC BASIC parser quirk during the chase).
+
+Also documents the **RISC OS 16-colour flash-pair palette trap**: indices 8–15 default to "flashing pairs" that statically render as the *second* colour of each pair (so palette[15] = black = palette[0], palette[14] = red = palette[1]). This makes PATTERN=1 inverse-stress patterns render *identically* to PATTERN=0 in MODE 27 unless you override the high palette entries with `VDU 19,15,16,255,255,255` etc. Without that override, the bus stress is real but visually invisible — exactly what tripped us up mid-session.
+
+### Lessons captured
+
+- **A short between two bus lines is invisible to single-bit walking patterns.** Both bits at the same level satisfies the short; no conflict, no visible error. Future bus diagnostics should default to running PATTERN=0 (catches stuck-bit faults) **and** PATTERN=1 (catches shorts) across a wide bit range.
+- **Don't trust narrow ranges.** Testing only D4–D7 because of "second pixel" intuition missed the fault entirely — the actual fault was on D14/D15, in a range we initially had no reason to suspect.
+- **Don't assume your recent rework is the culprit.** All earlier theories implicitly blamed the Vcd0–7 bodge wires. The actual fault was rework collateral on a *different* nearby buffer (IC26), unrelated to the intentional repairs.
+- **Resistance values constrain location.** The 1 Ω reading ruled out everything beyond the series RP — that single number turned a "look everywhere along the trace" problem into "look at the RP." Don't skip the meter step in favour of jumping to visual.
+- **The MODE 27 default palette is treacherous for bit-inverse test patterns.** The flash-pair convention makes palette[8..15] look identical to palette[0..7] in static display. Override before any inverse-pattern visual test, or rely on the LA/memory-readback rather than the eye.
+- **Memory-readback PRINT debugging is invaluable.** Mid-session we wasted time wondering if `wordB%` writes were landing; a four-line readback confirmed the writes were perfect and the issue was purely palette mapping. Cheap, decisive.
+
+### Symptoms cleared
+- Green cast on desktop background: **gone**.
+- Vertical stripes on desktop background: **gone**.
+- "Pixel 3" corruption next to text: **gone**.
+- Mouse-cursor purple line: **gone**.
+- 4-colour grey desktop renders correctly: **yes**.
