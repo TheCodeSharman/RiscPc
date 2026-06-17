@@ -1189,20 +1189,27 @@ Sources: [docs/VIDC20.pdf](docs/VIDC20.pdf) §4.1.25 (fsynreg), §4.1.26 (conreg
 
 ### Schematic analysis (sheet 5 of 7, VCO Circuitry block, bottom-left)
 
-The VCO is a discrete current-starved oscillator, NOT a VCO that runs off its own logic Vcc. Topology:
+The VCO is a supply-modulated CMOS inverter relaxation oscillator. The oscillating element is a 74AC04 inverter (INV1) self-biased to threshold via R197, oscillating at its own propagation-delay-limited frequency. The propagation delay is modulated by varying the inverter's supply voltage (Vcc_04). The Q2/Q3 transistor pair is the analog control network that generates Vcc_04 from the loop's Pcomp signal.
 
-- **+12V → R193 (1K0) → R196 (3K3) → Vcostarpt** — voltage divider biasing **Q3's base** (BC849C NPN). With proper 12V: Q3 base sits at ~9.2V, Q3 emitter (= **Vcc_04**) at ~8.5V.
-- **Q3 collector** → L10 (33μH RF choke) → **+5V**. Q3 is the oscillator transistor.
-- **Q3 emitter = Vcc_04** node, which **powers the two 74AC04 inverters (IC32)** that buffer the oscillator to Vclk1. Inverters are labelled `Vcc=Vcc_04, GND=Vcostarpt` — they ride on the VCO's internal rail, not on system +5V.
-- **Q2 (BC859 PNP)** — emitter on the +12V rail (top of R193), base driven by **Pcomp** (VIDC's phase-comparator output, via R187 100K / R183 680R). Q2 is the **current-steering element** the loop uses to push the bias around. C134 (1μF) is the loop integrator on Q2 collector / Q3 base.
+Topology (Q2 pin 1 = emitter, pin 2 = base, pin 3 = collector; Q3 pin 1 = emitter, pin 2 = base, pin 3 = collector):
+
+- **+12V → R193 (1K0) → R196 (3K3) → node X** — 4K3 series chain from +12V down to a shared node. Node X can rise up to ~12V (when Q2 is off); when Q2 sinks current, node X drops toward 0V.
+- **Node X = Q2 emitter (pin 1) = Q3 base (pin 2)** — Q2's emitter and Q3's base are DC-tied together. C134 (1μF) is on this node to ground (Vcostarpt), acting as the loop integrator that stabilises the bias.
+- **Q2 (BC859 PNP) is a controlled current sink.** Base (pin 2) driven by **Pcomp** via the loop filter (R183 680R + R186 18R + C122 4u7). Collector (pin 3) → Vcostarpt (star ground). When Pcomp drives Q2's base low, Q2 turns on and sinks current from node X to ground, pulling node X (and Q3's base with it) down. When Pcomp rises, Q2 turns off and node X drifts up toward +12V via R193+R196. R193+R196 (high side) and Q2's collector-emitter path (low side) form a voltage-controlled divider with node X as the output tap.
+- **Q3 (BC849C NPN) is an emitter follower.** Base (pin 2) at node X, collector (pin 3) fed by **+5V via L10 (33μH RF choke)**, emitter (pin 1) = **Vcc_04**. Vcc_04 = node-X − 0.7V (Vbe drop). Vcc_04 tracks node X over a range of roughly 0V to ~4.3V (capped by Q3's collector at +5V minus Vce(sat)).
+- **Vcc_04 powers the two 74AC04 inverters (IC32)** — labelled `Vcc=Vcc_04, GND=Vcostarpt`. INV1 (pin 9→8) self-oscillates with R197 (68R) feedback + C141 (5p6) input cap; frequency set by inverter propagation delay, which depends on Vcc_04 (low Vcc_04 = slow tpd = low frequency, high Vcc_04 = fast tpd = high frequency). INV2 (pin 5→6) buffers the output to Vclk1 via C128 (33n10T) AC-coupling cap.
+
+With +12V supplied, the loop drives Vcc_04 from ~1V (low frequency, ~15–20 MHz floor) up to ~4.3V (high frequency, ~135 MHz ceiling), covering all VIDC pixel-clock targets.
 
 ### Why a missing 12V rail would explain the symptoms
 
-If +12V is missing (or being held at ~5V parasitically through some clamp/leakage path):
+If +12V is missing (or being held parasitically at a low voltage via leakage paths — see below: ~2V was observed, back-fed through the VGA port):
 
-1. **Bias divider output collapses.** Q3 base = 5 × 3.3/(1+3.3) ≈ 3.83V instead of 9.2V; Vcc_04 settles at ~3.18V instead of ~8.5V. Q3 still switches on, but in a starved, low-headroom regime.
-2. **Q2's compliance is destroyed.** Q2 is PNP — its emitter must sit above its base for it to source current. With emitter at ~5V instead of 12V, the loop simply cannot push Pcomp to a value that gives the collector current needed for high frequency. The phase-comparator loop saturates trying. **The upper tuning range is clamped shut.** This fits the observed 15 MHz lock-target far better than the simple "lower bias = lower freq" intuition would.
-3. **Vcc_04 ramping to 1.17V (session 4 observation) becomes a starvation symptom, not a "VIDC commanded slow"** — the loop is pushing as hard as it can but has no headroom. The "textbook acquisition transient" reading may have been wrong: it could have been the loop hitting its (artificially reduced) ceiling.
+1. **Q2's PNP headroom is destroyed.** Q2 is PNP — for it to be linearly controllable, its emitter must sit comfortably above its base. With the top of the 4K3 chain at only ~2V instead of +12V, Q2's emitter has no compliance to swing — it's stuck near or in saturation across the entire Pcomp range. Q2's small-signal transconductance — what the loop needs to convert Pcomp variation into node-X current variation — collapses.
+2. **Loop gain crashes; the upper tuning range is clamped shut.** With Q2 stuck near saturation, the PLL can't push node X up: small changes in Pcomp produce negligible changes in collector current. The phase comparator sees a persistent frequency error but the loop's control authority over Vcc_04 is gone. The PLL railed low is the only possible steady state.
+3. **Vcc_04 sitting at 1.17V (session 4 measurement) is a starvation symptom** — the loop is pushing as hard as it can but has no headroom. The 14–16 MHz observed frequency is the 74AC04 inverter's propagation-delay floor at that supply voltage, not a deliberate VIDC commanded value.
+
+**Observed parasitic +12V level:** measured ~2V at R195 on the bench when the +12V PSU lead was disconnected. Back-feed path: the monitor sources voltage on a VGA connector pin, which feeds through **R195 (1K0)** directly into the "+12V" net. The rail settles at the divider point between R195 and whatever DC load is on +12V (Q4 78L05 in dropout + audio op-amps + R193+R196 chain). With node X at ~1.87V (= Vcc_04 + Vbe = 1.17 + 0.7), only ~0.13V is dropped across the 4K3 chain — Q2 is barely conducting (~30µA), well below its linear region — but Q3 still acts as a follower producing Vcc_04 = 1.17V, enough for the inverters to oscillate at their propagation-delay floor (~14 MHz). Symptom = starved-but-functional; cure = supply real +12V.
 
 ### Why this is now the leading explanation (not just an alternative)
 
