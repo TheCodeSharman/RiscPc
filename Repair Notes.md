@@ -1098,7 +1098,9 @@ Stitched handoff values (low byte from A, upper byte from B):
 | POST | `D0000305` | 6 | 4 | (synth idle) | `02` | **RCLK (24 MHz)** | ÷1 | **24 MHz** — synth unused |
 | Handoff | `D0001404` | 5 | 21 | **100.8 MHz** | `0C` | **VCLK (the synth)** | **÷4** | **25.2 MHz** |
 
-**25.2 MHz = the standard VGA 640×480@60 pixel clock.** Handoff timing registers are VGA-consistent too (HCR upper byte `03` ≈ 0x320 ≈ 800 htotal; VCR `02`/`…3` ≈ 0x20B ≈ 525 vtotal) → 31.5 kHz HSync / 60 Hz VSync. **RISC OS programs a fully correct VGA mode at handoff.** (POST always displayed because its conreg selects RCLK — the raw 24 MHz reference — bypassing the synth entirely; only RISC OS routes pixel clock through the VCO.) The handoff is a proper two-write PLL load: first write asserts v-test bits (D14/D15), second clears them.
+**25.2 MHz = the standard VGA 640×480@60 pixel clock.** Handoff timing registers are VGA-consistent too (HCR upper byte `03` ≈ 0x320 ≈ 800 htotal; VCR `02`/`…3` ≈ 0x20B ≈ 525 vtotal) → 31.5 kHz HSync / 60 Hz VSync. **RISC OS programs a fully correct VGA mode at handoff.** The handoff is a proper two-write PLL load: first write asserts v-test bits (D14/D15), second clears them.
+
+POST does exercise the VCO during the VIRQ test's second pass ([TestSrc/Vidc:174-197](external/Kernel/TestSrc/Vidc#L174-L197)): the first pass runs on RCLK (24 MHz reference), then the test writes VIDVCOFREQ to set the **VCO to 24 MHz** and writes `&E0000400` to conreg to switch the pixel source to VCLK for the second pass. So the "POST passes / handoff fails" split isn't "POST avoids the VCO and handoff uses it" — both use the VCO. The decisive difference is the **commanded VCO frequency**: POST asks for 24 MHz (the low end of the VCO range, reachable even with a starved supply), handoff asks for 100.8 MHz (mid-range, needs the full +12V bias network compliance). A starved VCO sitting around 14–16 MHz can fudge a pass for 24 MHz but is nowhere near 100.8 MHz.
 
 ### What this overturns
 
