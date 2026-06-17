@@ -1569,6 +1569,10 @@ The "two phenomena" theory (mode-dependent comb + mode-independent colour tint) 
 - **Mouse-cursor purple line** = same mechanism on cursor palette entries.
 - **Mode-dependence** (MODE 26/27 obviously broken, MODE 28 superficially cleaner) was a *visibility* artifact: MODE 28's byte-per-pixel packing hides bit-position-in-word faults as subtle per-pixel tint instead of as a comb pattern, but the underlying fault is identical.
 
+### Why this fault didn't muddle mode setup (and the +12V fault could be diagnosed independently)
+
+The same Vcd14/Vcd15 lines that carry the green channel's MSBs in palette writes also carry the **v-test bits (bits[15:14]) of FSYNREG** in mode-setup writes. RISC OS always writes the test bits as 0 in normal operation (`D0001404` for the VGA-mode handoff — bits 14 and 15 both 0), so the short happens to land on a pair of always-equal bits during mode programming and is therefore invisible to the FreqSynth path. Mode-setup data survived the short cleanly; the mode-setup failure was entirely the missing +12V on the VCO bias network (Jun 16 entry) starving the analog loop. Two genuinely independent fault domains: bus-side palette corruption from the IC26↔VIDC20 RP bridge (this entry), and analog-loop starvation from the missing rail (Jun 16). If the short had landed on, say, vcd0↔vcd1, the FSYNREG `r` field would have been corrupted too and disentangling the two faults would have been substantially harder.
+
 ### Tools added: `tools/risc-pc-diag/Walk27.bas`
 
 Parameterised walking-bit pattern generator. Three knobs at the top:
