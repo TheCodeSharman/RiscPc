@@ -328,17 +328,35 @@ Results layout: `results/phaseN_{sa110,arm710}_{8bpp,16bpp,32bpp}.csv`.
   like modern shaded 3D? Per-pixel Lambert + procedural detail + alpha
   blending at a usable framerate on SA-110. Quantifies the headroom modern
   technique buys above what was actually shipped on this platform.
-- **32bpp Z-buffer in the alpha byte (sub-experiment):** VIDC20 ignores the
-  4th byte; we can use it for 8-bit Z at zero extra bus cost. The catch: Z-
-  test is read-modify-write, which defeats the write-buffer-streaming property
-  the rest of the project relies on. Viable strategy: **tile-based
-  rasterisation with cache-resident Z** — Hilbert/Morton traversal in 64×64
-  tiles (16 KB = D-cache size), RMW becomes a D-cache hit after the first
-  triangle in each tile. With VRAM fitted, splitting the buffers (colour in
-  VRAM write-only, Z in a separate DRAM buffer) wins instead. This is an
-  interesting regime shift: the optimisation game becomes about cache
-  residency rather than write-buffer drain. Different upper bound, same
-  research question.
+- **RMW path sub-experiment — Z-buffering, transparency, compositing:**
+  VIDC20 ignores the 4th byte at 32bpp; we can use it for 8-bit Z at zero
+  extra bus cost. The catch: any destination-reading effect (Z-test, alpha
+  blend, stencil) is read-modify-write, which defeats the write-buffer-
+  streaming property the rest of the project relies on. But **once you've
+  paid for the LDR, the marginal cost of additional effects is near-zero** —
+  the dst pixel is already in a register while the bus drains. So a single
+  RMW path supports:
+  - **Z-test + write** (opaque depth-buffered geometry)
+  - **Alpha blend** (transparency: `(src*a + dst*(256-a)) >> 8` on the byte
+    channels of 32bpp; per-channel bit-twiddle on 16bpp; palette-table lookup
+    on 8bpp)
+  - **Order-independent transparency** via the classic two-pass technique —
+    opaque front-to-back with Z-write, then transparent back-to-front with
+    Z-test-only-no-write. Both passes share the same tile working set; the
+    second pass hits D-cache for free.
+  - **Stencil masking** for one-bit composition effects
+  - **Compositing operators** (over/under/multiply etc) cheap once the LDR
+    is in flight
+  Viable strategy: **tile-based rasterisation with cache-resident framebuffer
+  tiles**. Hilbert/Morton traversal in 64×64 tiles (16 KB = D-cache size),
+  RMW becomes a D-cache hit after the first triangle in each tile. With VRAM
+  fitted, splitting the buffers (colour in VRAM write-only, Z in a separate
+  DRAM buffer) wins for pure Z-buffering — but the two-pass-with-blend
+  technique requires the colour buffer to be readable, which favours
+  colour-and-Z-in-DRAM (no VRAM, or a manually managed colour copy in DRAM).
+  The optimisation game shifts from write-buffer drain to **LDR-latency
+  budget**: how much useful compute fits between the load and the dependent
+  store. Same upper-bound research question, different regime.
 - **Cross-format comparison:** for each lighting scheme, measure same-scene
   output across 8bpp / 16bpp / 32bpp. The 8bpp-palette-ramps vs 16bpp-per-
   channel comparison is the key one — same visual problem, two paradigms.
