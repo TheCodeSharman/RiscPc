@@ -46,7 +46,10 @@
 set -euo pipefail
 
 RPCEMU_FORK_URL="${RPCEMU_FORK_URL:-https://github.com/TheCodeSharman/rpcemu.git}"
-RPCEMU_FORK_BRANCH="${RPCEMU_FORK_BRANCH:-feature/vram-honesty}"
+# main is the fork's integration branch (upstream + all patches applied).
+# upstream is RPCEmu mainline pristine, individual patches live on
+# feature/* branches with standing PRs.
+RPCEMU_FORK_BRANCH="${RPCEMU_FORK_BRANCH:-main}"
 RPCEMU_ROOT="${RPCEMU_ROOT:-$HOME/opt/rpcemu}"
 APT="${APT:-sudo apt-get}"
 

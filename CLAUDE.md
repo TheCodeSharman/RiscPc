@@ -89,36 +89,44 @@ as the design-discussion record.
 The raster-lab subproject builds a customised RPCEmu (`setup-rpcemu.sh`
 clones from it).  The fork at
 [TheCodeSharman/rpcemu](https://github.com/TheCodeSharman/rpcemu) uses a
-different branch model than this repo because **its `main` tracks RPCEmu
-upstream pristine** — we don't merge our patches into `main` there.
+different branch model than this repo because we don't control upstream
+RPCEmu (it's Mercurial at marutan.net, we can't push back).
 
 Layout:
 
-- `main` — RPCEmu upstream verbatim, tagged with the import version
-  (e.g. `v0.9.5`).  Only changes when we import a new upstream release.
-- `feature/vram-honesty` and other `feature/*` branches — **long-lived
-  patch branches** off `main`.  Each carries one cumulative patch.
-  Never merged into `main`.
-- The PR for each `feature/*` branch is a **standing review surface**
-  (not a "to be merged" thing).  Comments, additional commits, and
-  force-pushes (after upstream rebases) all happen on this PR.
+- **`upstream`** — RPCEmu upstream verbatim, tagged with import versions
+  (`v0.9.5`, `v0.9.6`, ...).  Only changes when we import a new upstream
+  release.  This is what gets diffed-against to produce patches we email
+  to marutan.
+- **`main`** — the **integration branch**.  `upstream` + all our patches
+  applied (currently just the one).  This is what `setup-rpcemu.sh`
+  clones and what consumers actually use.
+- **`feature/vram-honesty`** and other `feature/*` branches —
+  **long-lived patch branches** off `upstream`.  Each carries one
+  logical patch and has a **standing PR open against `upstream`**.  The
+  PR is the design-discussion thread and the "what we'd send upstream"
+  preview.  Never merged into `upstream` (we send patches via hg/email
+  to marutan when ready); periodically `main` gets the cumulative state
+  fast-forwarded or re-integrated.
 
-Why this model: RPCEmu mainline lives on Mercurial at marutan.net; we
-can't push back to mainline directly.  Long-lived patch branches let us
-maintain customisations locally, rebase them forward when mainline
-releases, and extract them as clean unified diffs (`git diff main
-feature/X`) to email upstream when ready.
+Why three branches instead of two: the `upstream` / `feature/*` split
+keeps each patch isolated for clean upstream-submission diffs; the
+`main` integration branch gives consumers (`setup-rpcemu.sh`) a single
+predictable target without having to know about individual patches.
 
 When mainline ships a new release:
 
-1. `git checkout main && git checkout -b sync/rpcemu-x.y.z`
-2. Rsync new upstream source over the working tree (sidecar hg clone in
-   `~/opt/rpcemu-upstream/`)
+1. `git checkout upstream && git checkout -b sync/rpcemu-x.y.z`
+2. Rsync new upstream source over the working tree (from a sidecar hg
+   clone in `~/opt/rpcemu-upstream/`)
 3. Commit as `Import RPCEmu x.y.z`, tag as `vx.y.z`
-4. Open PR `sync/...` → `main` for review, merge once verified
-5. `git checkout feature/vram-honesty && git rebase main`, force-push.
+4. Open PR `sync/...` → `upstream` for review, merge once verified
+5. For each `feature/*` branch: `git rebase upstream`, force-push.
    Resolve conflicts where upstream and our patches collide.
+6. Fast-forward `main` to match `feature/vram-honesty` (or, if multiple
+   patches exist, re-integrate by branching from `upstream` and
+   cherry-picking each feature branch's commits).
 
-`setup-rpcemu.sh` clones whichever feature branch is configured (default
-`feature/vram-honesty`), so consumers automatically get the latest
-rebased state.
+When a patch is ready for upstream submission: `git diff upstream
+feature/X` produces the clean unified diff to email to marutan via the
+hg patch workflow.
