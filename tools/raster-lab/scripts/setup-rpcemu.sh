@@ -1,49 +1,53 @@
 #!/usr/bin/env bash
 # setup-rpcemu.sh
 #
-# Repeatable RPCEmu install on Linux hosts.  Builds version 0.9.5 from
-# the canonical upstream tarball (marutan.net), enables the dynamic
-# recompiler on x86_64 hosts, and symlinks this repo's ROMS/merged.bin
-# into the emulator's roms/ directory so it picks up the same ROM that
-# runs on the user's physical RISC PC.
+# Repeatable RPCEmu install on Linux hosts.  Clones the project's RPCEmu
+# fork (TheCodeSharman/rpcemu), checks out the branch with our patches
+# applied, enables the dynamic recompiler on x86_64 hosts, and symlinks
+# a pristine RISC OS ROM into the emulator's roms/ directory.
+#
+# The fork is based on v0.9.5 mainline plus:
+#   - philpem's os_reset patch (SWI poweroff support, cherry-picked)
+#   - VRAM-honesty patch (Configure / settings / romload — exposes real
+#     None / 1 / 2 / 8 MB options instead of mainline's hard-coded 0 or 8)
 #
 # Tested target: Pop!_OS 24.04 / Ubuntu derivatives.
 #
 # Stages (each is idempotent; safe to re-run):
 #   deps    - install Qt5 + build deps via apt
-#   source  - download + extract the RPCEmu 0.9.5 source tarball
-#   build   - apply VRAM-honesty patch then run buildit.sh + make; enables
-#             dynarec on x86_64.  The VRAM patch makes Configure expose
-#             None / 1 / 2 / 8 MB, makes the loader honour the real value,
-#             and gates the in-memory ROM patch on vram_size > 2.
-#   rom     - symlink the project's pristine RISC OS 3.60 ROM dump into the
-#             emulator's roms/ dir (exactly one file — RPCEmu concatenates
-#             everything in roms/).  Override which ROM via ROM_SOURCE=...
+#   source  - git clone the project's RPCEmu fork on the configured branch
+#   build   - run buildit.sh + make; enables dynarec on x86_64
+#   rom     - symlink the project's pristine RISC OS 3.60 ROM dump into
+#             the emulator's roms/ dir (exactly one file — RPCEmu
+#             concatenates everything in roms/).  Override via ROM_SOURCE=
 #   launch  - write a launcher script that puts everything on PATH
 #
 # Usage:
 #   ./setup-rpcemu.sh                  # run all stages in order
 #   ./setup-rpcemu.sh deps             # only install host deps
-#   ./setup-rpcemu.sh source           # only fetch + extract source
+#   ./setup-rpcemu.sh source           # only clone the fork
 #   ./setup-rpcemu.sh build            # only build
 #   ./setup-rpcemu.sh rom              # only symlink ROM
 #   ./setup-rpcemu.sh launch           # only write launcher
 #
 # Environment variable overrides:
-#   RPCEMU_VERSION       which version to install (default: 0.9.5)
+#   RPCEMU_FORK_URL      git URL to clone (default: TheCodeSharman/rpcemu)
+#   RPCEMU_FORK_BRANCH   branch to check out (default: feature/vram-honesty)
 #   RPCEMU_ROOT          install root (default: $HOME/opt/rpcemu)
-#   ROM_SOURCE           absolute path to ROM (default: <repo>/ROMS/merged.bin)
+#   ROM_SOURCE           absolute path to ROM (default: <repo>/ROMS/dump/RiscOS_3.60.rom)
 #   APT                  apt-get binary (default: sudo apt-get)
 #
 # References:
-#   https://www.marutan.net/rpcemu/
-#   https://www.marutan.net/rpcemu/linuxcompile.html
+#   https://github.com/TheCodeSharman/rpcemu                  (our fork)
+#   https://github.com/philpem/rpcemu                         (upstream-of-fork)
+#   https://www.marutan.net/rpcemu/                           (mainline)
+#   https://www.marutan.net/rpcemu/linuxcompile.html          (build docs)
 
 set -euo pipefail
 
-RPCEMU_VERSION="${RPCEMU_VERSION:-0.9.5}"
+RPCEMU_FORK_URL="${RPCEMU_FORK_URL:-https://github.com/TheCodeSharman/rpcemu.git}"
+RPCEMU_FORK_BRANCH="${RPCEMU_FORK_BRANCH:-feature/vram-honesty}"
 RPCEMU_ROOT="${RPCEMU_ROOT:-$HOME/opt/rpcemu}"
-RPCEMU_TARBALL_URL="https://www.marutan.net/rpcemu/cgi/download.php?sFName=${RPCEMU_VERSION}/rpcemu-${RPCEMU_VERSION}.tar.gz"
 APT="${APT:-sudo apt-get}"
 
 # Resolve project root from this script's path: tools/raster-lab/scripts/ -> repo root
@@ -57,7 +61,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # actual ROM state (e.g. for cross-checking bit-error diagnosis).
 ROM_SOURCE="${ROM_SOURCE:-$PROJECT_ROOT/ROMS/dump/RiscOS_3.60.rom}"
 
-RPCEMU_SRC_DIR="$RPCEMU_ROOT/rpcemu-$RPCEMU_VERSION"
+RPCEMU_SRC_DIR="$RPCEMU_ROOT/rpcemu"
 
 log()  { printf '\033[1;34m[setup-rpcemu]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[setup-rpcemu] WARNING:\033[0m %s\n' "$*" >&2; }
@@ -72,64 +76,31 @@ stage_deps() {
     qtmultimedia5-dev \
     libqt5multimedia5-plugins \
     libxcb-cursor0 \
+    git \
     wget
 }
 
 stage_source() {
-  log "Fetching RPCEmu $RPCEMU_VERSION source"
+  log "Cloning project RPCEmu fork from $RPCEMU_FORK_URL ($RPCEMU_FORK_BRANCH)"
   mkdir -p "$RPCEMU_ROOT"
-  cd "$RPCEMU_ROOT"
 
-  local tarball="rpcemu-$RPCEMU_VERSION.tar.gz"
-  if [[ -f "$tarball" ]] && [[ $(stat -c%s "$tarball") -gt 1000000 ]]; then
-    log "  $tarball already downloaded ($(stat -c%s "$tarball") bytes); skipping fetch"
+  if [[ -d "$RPCEMU_SRC_DIR/.git" ]]; then
+    log "  Repo already cloned at $RPCEMU_SRC_DIR; fetching + checking out branch"
+    ( cd "$RPCEMU_SRC_DIR" \
+        && git fetch --tags origin \
+        && git checkout "$RPCEMU_FORK_BRANCH" \
+        && git pull --ff-only origin "$RPCEMU_FORK_BRANCH" 2>/dev/null || true )
   else
-    rm -f "$tarball"
-    log "  $RPCEMU_TARBALL_URL"
-    curl -sLfo "$tarball" "$RPCEMU_TARBALL_URL" || die "Download failed: $RPCEMU_TARBALL_URL"
+    git clone --branch "$RPCEMU_FORK_BRANCH" "$RPCEMU_FORK_URL" "$RPCEMU_SRC_DIR"
   fi
 
-  if [[ -d "$RPCEMU_SRC_DIR" ]]; then
-    log "  $RPCEMU_SRC_DIR already extracted; skipping"
-  else
-    log "  Extracting $tarball"
-    tar xzf "$tarball"
-    [[ -d "$RPCEMU_SRC_DIR" ]] || die "Extraction did not produce $RPCEMU_SRC_DIR"
-  fi
-}
-
-stage_authentic_vram() {
-  log "Patching RPCEmu for authentic VRAM sizing (None / 1 / 2 / 8 MB)"
-  local target="$RPCEMU_SRC_DIR/src/qt5/configure_dialog.h"
-  [[ -f "$target" ]] || die "configure_dialog.h not found - run 'source' stage first"
-
-  # RPCEmu 0.9.5 ships with vram_size hard-coded to 0 or 8 — the Configure
-  # dialog's "2 MB" option silently writes 8 internally, the config-file
-  # loader treats anything non-zero as 8, and the in-memory ROM patch is
-  # applied unconditionally on signature match.  Real Risc PC hardware had
-  # VRAM SIMMs of 1 or 2 MB; 8 MB is an emulator-only mode that requires
-  # the ROM patch.  This patch makes Configure expose the real sizes,
-  # makes settings.cpp parse/write actual integers, and gates the ROM
-  # patch behind vram_size > 2.  See:
-  #   tools/raster-lab/scripts/rpcemu-vram-honesty.patch
-  if grep -q '\*vram_1' "$target"; then
-    log "  VRAM-honesty patch already applied; skipping"
-    return 0
-  fi
-
-  local patch_file="$SCRIPT_DIR/rpcemu-vram-honesty.patch"
-  [[ -f "$patch_file" ]] || die "Patch file missing: $patch_file"
-
-  ( cd "$RPCEMU_SRC_DIR" && patch -p1 < "$patch_file" )
-  log "  VRAM-honesty patch applied"
+  [[ -d "$RPCEMU_SRC_DIR/src/qt5" ]] || die "Expected RPCEmu source layout missing under $RPCEMU_SRC_DIR"
+  log "  Checked out: $(cd "$RPCEMU_SRC_DIR" && git log --oneline -1)"
 }
 
 stage_build() {
   log "Building RPCEmu"
   [[ -d "$RPCEMU_SRC_DIR/src/qt5" ]] || die "src/qt5 not found - run 'source' stage first"
-
-  # Apply the VRAM-honesty patch before building
-  stage_authentic_vram
 
   # Short-circuit if either binary already exists.  With dynarec enabled the
   # build produces rpcemu-recompiler only (not rpcemu-interpreter), so accept
