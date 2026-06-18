@@ -35,17 +35,18 @@ Two stacked decoders implement the Acorn POST protocol:
 ```
 Then load in PulseView or use with `sigrok-cli`.
 
-## ROM Analysis Scripts
+## ROM Images
 
-Located in `ROMS/`, run directly with Python 3:
+Known-good RISC OS ROM dumps live in `ROMS/4. Local Dump/`:
 
-```bash
-python3 ROMS/analyze_errors.py      # Compare two ROM binaries for bit errors
-python3 ROMS/analyze_jumps.py       # Detect bit-flip patterns in address deltas
-python3 ROMS/find_alias.py          # Search for byte sequences in ROM files
-```
+- `RiscOS_3.60.rom`, `RiscOS_3.70.rom` — clean 4MB merged images (ready to
+  use directly with RPCEmu).
+- `RO3_60-1203.101/102-01.rom`, `RO3_70-1203.191/192-01.rom` — the
+  individual 2MB chip dumps that make up each merged image.
 
-ROM images: `ROMS/RO_3_7_1.BIN`, `ROMS/RO_3_7_2.BIN` (1MB each, individual chips); `ROMS/merged.bin` (2MB, combined).
+To run one under the customised RPCEmu, symlink a `.rom` into the
+emulator's `roms/` directory (RPCEmu concatenates everything there
+alphabetically; a single 4MB file is a valid ROM on its own).
 
 ## External Submodules
 
@@ -66,3 +67,67 @@ git submodule update --init
 ./tools/vscode-aasm/install.sh
 ```
 Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
+
+## Workflow: feature branches + self-review PRs
+
+For any non-trivial change (more than a small typo / single-file tweak):
+
+1. **Branch off `main`.**  Name with a `feature/` or `fix/` prefix
+   (e.g. `feature/raster-lab-phase1`, `fix/setup-script-shebang`).
+2. **Commit incrementally** on the branch.  Exploratory commits are fine —
+   they're documentation of how the design evolved.
+3. **Push the branch** and open a self-review **PR against `main`**.
+   The PR description is the place to document *why* and the journey;
+   commit messages document *what*.
+4. **Rebase / squash before merge** when the design has stabilised so
+   `main` ends up with a clean, narrated history.
+
+This keeps `main` linear and review-ready, while feature branches serve
+as the design-discussion record.
+
+## Customised RPCEmu fork
+
+The raster-lab subproject builds a customised RPCEmu (`setup-rpcemu.sh`
+clones from it).  The fork at
+[TheCodeSharman/rpcemu](https://github.com/TheCodeSharman/rpcemu) uses a
+different branch model than this repo because we don't control upstream
+RPCEmu (it's Mercurial at marutan.net, we can't push back).
+
+Layout:
+
+- **`upstream`** — RPCEmu upstream verbatim, tagged with import versions
+  (`v0.9.5`, `v0.9.6`, ...).  Only changes when we import a new upstream
+  release.  This is what gets diffed-against to produce patches we email
+  to marutan.
+- **`main`** — the **integration branch**.  `upstream` + all our patches
+  applied (currently just the one).  This is what `setup-rpcemu.sh`
+  clones and what consumers actually use.
+- **`feature/vram-honesty`** and other `feature/*` branches —
+  **long-lived patch branches** off `upstream`.  Each carries one
+  logical patch and has a **standing PR open against `upstream`**.  The
+  PR is the design-discussion thread and the "what we'd send upstream"
+  preview.  Never merged into `upstream` (we send patches via hg/email
+  to marutan when ready); periodically `main` gets the cumulative state
+  fast-forwarded or re-integrated.
+
+Why three branches instead of two: the `upstream` / `feature/*` split
+keeps each patch isolated for clean upstream-submission diffs; the
+`main` integration branch gives consumers (`setup-rpcemu.sh`) a single
+predictable target without having to know about individual patches.
+
+When mainline ships a new release:
+
+1. `git checkout upstream && git checkout -b sync/rpcemu-x.y.z`
+2. Rsync new upstream source over the working tree (from a sidecar hg
+   clone in `~/opt/rpcemu-upstream/`)
+3. Commit as `Import RPCEmu x.y.z`, tag as `vx.y.z`
+4. Open PR `sync/...` → `upstream` for review, merge once verified
+5. For each `feature/*` branch: `git rebase upstream`, force-push.
+   Resolve conflicts where upstream and our patches collide.
+6. Fast-forward `main` to match `feature/vram-honesty` (or, if multiple
+   patches exist, re-integrate by branching from `upstream` and
+   cherry-picking each feature branch's commits).
+
+When a patch is ready for upstream submission: `git diff upstream
+feature/X` produces the clean unified diff to email to marutan via the
+hg patch workflow.
