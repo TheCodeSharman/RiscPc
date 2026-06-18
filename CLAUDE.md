@@ -66,3 +66,32 @@ git submodule update --init
 ./tools/vscode-aasm/install.sh
 ```
 Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
+
+## Workflow: feature branches + self-review PRs
+
+For any non-trivial change (more than a small typo / single-file tweak):
+
+1. **Branch off `main`.**  Name with a `feature/` or `fix/` prefix
+   (e.g. `feature/vendor-rpcemu`, `fix/setup-script-shebang`).
+2. **Commit incrementally** on the branch.  Exploratory commits are fine —
+   they're documentation of how the design evolved.
+3. **Push the branch** and open a self-review **PR against `main`**.
+   The PR description is the place to document *why* and the journey;
+   commit messages document *what*.
+4. **Rebase / squash before merge** when the design has stabilised so
+   `main` ends up with a clean, narrated history.
+5. **Vendored upstream code under `external/`**: when modifying
+   `external/rpcemu/` (or any other vendored tree), commits on the feature
+   branch can later be rolled into a single clean diff against the import
+   tag (e.g. `git diff rpcemu-v0.9.5-import HEAD -- external/rpcemu/`) for
+   upstream submission via that project's preferred patch channel.
+
+This workflow keeps `main` linear and review-ready, while feature branches
+serve as the design-discussion record.
+
+### Vendored RPCEmu source
+
+`external/rpcemu/` contains a vendored snapshot of RPCEmu 0.9.5 from
+mainline Mercurial.  See `external/rpcemu/VENDOR.md` for the import
+revision, the sync procedure for new upstream releases, and how to
+extract local patches as an upstream-ready diff.
