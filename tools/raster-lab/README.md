@@ -5,8 +5,9 @@ Goal: characterise an **upper bound** on what the hardware was actually capable
 of, by applying modern algorithmic and microarchitectural knowledge to the
 period-correct ARMv4 / APCS-32 / RISC PC platform. Primary target is
 StrongARM SA-110; ARM710 (the original RISC PC core) is the comparison
-target — same binary runs on both, but the microarchitectural delta makes
-the per-technique payoff very different on each.
+target — same AASM *source* compiles to two microarchitecturally tuned
+binaries via target-conditional macros, each representing the upper bound
+for that specific core.
 
 Each phase adds one technique and measures the result against the previous,
 so we can quantify what each trick actually buys on real hardware.
@@ -57,6 +58,57 @@ The C↔AASM boundary is **APCS-32** throughout:
 Norcroft generates APCS-32 natively. On the GCCSDK side, code that calls the
 library uses `-mapcs-32` (and matching ABI flags). Compatible.
 
+### Per-target macros — one source, two tuned binaries
+
+AASM's macro / conditional-assembly facilities let a single `.s` source
+produce target-tuned implementations for both cores. The build invokes
+`objasm` with `-PD TARGET_SA110 SETL {TRUE}` or `-PD TARGET_ARM710 SETL
+{TRUE}`; per-target `EQU` blocks set sizing constants and `[ ... | ... ]`
+conditional blocks substitute different code paths where the structure
+itself differs.
+
+What gets parameterised per target:
+
+| Parameter | SA-110 | ARM710 | Macro |
+|---|---|---|---|
+| Tile size for rasterisation | 64×64 (16 KB D-cache fit) | 32×32 (~4 KB fits in 8 KB unified) | `TILE_SHIFT` |
+| Write-buffer batch target | 6–7 stores in flight | 2–3 stores in flight | `WB_DEPTH` |
+| Unroll factor | aggressive (16 KB I-cache headroom) | modest (8 KB shared with D-stream) | `UNROLL` |
+| Software-pipeline depth | 3 stages (matches 5-stage pipe) | 1 stage (matches 3-stage pipe) | `PIPE_STAGES` |
+| "Fake PLD" prefetch distance | ~16 cycles ahead of use | ~4 cycles ahead of use | `PREFETCH_DIST` |
+| Texture working set hint | up to ~8 KB | up to ~4 KB | `TEXTURE_KB` |
+
+Some of these are pure constants (`EQU` differences); others — notably the
+software-pipelined inner loop — are structurally different code paths via
+`[ TARGET_SA110 ... | ... ]` conditional blocks. Both flavours land in the
+same source so the algorithm stays in one place.
+
+### Build variant matrix
+
+Per phase, the matrix is **2 targets × 3 pixel formats** = 6 library
+variants from the same source:
+
+```
+lib/phase3_writebuffer/
+  triangle_fill.s          ; single source, conditional on TARGET_* and FORMAT_*
+  span_fill.s
+  build/
+    obj/sa110_8bpp/*.o
+    obj/sa110_16bpp/*.o
+    obj/sa110_32bpp/*.o
+    obj/arm710_8bpp/*.o
+    obj/arm710_16bpp/*.o
+    obj/arm710_32bpp/*.o
+    lib_phase3_sa110_8bpp.alf  ; ... and so on
+```
+
+The harness binary is built once per (target, format) pair and named
+accordingly. Result CSVs are `results/phaseN_{target}_{format}.csv`.
+
+This makes "characterise the upper bound" precise: each binary represents
+the upper bound for that specific (microarchitecture, pixel format) cell.
+12 numbers per phase (cycles/pixel and bottleneck for 6 binaries).
+
 ### Hardware-fixed, technique-open
 
 The research question is **"what was this hardware actually capable of?"**, not
@@ -69,7 +121,8 @@ and its software interfaces — not the techniques used to exploit them.
   STREX (ARMv6), no DMB/DSB (ARMv6+), no NEON, no Thumb
 - **No FPU instructions** (neither SA-110 nor ARM710 has an FPU)
 - **APCS-32 calling convention** at function boundaries
-- **Two target microarchitectures**, both running the same binary:
+- **Two target microarchitectures**, each built from the same AASM source via
+  conditional assembly into a tuned per-target binary:
   - **StrongARM SA-110 (primary):** 5-stage pipeline, 16 KB I + 16 KB D split
     L1 (32-way each), 8-entry write buffer, single outstanding D-cache miss,
     no branch prediction. RISC PC clock 200 / 233 MHz, CPU:bus ratio ~12–15:1.
