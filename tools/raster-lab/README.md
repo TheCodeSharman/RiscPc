@@ -104,14 +104,39 @@ in-order 5-stage scalar pipelines with shallow caches.
 ### Library API surface (provisional)
 
 ```
-void rl_fill_triangle(
+void rl_fill_triangle_rgb565(    /* one entry point per pixel format */
     const rl_triangle_t* tri,    /* R0: ptr to {x0,y0,x1,y1,x2,y2} in 16.16 fp */
-    rl_framebuffer_t*    fb,     /* R1: ptr to {base,width,height,stride} */
-    uint8_t              colour);/* R2: 8bpp index */
+    rl_framebuffer_t*    fb,     /* R1: ptr to {base,width,height,stride,format} */
+    uint32_t             colour);/* R2: colour in fb's native format (low bits) */
 ```
 
 Pointer args because APCS-32 only has R0–R3 for arg-passing and we'd run out
-otherwise. The function is total over its input; no error codes, no errno.
+otherwise. `colour` is always `uint32_t` regardless of format — 8bpp uses the
+low 8 bits, 16bpp the low 16, 32bpp all of them — so the calling convention
+is uniform across format variants. The function is total over its input; no
+error codes, no errno.
+
+The harness selects the entry point based on the framebuffer's `format`
+field — never the inner loop. Each format gets its own AASM implementation
+optimised for that pixel layout's specific microarchitectural sweet spot.
+
+### Pixel format coverage
+
+| Format | Notation | Px/word | Lighting paradigm | Role in project |
+|---|---|---|---|---|
+| 8bpp paletted | `C256` | 4 | **Careful palette** — Quake-style ramps where the same diffuse hue is stored at multiple brightness rows. Lighting reduces to *index arithmetic* (add brightness offset to base index). Cheap on SA-110: a few dprocs with the barrel shifter. | **First-class target.** Period-canonical for Acorn games and Quake-on-RISC-PC. Maximum write-buffer throughput; an interesting comparison against 16bpp because it solves lighting at the *colourmap layout* level rather than per-pixel maths. |
+| 16bpp 5:6:5 RGB | `C64K` | 2 | **Per-channel arithmetic** — Lambert / approximate-Phong via fixed-point on R/G/B independently; 5–6 bits per channel is enough. | **First-class target.** Period-canonical for StrongARM-era 3D demos. Every phase implements this. |
+| 32bpp RGBA8 | `C16M` | 1 | Full per-channel; trivial maths; alpha blending available | **Phase 5 stretch.** Asks: with all modern technique applied, can SA-110 produce 32bpp output that *looks like modern graphics*? Bus footprint is brutal, so this is where the upper-bound question gets most interesting. |
+
+Comparing 8bpp+ramp-palette against 16bpp per-channel is genuinely instructive
+— same lighting problem, two completely different solutions. Index arithmetic
+in 8bpp may end up beating per-channel maths in 16bpp on this hardware *even
+for lighting quality per cycle*, because the SA-110's barrel-shifter +
+LDRB makes the table-lookup paradigm very cheap.
+
+24bpp is not a RISC OS screen mode — VIDC20 only supports power-of-2 bit
+depths (the mode descriptors use `log2bpp`). "24-bit colour" on RISC OS is
+8:8:8:padding stored in 32bpp.
 
 ## Target platforms
 
@@ -202,37 +227,46 @@ validate correctness.
 - **Test focus:** none yet — establishes the harness
 
 ### Phase 1 — Baseline flat triangle in C
-- MODE 13 (320x256, 8bpp) for simplicity, with a switch to MODE 15 (640x480, 8bpp)
-  for more pixels under load
+- Two screen modes: `X640 Y480 C256` (8bpp paletted) and `X640 Y480 C64K`
+  (16bpp 5:6:5). Mode set via `OS_ScreenMode` (RISC OS 3.5+ mode-selector block)
 - Pure C span filler, framebuffer via `OS_ReadVduVariables`
 - Code must compile both as the RISC OS binary and as a Linux host program (the
   oracle); framebuffer setup is the only platform-specific layer
-- Establishes the baseline pixels/sec and cycles/pixel to beat
-- **Test focus:** this phase **defines** correctness. Top-left fill rule, sub-pixel
-  precision locked in here. Host build regenerates `tests/golden/*.bin`. The
-  RISC OS build must produce byte-identical output to the host build.
+- Establishes baseline pixels/sec and cycles/pixel for both formats — these are
+  the numbers to beat
+- 32bpp not implemented at this phase
+- **Test focus:** this phase **defines** correctness. Top-left fill rule,
+  sub-pixel precision, and 8bpp / 16bpp colour encoding locked in here.
+  Host build regenerates `tests/golden/{8bpp,16bpp}/*.bin`. The RISC OS build
+  must produce byte-identical output to the host build for both formats.
 
 ### Phase 2 — First AASM library
 - First standalone AASM `.s` source assembled by objasm into an ALF library
-- Replaces the Phase 1 C implementation behind the same APCS-32 entry points
-- Single-word stores, straightforward loop
+- Separate entry point per format (`rl_fill_triangle_pal8`,
+  `rl_fill_triangle_rgb565`), each its own `.s` file
+- Replaces the Phase 1 C implementation behind the same APCS-32 ABI
+- Straightforward per-pixel stores (`STRB` for 8bpp, `STRH` for 16bpp) — the
+  word-packing optimisations land in Phase 3
 - Compare to Phase 1 baseline (modest gain expected; Norcroft's codegen is
   competent here)
-- **Test focus:** every scene in the battery must bit-match the golden. The
-  span-length scene (1/3/4/7/13/17 pixels) is the most likely place for an
-  off-by-one in the loop bounds. Also validates the ABI roundtrip — if the
-  harness can call the AASM and get bit-identical output to the C reference,
-  the APCS-32 boundary is wired correctly.
+- **Test focus:** every scene in the battery must bit-match the golden for
+  both formats. The span-length scene (1/3/4/7/13/17 pixels) is the most
+  likely place for an off-by-one in the loop bounds. Also validates the ABI
+  roundtrip — if the harness can call the AASM and get bit-identical output
+  to the C reference, the APCS-32 boundary is wired correctly.
 
 ### Phase 3 — Write-buffer tuning
-- Word-wide stores (4 pixels per `STR` in 8bpp packing)
-- `STM` for batched runs of pixels
+- Word-wide stores: 4 pixels per `STR` in 8bpp, 2 pixels per `STR` in 16bpp
+- `STM` for batched runs of pixels (4-word burst = 16 px @ 8bpp, 8 px @ 16bpp)
 - Burst-friendly sequential addressing
-- Goal: hit the IOMD write-buffer drain ceiling and identify it empirically
+- Head/tail handling for each format (unaligned start, partial-word tail)
+- Goal: hit the IOMD write-buffer drain ceiling for each format and identify
+  it empirically. The 8bpp ceiling tells us the absolute bus drain rate;
+  16bpp's tells us what's available *with* per-channel maths headroom.
 - **Test focus:** the span-length scene is critical — word-packed stores must
-  handle the head (alignment to word boundary) and tail (1-3 leftover pixels)
-  exactly. Adjacent-triangle fill-rule scene checks that the start of each
-  span lands on the right pixel.
+  handle the head (alignment to word boundary) and tail (1-3 leftover pixels
+  at 8bpp, 0-1 at 16bpp) exactly. Adjacent-triangle fill-rule scene checks
+  that the start of each span lands on the right pixel for both formats.
 
 ### Phase 4 — FIQ-mode banked registers
 - `OS_ClaimFIQ` and switch the span filler into FIQ mode with FIQs masked
@@ -250,7 +284,10 @@ validate correctness.
   waiting for the bus. Candidates explicitly include techniques the period
   wouldn't have used:
   - Hash-based procedural noise / detail (barrel-shifter-friendly)
-  - Lambert / approximate-Phong lighting via MLA fixed-point
+  - **8bpp + ramp-palette lighting:** Quake-style colour-ramp tables —
+    lighting becomes an index addition + LDRB rather than per-channel maths.
+    Often faster *and* visually equivalent to per-channel for diffuse lighting
+  - **16bpp per-channel Lambert / approximate-Phong** via MLA fixed-point
   - Pineda-style per-pixel edge evaluation (rather than incremental edge
     stepping) if it helps register pressure
   - Modern approximate transcendentals / blending math
@@ -258,11 +295,19 @@ validate correctness.
   same wall-clock cost, up to the write-buffer drain threshold
 - Find the threshold empirically: ratchet compute up until pixel rate drops.
   The point at which it drops is the upper bound this hardware can sustain.
+- **32bpp stretch goal — "modern graphics on period hardware":** given the
+  bus is brutal at 32bpp (1 px/STR), can we still produce output that *looks*
+  like modern shaded 3D? Per-pixel Lambert + procedural detail + alpha
+  blending at a usable framerate on SA-110. Quantifies the headroom modern
+  technique buys above what was actually shipped on this platform.
+- **Cross-format comparison:** for each lighting scheme, measure same-scene
+  output across 8bpp / 16bpp / 32bpp. The 8bpp-palette-ramps vs 16bpp-per-
+  channel comparison is the key one — same visual problem, two paradigms.
 - **Test focus:** this phase produces **different** pixels (it adds shading
-  /detail). Golden frames forked into `tests/golden/phase5/` with their own
-  deterministic reference. Critical timing note: the "compute is free" property
-  is **invisible in RPCEmu** — Phase 5's architectural punchline can only be
-  observed on iron.
+  /detail). Golden frames forked into `tests/golden/phase5/{8bpp,16bpp,32bpp}/`
+  with their own deterministic references. Critical timing note: the "compute
+  is free" property is **invisible in RPCEmu** — Phase 5's architectural
+  punchline can only be observed on iron.
 
 ## Layout (intended)
 
