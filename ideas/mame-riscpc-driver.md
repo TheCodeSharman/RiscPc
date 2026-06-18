@@ -3,6 +3,9 @@
 **Status:** idea / exploration
 **Author:** Michael Sharman
 **Date:** 2026-06-19
+**See also:** [sa110-cache-analyzer.md](sa110-cache-analyzer.md) — the
+*simulator track* below, distilled into a concrete, buildable project
+(QEMU/TCG × LLVM-MCA + a cache model).
 
 ## One-line pitch
 
