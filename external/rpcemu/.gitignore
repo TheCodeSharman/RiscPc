@@ -1,0 +1,19 @@
+# Build artifacts from RPCEmu's qmake-based build
+src/qt5/release/
+src/qt5/Makefile
+src/qt5/.qmake.stash
+*.o
+*.so
+
+# Built binaries (top-level per upstream's buildit.sh)
+/rpcemu-recompiler
+/rpcemu-interpreter
+
+# Runtime files RPCEmu writes alongside the binary
+/rpc.cfg
+/rpclog.txt
+/cmos.ram
+/build-cross-output.txt
+/hd4.hdf
+/roms/ROM
+/roms/RO*
