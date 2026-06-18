@@ -20,13 +20,31 @@ git diff rpcemu-v0.9.5-import HEAD -- external/rpcemu/
 
 ## Syncing with a new upstream release
 
-When a new mainline release ships (e.g. `release_0.9.6`):
+When a new mainline release ships (e.g. `release_0.9.6`), use the helper
+script that automates the hg-clone + rsync mechanics:
 
-1. `hg pull` in a separate hg clone of mainline, `hg update release_0.9.6`
-2. Rsync that clone over `external/rpcemu/` (excluding `.hg`)
-3. Commit as "Import RPCEmu 0.9.6"
-4. Tag as `rpcemu-v0.9.6-import`
-5. Rebase or re-apply local patches on top, resolving conflicts
+```bash
+git checkout main
+git checkout -b sync/rpcemu-0.9.6
+./tools/raster-lab/scripts/sync-rpcemu-upstream.sh release_0.9.6
+git diff HEAD -- external/rpcemu/         # review the upstream delta
+git add external/rpcemu/
+git commit -m "Import RPCEmu 0.9.6"
+git tag -a rpcemu-v0.9.6-import -m "RPCEmu release_0.9.6 verbatim"
+git rebase main                           # bring local patches forward
+# resolve conflicts where upstream and our patches collide
+# open PR sync/rpcemu-0.9.6 -> main
+```
+
+The script refuses to run unless you're on a `sync/...` branch — that's
+a guardrail because the rsync silently reverts local patches that aren't
+yet upstream, so the script must produce a branch with a clean intent.
+
+Why not git-remote-hg: we tried.  Marutan's hg server is too old to
+advertise the wire-bundle features modern git-remote-hg expects
+(`missing support for changegroup`), so the bridge doesn't work for this
+specific upstream.  Plain rsync against a sidecar hg clone is the
+reliable path.
 
 ## Local patches applied
 
