@@ -60,6 +60,7 @@ stage_deps() {
     qtbase5-dev \
     qtmultimedia5-dev \
     libqt5multimedia5-plugins \
+    libxcb-cursor0 \
     wget
 }
 
@@ -175,7 +176,14 @@ stage_launch() {
 # Launch RPCEmu from its install dir so it finds roms/ and writes its
 # config alongside the binary.  Picks recompiler if available, falls
 # back to interpreter.
+#
+# Force XWayland: RPCEmu's Qt5 build doesn't render correctly on native
+# Wayland (Pop!_OS COSMIC default).  QT_QPA_PLATFORM=xcb makes Qt use
+# X11 protocol via XWayland — the well-known workaround for Qt5 apps
+# that haven't been ported to wayland-native rendering.  Override by
+# setting QT_QPA_PLATFORM in the environment before invoking this script.
 set -e
+export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-xcb}"
 cd "$RPCEMU_SRC_DIR"
 if [[ -x ./rpcemu-recompiler ]]; then
   exec ./rpcemu-recompiler "\$@"
