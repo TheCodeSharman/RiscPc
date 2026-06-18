@@ -12,7 +12,10 @@
 # Stages (each is idempotent; safe to re-run):
 #   deps    - install Qt5 + build deps via apt
 #   source  - download + extract the RPCEmu 0.9.5 source tarball
-#   build   - run buildit.sh + make; enables dynarec on x86_64
+#   build   - apply VRAM-honesty patch then run buildit.sh + make; enables
+#             dynarec on x86_64.  The VRAM patch makes Configure expose
+#             None / 1 / 2 / 8 MB, makes the loader honour the real value,
+#             and gates the in-memory ROM patch on vram_size > 2.
 #   rom     - symlink the project's pristine RISC OS 3.60 ROM dump into the
 #             emulator's roms/ dir (exactly one file — RPCEmu concatenates
 #             everything in roms/).  Override which ROM via ROM_SOURCE=...
@@ -95,9 +98,38 @@ stage_source() {
   fi
 }
 
+stage_authentic_vram() {
+  log "Patching RPCEmu for authentic VRAM sizing (None / 1 / 2 / 8 MB)"
+  local target="$RPCEMU_SRC_DIR/src/qt5/configure_dialog.h"
+  [[ -f "$target" ]] || die "configure_dialog.h not found - run 'source' stage first"
+
+  # RPCEmu 0.9.5 ships with vram_size hard-coded to 0 or 8 — the Configure
+  # dialog's "2 MB" option silently writes 8 internally, the config-file
+  # loader treats anything non-zero as 8, and the in-memory ROM patch is
+  # applied unconditionally on signature match.  Real Risc PC hardware had
+  # VRAM SIMMs of 1 or 2 MB; 8 MB is an emulator-only mode that requires
+  # the ROM patch.  This patch makes Configure expose the real sizes,
+  # makes settings.cpp parse/write actual integers, and gates the ROM
+  # patch behind vram_size > 2.  See:
+  #   tools/raster-lab/scripts/rpcemu-vram-honesty.patch
+  if grep -q '\*vram_1' "$target"; then
+    log "  VRAM-honesty patch already applied; skipping"
+    return 0
+  fi
+
+  local patch_file="$SCRIPT_DIR/rpcemu-vram-honesty.patch"
+  [[ -f "$patch_file" ]] || die "Patch file missing: $patch_file"
+
+  ( cd "$RPCEMU_SRC_DIR" && patch -p1 < "$patch_file" )
+  log "  VRAM-honesty patch applied"
+}
+
 stage_build() {
   log "Building RPCEmu"
   [[ -d "$RPCEMU_SRC_DIR/src/qt5" ]] || die "src/qt5 not found - run 'source' stage first"
+
+  # Apply the VRAM-honesty patch before building
+  stage_authentic_vram
 
   # Short-circuit if either binary already exists.  With dynarec enabled the
   # build produces rpcemu-recompiler only (not rpcemu-interpreter), so accept
@@ -183,10 +215,15 @@ stage_launch() {
 #!/usr/bin/env bash
 # Launch RPCEmu from its install dir so it finds roms/ and writes its
 # config alongside the binary.  Picks recompiler if available, falls
-# back to interpreter.  Override QT_QPA_PLATFORM in the environment if
-# you want to force xcb / XWayland for any reason.
+# back to interpreter.
+#
+# Default to xcb / XWayland: native Wayland blocks programmatic cursor
+# positioning (security model), which RPCEmu needs for mouse-grab modes.
+# XWayland inherits X11's cursor-warp semantics so the emulator's mouse
+# handling works.  Override to wayland-native if you don't need mouse
+# grab: QT_QPA_PLATFORM=wayland $launcher
 set -e
-export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-wayland}"
+export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-xcb}"
 cd "$RPCEMU_SRC_DIR"
 if [[ -x ./rpcemu-recompiler ]]; then
   exec ./rpcemu-recompiler "\$@"
