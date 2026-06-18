@@ -1,9 +1,12 @@
 # raster-lab
 
-An incremental experiment in StrongARM-era rasterisation on the Acorn RISC PC.
+An incremental experiment in ARMv4-era rasterisation on the Acorn RISC PC.
 Goal: characterise an **upper bound** on what the hardware was actually capable
 of, by applying modern algorithmic and microarchitectural knowledge to the
-period-correct SA-110 / ARMv4 / RISC PC platform.
+period-correct ARMv4 / APCS-32 / RISC PC platform. Primary target is
+StrongARM SA-110; ARM710 (the original RISC PC core) is the comparison
+target — same binary runs on both, but the microarchitectural delta makes
+the per-technique payoff very different on each.
 
 Each phase adds one technique and measures the result against the previous,
 so we can quantify what each trick actually buys on real hardware.
@@ -64,10 +67,15 @@ and its software interfaces — not the techniques used to exploit them.
 
 - **ARMv4 instruction set only** — no PLD (ARMv5TE), no CLZ (ARMv5), no LDREX/
   STREX (ARMv6), no DMB/DSB (ARMv6+), no NEON, no Thumb
-- **No FPU instructions** (SA-110 has no FPU)
+- **No FPU instructions** (neither SA-110 nor ARM710 has an FPU)
 - **APCS-32 calling convention** at function boundaries
-- **SA-110 microarchitecture:** 5-stage pipeline, 16K+16K split L1, 8-entry
-  write buffer, single outstanding D-cache miss, no branch prediction
+- **Two target microarchitectures**, both running the same binary:
+  - **StrongARM SA-110 (primary):** 5-stage pipeline, 16 KB I + 16 KB D split
+    L1 (32-way each), 8-entry write buffer, single outstanding D-cache miss,
+    no branch prediction. RISC PC clock 200 / 233 MHz, CPU:bus ratio ~12–15:1.
+  - **ARM710 (comparison):** 3-stage pipeline, 8 KB unified L1 (4-way),
+    4-entry write buffer, no branch prediction. RISC PC clock 30 MHz,
+    CPU:bus ratio ~2:1. Same IOMD bus underneath.
 - **RISC PC bus topology:** ~16 MHz IOMD, VRAM (when fitted) on a separate
   port, no L2 cache, no DMA paths other than VIDC's
 - **AASM syntax** (objasm dialect) for the library — the platform's canonical
@@ -97,9 +105,12 @@ was first published or widely understood. Specifically welcome:
   often what the microarchitecture actually rewards.
 
 The deliverable is therefore an **upper bound** on the platform: the most
-useful work per cycle that a SA-110 RISC PC can sustain for triangle
-rasterisation, given everything we know in 2026 about how to write code for
-in-order 5-stage scalar pipelines with shallow caches.
+useful work per cycle that a RISC PC can sustain for triangle rasterisation,
+given everything we know in 2026 about how to write code for in-order scalar
+pipelines with shallow caches — characterised on both the SA-110 (deep CPU,
+shallow bus, wide stall budget) and ARM710 (modest CPU, modest bus, narrow
+stall budget). The per-technique payoff diverges sharply between the two,
+which is half the point of the experiment.
 
 ### Library API surface (provisional)
 
@@ -156,10 +167,12 @@ appear free indefinitely.
   ways — native via Norcroft DDE (the AASM library + harness), and cross via
   GCCSDK (the C reference for Phase 1 only). Used to confirm the RISC OS
   binaries produce byte-identical framebuffers to the host oracle.
-- **Real iron (timing):** Acorn RISC PC with StrongARM SA-110. The only
-  authoritative source for cycles/pixel, triangles/sec, and bottleneck
-  analysis. Every performance number in `results/` must come from the real
-  machine.
+- **Real iron (timing):** Acorn RISC PC. Two processor cards swappable into
+  the same chassis — **StrongARM SA-110** (primary timing target) and
+  **ARM710** (comparison). The only authoritative source for cycles/pixel,
+  triangles/sec, and bottleneck analysis. Every performance number in
+  `results/` must come from real iron and is tagged with the processor card
+  it ran on. Same binary on both, different numbers.
 
 ### Toolchain split
 
@@ -215,8 +228,12 @@ Committed under `tests/scenes/`, replayed by every phase's `--test` mode:
 
 Each phase records: cycles/pixel, triangles/sec at a fixed test scene, and the
 apparent bottleneck (CPU compute / write buffer / D-cache miss / instruction
-fetch). **All timing numbers come from real iron.** Emulator runs only
-validate correctness.
+fetch) **for both SA-110 and ARM710**. The expectation is that each
+technique's payoff differs sharply between cores — that delta is itself the
+research output. **All timing numbers come from real iron.** Emulator runs
+only validate correctness.
+
+Results layout: `results/phaseN_{sa110,arm710}_{8bpp,16bpp,32bpp}.csv`.
 
 ### Phase 0 — Setup
 - Install GCCSDK on the Linux host
@@ -263,6 +280,12 @@ validate correctness.
 - Goal: hit the IOMD write-buffer drain ceiling for each format and identify
   it empirically. The 8bpp ceiling tells us the absolute bus drain rate;
   16bpp's tells us what's available *with* per-channel maths headroom.
+- **Cross-core comparison is decisive here:** SA-110 has an 8-entry write
+  buffer behind a CPU running 12–15× the bus rate, so this phase hits the
+  bus ceiling almost immediately and reveals the absolute throughput. ARM710
+  has a 4-entry buffer behind a CPU running only ~2× bus rate, so the buffer
+  is rarely the bottleneck — Phase 3's win is dramatically smaller on ARM710,
+  which is exactly the point.
 - **Test focus:** the span-length scene is critical — word-packed stores must
   handle the head (alignment to word boundary) and tail (1-3 leftover pixels
   at 8bpp, 0-1 at 16bpp) exactly. Adjacent-triangle fill-rule scene checks
@@ -273,6 +296,11 @@ validate correctness.
 - Hold stepping state (edge deltas, span counter, dest pointer, colour) in
   R8-R14_fiq across iterations to eliminate stack spills
 - Verify pixel output is identical; measure cycle reduction from spill removal
+- **Cross-core note:** FIQ banking is identical hardware on both cores —
+  same 7 banked registers. The *win* may differ though: ARM710's unified 8 KB
+  cache makes stack spills more expensive in relative terms (spill traffic
+  evicts hot lines that I-stream also wants), so FIQ banking may help ARM710
+  *more* in relative terms than it helps SA-110. Empirical question.
 - **Test focus:** the random-stress scene (1024 triangles, fixed seed) is the
   decisive test. A register-save bug in the mode-switch path can pass single
   triangles cleanly and only corrupt under sustained load. R13_fiq must be
@@ -300,6 +328,17 @@ validate correctness.
   like modern shaded 3D? Per-pixel Lambert + procedural detail + alpha
   blending at a usable framerate on SA-110. Quantifies the headroom modern
   technique buys above what was actually shipped on this platform.
+- **32bpp Z-buffer in the alpha byte (sub-experiment):** VIDC20 ignores the
+  4th byte; we can use it for 8-bit Z at zero extra bus cost. The catch: Z-
+  test is read-modify-write, which defeats the write-buffer-streaming property
+  the rest of the project relies on. Viable strategy: **tile-based
+  rasterisation with cache-resident Z** — Hilbert/Morton traversal in 64×64
+  tiles (16 KB = D-cache size), RMW becomes a D-cache hit after the first
+  triangle in each tile. With VRAM fitted, splitting the buffers (colour in
+  VRAM write-only, Z in a separate DRAM buffer) wins instead. This is an
+  interesting regime shift: the optimisation game becomes about cache
+  residency rather than write-buffer drain. Different upper bound, same
+  research question.
 - **Cross-format comparison:** for each lighting scheme, measure same-scene
   output across 8bpp / 16bpp / 32bpp. The 8bpp-palette-ramps vs 16bpp-per-
   channel comparison is the key one — same visual problem, two paradigms.
