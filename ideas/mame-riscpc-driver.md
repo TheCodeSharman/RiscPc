@@ -1,4 +1,4 @@
-# Idea: Bring MAME's Acorn RISC PC driver up to working accuracy
+# Idea: Accurate Acorn RISC PC modelling — a MAME driver *and* a memory-subsystem simulator
 
 **Status:** idea / exploration
 **Author:** Michael Sharman
@@ -13,6 +13,17 @@ hardware* needed to finish the IOMD + VIDC20 modelling. This repository's
 bench-diagnosis work (logic-analyzer captures, POST decoding, the VCO /
 VRAM / video-DMA investigations) is exactly that missing asset.
 
+**Caveat that grew during discussion:** MAME is an *emulator* — excellent
+for functional and *device* fidelity, but it does **not** model CPU
+cache/pipeline *timing*. On a VRAM-less RISC PC that timing leaks into
+*visible* output (CPU↔video-DMA contention on the shared DRAM bus). The
+questions that actually motivate this — mode viability, bus contention,
+workload-dependent display artifacts — are really **simulator**
+questions, not emulator ones. So this document ended up covering two
+complementary tracks: a **MAME emulator** track (chipset fidelity) and a
+**memory-subsystem simulator** track (timing / viability / artifacts).
+See "Reframing" below.
+
 ## Why MAME, and why not just use RPCEmu
 
 [RPCEmu](https://www.marutan.net/rpcemu/) is excellent at *running* RISC
@@ -23,11 +34,16 @@ external pixel-clock model). That abstraction is the opposite of what is
 needed to reproduce *hardware faults* and validate *real silicon
 behaviour*.
 
-MAME's philosophy is the inverse: cycle-/signal-accurate, no-shortcuts
-device modelling, with each chip as a reusable `device_t`. For an
-accuracy-oriented project — and for cross-checking a real motherboard
-under repair — MAME is the better architecture. The goal here is
-**fidelity, not stability**.
+MAME's philosophy is the inverse: signal- and register-accurate,
+no-shortcuts *device* modelling, each chip a reusable `device_t`. For
+reproducing chipset behaviour and hardware faults it is far better than
+RPCEmu. But state the limit up front: MAME is **not cycle-accurate at the
+CPU level** — it models pipeline/cache *visibility* (PC+8, prefetch-buffer
+stale-SMC, abort points) but **not** their *timing* (no cache hit/miss
+cycles, interlocks, or write-buffer drain). See "Where performance
+becomes behaviour" below for why that matters here specifically. The goal
+is **fidelity, not stability** — and part of this document is working out
+*which kind* of fidelity each question actually needs.
 
 ## Current state of MAME (assessed against `master`, June 2026)
 
@@ -82,7 +98,127 @@ In other words: the MAME TODOs are mostly empirical questions ("how are
 the modulos used", "which IOMD variant", "DRAM/refresh timing"), and this
 repo can answer them with signal captures rather than guesswork.
 
-## Proposed phases
+## The bandwidth-viability problem (the sharpest single justification)
+
+A *functional* emulator decouples work-done from time-elapsed, so it will
+happily execute workloads — and **display screen modes** — that the real
+board physically cannot sustain. On the RISC PC this is not a corner
+case; it is the central phenomenon, because **with no VRAM fitted all
+video is fetched from DRAM**, so the CPU and the VIDC video DMA contend
+for one memory bus.
+
+MAME's IOMD does video DMA as a **lump copy at vblank**, with no
+per-scanline FIFO and no refill-rate model — so the video stream can
+never *starve*. A high-bandwidth mode that real hardware can't feed (deep
+colour at high resolution with no VRAM) renders perfectly in MAME. The
+emulator says "works"; the silicon says "no".
+
+The distinction that matters:
+
+- **(a) pure performance** — runs, just slower on real HW. Out of scope;
+  accept it.
+- **(b) timing-starvation that becomes *observable*** — the video FIFO
+  underruns → **visible corruption / the mode is simply unavailable**;
+  sound DMA underruns → **audible dropouts**.
+
+(b) is *inside* MAME's philosophy — it changes what's on screen — so the
+reason it isn't reproduced is **model incompleteness, not a design
+exclusion**. A faithful VIDC20+IOMD *should* underrun when starved.
+
+First-order, viability is **analytic**: `video_byte_rate = pixel_clock ×
+bytes_per_pixel`, compared against the DRAM bandwidth left after refresh
+and CPU traffic (and ×0 of it is VRAM-resident when none is fitted). RISC
+OS's own mode tables encode exactly this — which modes are *offered*
+depends on whether VRAM is fitted. So a **bandwidth-accounting layer**
+(demand per mode vs a modelled bus budget → FIFO underrun → corruption /
+unavailability) reproduces the observable behaviour without simulating a
+single cache line. Bench captures calibrate the budget.
+
+## Where performance *becomes* behaviour: cache dynamics produce visible artifacts
+
+The clean "performance is invisible, behaviour is visible" split above
+**breaks down for this machine**, and it's worth being honest about why.
+
+The CPU's share of DRAM bandwidth is **not a constant** — it is a
+function of the SA-110's **cache hit rate and write-buffer state**. A
+cache-cold or write-heavy workload hammers DRAM; a cache-warm one leaves
+the bus free for video. Because CPU and video DMA share one bus (no
+VRAM), **how well the cache is doing directly modulates whether the video
+stream starves** — and starvation is *visible*. So on the RISC PC, CPU
+*performance* leaks into *observable output* through the shared bus;
+"performance" and "behaviour" are not cleanly separable here.
+
+Consequences:
+
+- The analytic bandwidth model above assumes a fixed "CPU share". That is
+  a first-order approximation; real CPU demand is **content- and
+  cache-state-dependent**, so the *exact* transient artifacts (glitching
+  that depends on what code runs that frame) require modelling the cache
+  + write buffer feeding a bus arbiter.
+- This is the decisive reason MAME alone — even with a static bandwidth
+  layer — cannot reproduce the *workload-dependent* artifacts: it has no
+  cache timing, so it cannot know the CPU's instantaneous bus demand.
+- **Fidelity is a dial, not a switch.** A full microarchitectural cache
+  (line-by-line, O3-style) is very likely *not* needed. What is needed is
+  the cache's *effect on DRAM access rate and burst pattern* — plausibly
+  a parametric model (miss-rate × line-fill burst + write-buffer
+  depth/drain → DRAM byte stream) feeding an arbiter. **What minimum
+  cache fidelity is sufficient to reproduce the observed artifacts is
+  itself a research question the bench captures can settle.**
+
+## Reframing: do I actually want an *emulator* or a *simulator*?
+
+Stepping back, the questions driving this — *"would this workload/mode be
+viable on real silicon?"*, *"how do the ARM and VIDC contend for DRAM?"*,
+*"why does this configuration glitch?"* — are **mechanistic and
+predictive**. That is the goal of a **simulator** (model internal
+dynamics to understand/predict), not an **emulator** (reproduce the
+external interface so software runs).
+
+- **Emulator** (RPCEmu, MAME): runs the real software, produces the real
+  outputs; models *what the machine does*. MAME adds structural *device*
+  fidelity but **approximate CPU timing**.
+- **Simulator** (gem5, SystemC/TLM, a bespoke event model, SPICE):
+  models *how the machine does it* — cache, write buffer, bus
+  arbitration, DRAM timing, even analog behaviour — to predict the
+  dynamics an emulator abstracts away.
+
+Levels of simulation, mapped to the questions in this repo:
+
+| Level | Tool examples | RISC PC question it answers |
+|---|---|---|
+| Analog / circuit | SPICE | VCO start-up (+12 V rail), video-bus RC / signal integrity — *already in our bench notes* |
+| Gate / RTL | Verilog + Verilator / Icarus | gold-standard IOMD/VIDC20 register + timing logic (could co-sim with an ARM model) |
+| Cycle / transaction | bespoke event-driven, SystemC TLM, gem5 | **CPU(cache+wb) ↔ bus arbiter ↔ VIDC DMA ↔ DRAM contention; mode viability; visible-artifact prediction** |
+| Functional device | MAME `device_t`, RPCEmu | does software run; does the chipset behave; register / fault semantics |
+
+Honest conclusion: **the artifact-prediction and bandwidth-viability
+goals live at the cycle/transaction level — a simulator, not an
+emulator.** The most direct vehicle is a **bespoke transaction-level
+model of the RISC PC memory subsystem** (CPU access stream with a
+parametric cache + write buffer → DRAM arbiter ← VIDC DMA), calibrated
+and validated against the DSLogic captures. gem5 is the heavier,
+more-rigorous fallback — but it models *generic* Arm, not the real
+chipset (no IOMD/VIDC20, no SA-110 config out of the box). SPICE remains
+the right tool for the analog faults.
+
+This does not kill the MAME track — the two are complementary:
+
+- **MAME** answers *functional* questions and reproduces *static-config*
+  faults (stuck bits, wiring, register behaviour, POST); a
+  bandwidth-accounting layer there is a legitimate in-philosophy
+  contribution.
+- **The simulator** answers the *dynamic* questions (contention,
+  viability, workload-dependent artifacts) MAME structurally cannot.
+- A transaction-level memory-subsystem model, validated against captures,
+  could even serve as the **specification** for the eventual MAME IOMD
+  video-DMA device — feeding the emulator track.
+
+So: pursue MAME for chipset fidelity, but treat the **memory-subsystem
+simulator as the primary vehicle for the timing / viability research** —
+it is what the original question was really reaching for.
+
+## The emulator track: proposed phases (MAME)
 
 Each phase is independently useful and independently upstreamable.
 
