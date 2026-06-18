@@ -66,3 +66,59 @@ git submodule update --init
 ./tools/vscode-aasm/install.sh
 ```
 Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
+
+## Workflow: feature branches + self-review PRs
+
+For any non-trivial change (more than a small typo / single-file tweak):
+
+1. **Branch off `main`.**  Name with a `feature/` or `fix/` prefix
+   (e.g. `feature/raster-lab-phase1`, `fix/setup-script-shebang`).
+2. **Commit incrementally** on the branch.  Exploratory commits are fine —
+   they're documentation of how the design evolved.
+3. **Push the branch** and open a self-review **PR against `main`**.
+   The PR description is the place to document *why* and the journey;
+   commit messages document *what*.
+4. **Rebase / squash before merge** when the design has stabilised so
+   `main` ends up with a clean, narrated history.
+
+This keeps `main` linear and review-ready, while feature branches serve
+as the design-discussion record.
+
+## Customised RPCEmu fork
+
+The raster-lab subproject builds a customised RPCEmu (`setup-rpcemu.sh`
+clones from it).  The fork at
+[TheCodeSharman/rpcemu](https://github.com/TheCodeSharman/rpcemu) uses a
+different branch model than this repo because **its `main` tracks RPCEmu
+upstream pristine** — we don't merge our patches into `main` there.
+
+Layout:
+
+- `main` — RPCEmu upstream verbatim, tagged with the import version
+  (e.g. `v0.9.5`).  Only changes when we import a new upstream release.
+- `feature/vram-honesty` and other `feature/*` branches — **long-lived
+  patch branches** off `main`.  Each carries one cumulative patch.
+  Never merged into `main`.
+- The PR for each `feature/*` branch is a **standing review surface**
+  (not a "to be merged" thing).  Comments, additional commits, and
+  force-pushes (after upstream rebases) all happen on this PR.
+
+Why this model: RPCEmu mainline lives on Mercurial at marutan.net; we
+can't push back to mainline directly.  Long-lived patch branches let us
+maintain customisations locally, rebase them forward when mainline
+releases, and extract them as clean unified diffs (`git diff main
+feature/X`) to email upstream when ready.
+
+When mainline ships a new release:
+
+1. `git checkout main && git checkout -b sync/rpcemu-x.y.z`
+2. Rsync new upstream source over the working tree (sidecar hg clone in
+   `~/opt/rpcemu-upstream/`)
+3. Commit as `Import RPCEmu x.y.z`, tag as `vx.y.z`
+4. Open PR `sync/...` → `main` for review, merge once verified
+5. `git checkout feature/vram-honesty && git rebase main`, force-push.
+   Resolve conflicts where upstream and our patches collide.
+
+`setup-rpcemu.sh` clones whichever feature branch is configured (default
+`feature/vram-honesty`), so consumers automatically get the latest
+rebased state.
