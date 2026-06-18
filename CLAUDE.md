@@ -35,17 +35,18 @@ Two stacked decoders implement the Acorn POST protocol:
 ```
 Then load in PulseView or use with `sigrok-cli`.
 
-## ROM Analysis Scripts
+## ROM Images
 
-Located in `ROMS/`, run directly with Python 3:
+Known-good RISC OS ROM dumps live in `ROMS/4. Local Dump/`:
 
-```bash
-python3 ROMS/analyze_errors.py      # Compare two ROM binaries for bit errors
-python3 ROMS/analyze_jumps.py       # Detect bit-flip patterns in address deltas
-python3 ROMS/find_alias.py          # Search for byte sequences in ROM files
-```
+- `RiscOS_3.60.rom`, `RiscOS_3.70.rom` — clean 4MB merged images (ready to
+  use directly with RPCEmu).
+- `RO3_60-1203.101/102-01.rom`, `RO3_70-1203.191/192-01.rom` — the
+  individual 2MB chip dumps that make up each merged image.
 
-ROM images: `ROMS/RO_3_7_1.BIN`, `ROMS/RO_3_7_2.BIN` (1MB each, individual chips); `ROMS/merged.bin` (2MB, combined).
+To run one under the customised RPCEmu, symlink a `.rom` into the
+emulator's `roms/` directory (RPCEmu concatenates everything there
+alphabetically; a single 4MB file is a valid ROM on its own).
 
 ## External Submodules
 
