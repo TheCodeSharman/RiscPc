@@ -1,58 +1,54 @@
 #!/usr/bin/env bash
 # setup-rpcemu.sh
 #
-# Repeatable RPCEmu install on Linux hosts.  Clones the project's RPCEmu
-# fork (TheCodeSharman/rpcemu), checks out the branch with our patches
-# applied, enables the dynamic recompiler on x86_64 hosts, and symlinks
-# a pristine RISC OS ROM into the emulator's roms/ directory.
+# Builds RPCEmu from this repo's vendored source at external/rpcemu/ and
+# symlinks a pristine RISC OS ROM into the emulator's roms/ directory.
 #
-# The fork is based on v0.9.5 mainline plus:
-#   - philpem's os_reset patch (SWI poweroff support, cherry-picked)
-#   - VRAM-honesty patch (Configure / settings / romload — exposes real
-#     None / 1 / 2 / 8 MB options instead of mainline's hard-coded 0 or 8)
+# The source under external/rpcemu/ is RPCEmu mainline 0.9.5 (tag
+# rpcemu-v0.9.5-import) plus any local patches in this repo's git history.
+# We do an out-of-tree build under $RPCEMU_BUILD_DIR so the vendored
+# source stays clean (no build artifacts to commit by accident).
 #
 # Tested target: Pop!_OS 24.04 / Ubuntu derivatives.
 #
 # Stages (each is idempotent; safe to re-run):
 #   deps    - install Qt5 + build deps via apt
-#   source  - git clone the project's RPCEmu fork on the configured branch
-#   build   - run buildit.sh + make; enables dynarec on x86_64
+#   sync    - rsync external/rpcemu/ -> $RPCEMU_BUILD_DIR
+#   build   - configure (with dynarec on x86_64) + make
 #   rom     - symlink the project's pristine RISC OS 3.60 ROM dump into
-#             the emulator's roms/ dir (exactly one file — RPCEmu
+#             the build's roms/ dir (exactly one file — RPCEmu
 #             concatenates everything in roms/).  Override via ROM_SOURCE=
-#   launch  - write a launcher script that puts everything on PATH
+#   launch  - write a launcher script that picks the right binary
 #
 # Usage:
 #   ./setup-rpcemu.sh                  # run all stages in order
 #   ./setup-rpcemu.sh deps             # only install host deps
-#   ./setup-rpcemu.sh source           # only clone the fork
-#   ./setup-rpcemu.sh build            # only build
+#   ./setup-rpcemu.sh sync             # only rsync source into build dir
+#   ./setup-rpcemu.sh build            # only build (and sync first)
 #   ./setup-rpcemu.sh rom              # only symlink ROM
 #   ./setup-rpcemu.sh launch           # only write launcher
 #
 # Environment variable overrides:
-#   RPCEMU_FORK_URL      git URL to clone (default: TheCodeSharman/rpcemu)
-#   RPCEMU_FORK_BRANCH   branch to check out (default: feature/vram-honesty)
 #   RPCEMU_ROOT          install root (default: $HOME/opt/rpcemu)
+#   RPCEMU_BUILD_DIR     where to build (default: $RPCEMU_ROOT/build)
 #   ROM_SOURCE           absolute path to ROM (default: <repo>/ROMS/dump/RiscOS_3.60.rom)
 #   APT                  apt-get binary (default: sudo apt-get)
 #
 # References:
-#   https://github.com/TheCodeSharman/rpcemu                  (our fork)
-#   https://github.com/philpem/rpcemu                         (upstream-of-fork)
-#   https://www.marutan.net/rpcemu/                           (mainline)
+#   external/rpcemu/VENDOR.md                                 (vendor notes)
 #   https://www.marutan.net/rpcemu/linuxcompile.html          (build docs)
 
 set -euo pipefail
 
-RPCEMU_FORK_URL="${RPCEMU_FORK_URL:-https://github.com/TheCodeSharman/rpcemu.git}"
-RPCEMU_FORK_BRANCH="${RPCEMU_FORK_BRANCH:-feature/vram-honesty}"
 RPCEMU_ROOT="${RPCEMU_ROOT:-$HOME/opt/rpcemu}"
+RPCEMU_BUILD_DIR="${RPCEMU_BUILD_DIR:-$RPCEMU_ROOT/build}"
 APT="${APT:-sudo apt-get}"
 
 # Resolve project root from this script's path: tools/raster-lab/scripts/ -> repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+VENDORED_SRC="$PROJECT_ROOT/external/rpcemu"
+
 # Default to the pristine RISC OS 3.60 dump.  Matches the version pinned by
 # the external/Kernel/ submodule (RO_3_60), so kernel source and OS behaviour
 # in the emulator line up.  The project's physical-machine merged.bin has
@@ -60,8 +56,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # via ROM_SOURCE=... if you want to test emulation against the hardware's
 # actual ROM state (e.g. for cross-checking bit-error diagnosis).
 ROM_SOURCE="${ROM_SOURCE:-$PROJECT_ROOT/ROMS/dump/RiscOS_3.60.rom}"
-
-RPCEMU_SRC_DIR="$RPCEMU_ROOT/rpcemu"
 
 log()  { printf '\033[1;34m[setup-rpcemu]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[setup-rpcemu] WARNING:\033[0m %s\n' "$*" >&2; }
@@ -76,42 +70,62 @@ stage_deps() {
     qtmultimedia5-dev \
     libqt5multimedia5-plugins \
     libxcb-cursor0 \
-    git \
-    wget
+    rsync
 }
 
-stage_source() {
-  log "Cloning project RPCEmu fork from $RPCEMU_FORK_URL ($RPCEMU_FORK_BRANCH)"
-  mkdir -p "$RPCEMU_ROOT"
+stage_sync() {
+  log "Syncing vendored source -> $RPCEMU_BUILD_DIR"
+  [[ -d "$VENDORED_SRC/src/qt5" ]] || die "Vendored source missing at $VENDORED_SRC"
+  mkdir -p "$RPCEMU_BUILD_DIR"
 
-  if [[ -d "$RPCEMU_SRC_DIR/.git" ]]; then
-    log "  Repo already cloned at $RPCEMU_SRC_DIR; fetching + checking out branch"
-    ( cd "$RPCEMU_SRC_DIR" \
-        && git fetch --tags origin \
-        && git checkout "$RPCEMU_FORK_BRANCH" \
-        && git pull --ff-only origin "$RPCEMU_FORK_BRANCH" 2>/dev/null || true )
-  else
-    git clone --branch "$RPCEMU_FORK_BRANCH" "$RPCEMU_FORK_URL" "$RPCEMU_SRC_DIR"
-  fi
+  # rsync preserves whatever was previously built in the destination —
+  # so make picks up only what actually changed in the source.  --delete
+  # cleans up files removed from the vendored tree.  Excludes ensure we
+  # never overwrite build artifacts or runtime files that live in the
+  # build dir.
+  rsync -a --delete \
+    --exclude='/rpcemu-recompiler' \
+    --exclude='/rpcemu-interpreter' \
+    --exclude='/src/qt5/release/' \
+    --exclude='/src/qt5/Makefile' \
+    --exclude='/src/qt5/.qmake.stash' \
+    --exclude='/roms/ROM' \
+    --exclude='/roms/RO*' \
+    --exclude='/rpc.cfg' \
+    --exclude='/rpclog.txt' \
+    --exclude='/cmos.ram' \
+    --exclude='/hd4.hdf' \
+    --exclude='/build-cross-output.txt' \
+    "$VENDORED_SRC/" "$RPCEMU_BUILD_DIR/"
 
-  [[ -d "$RPCEMU_SRC_DIR/src/qt5" ]] || die "Expected RPCEmu source layout missing under $RPCEMU_SRC_DIR"
-  log "  Checked out: $(cd "$RPCEMU_SRC_DIR" && git log --oneline -1)"
+  log "  Sync complete ($(find "$RPCEMU_BUILD_DIR" -type f | wc -l) files)"
 }
 
 stage_build() {
   log "Building RPCEmu"
-  [[ -d "$RPCEMU_SRC_DIR/src/qt5" ]] || die "src/qt5 not found - run 'source' stage first"
 
-  # Short-circuit if either binary already exists.  With dynarec enabled the
-  # build produces rpcemu-recompiler only (not rpcemu-interpreter), so accept
-  # either as proof the build is done.
-  if [[ -x "$RPCEMU_SRC_DIR/rpcemu-recompiler" ]] || \
-     [[ -x "$RPCEMU_SRC_DIR/rpcemu-interpreter" ]]; then
-    log "  rpcemu binary already built; skipping (delete it to force rebuild)"
-    return 0
+  # Always sync first so that any commits to external/rpcemu/ propagate.
+  stage_sync
+
+  # Short-circuit only if both source-side and binary-side timestamps
+  # suggest the build is current (rsync would have touched files).
+  if [[ -x "$RPCEMU_BUILD_DIR/rpcemu-recompiler" ]] || \
+     [[ -x "$RPCEMU_BUILD_DIR/rpcemu-interpreter" ]]; then
+    # Check if any source file is newer than the binary
+    local binary
+    if [[ -x "$RPCEMU_BUILD_DIR/rpcemu-recompiler" ]]; then
+      binary="$RPCEMU_BUILD_DIR/rpcemu-recompiler"
+    else
+      binary="$RPCEMU_BUILD_DIR/rpcemu-interpreter"
+    fi
+    if [[ -z "$(find "$RPCEMU_BUILD_DIR/src" -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.h' \) -newer "$binary" -print -quit)" ]]; then
+      log "  rpcemu binary already up to date; skipping build"
+      return 0
+    fi
+    log "  Source newer than binary; rebuilding"
   fi
 
-  cd "$RPCEMU_SRC_DIR/src/qt5"
+  cd "$RPCEMU_BUILD_DIR/src/qt5"
 
   # Enable dynamic recompiler on x86/x86_64 hosts.  rpcemu.pro defaults to
   # interpreter-only; one line edit flips it on.  dynarec is x86-only per
@@ -124,7 +138,6 @@ stage_build() {
       if ! grep -q 'debug_and_release dynarec' rpcemu.pro; then
         sed -i 's/^CONFIG += debug_and_release$/CONFIG += debug_and_release dynarec/' rpcemu.pro
       fi
-      grep '^CONFIG' rpcemu.pro
       ;;
     *)
       log "  Host arch $arch is not x86; building interpreter only"
@@ -138,14 +151,14 @@ stage_build() {
   make -j"$(nproc)"
 
   # With dynarec the build produces rpcemu-recompiler; without it,
-  # rpcemu-interpreter.  Both can exist if rpcemu.pro is configured for both.
+  # rpcemu-interpreter.
   local found=0
-  if [[ -x "$RPCEMU_SRC_DIR/rpcemu-recompiler" ]]; then
-    log "  Built: $RPCEMU_SRC_DIR/rpcemu-recompiler (dynarec)"
+  if [[ -x "$RPCEMU_BUILD_DIR/rpcemu-recompiler" ]]; then
+    log "  Built: $RPCEMU_BUILD_DIR/rpcemu-recompiler (dynarec)"
     found=1
   fi
-  if [[ -x "$RPCEMU_SRC_DIR/rpcemu-interpreter" ]]; then
-    log "  Built: $RPCEMU_SRC_DIR/rpcemu-interpreter"
+  if [[ -x "$RPCEMU_BUILD_DIR/rpcemu-interpreter" ]]; then
+    log "  Built: $RPCEMU_BUILD_DIR/rpcemu-interpreter"
     found=1
   fi
   [[ "$found" == "1" ]] || die "Build completed but no rpcemu-{recompiler,interpreter} binary found"
@@ -154,7 +167,7 @@ stage_build() {
 stage_rom() {
   log "Linking ROM into emulator's roms/ directory"
   [[ -f "$ROM_SOURCE" ]] || die "ROM source not found: $ROM_SOURCE"
-  local roms_dir="$RPCEMU_SRC_DIR/roms"
+  local roms_dir="$RPCEMU_BUILD_DIR/roms"
   mkdir -p "$roms_dir"
   local dest="$roms_dir/ROM"
 
@@ -162,7 +175,6 @@ stage_rom() {
   # extension 'txt' will be joined together in alphabetical order".
   # So we MUST keep exactly one ROM file here — any second file gets
   # concatenated and the resulting blob isn't a valid RISC OS ROM.
-  # Remove any stray non-ROM files that might've been left behind.
   find "$roms_dir" -maxdepth 1 -type l ! -name 'ROM' -delete 2>/dev/null || true
 
   if [[ -L "$dest" ]] && [[ "$(readlink -f "$dest")" == "$(readlink -f "$ROM_SOURCE")" ]]; then
@@ -184,18 +196,17 @@ stage_launch() {
 
   cat > "$launcher" <<EOF
 #!/usr/bin/env bash
-# Launch RPCEmu from its install dir so it finds roms/ and writes its
+# Launch RPCEmu from its build dir so it finds roms/ and writes its
 # config alongside the binary.  Picks recompiler if available, falls
 # back to interpreter.
 #
 # Default to xcb / XWayland: native Wayland blocks programmatic cursor
 # positioning (security model), which RPCEmu needs for mouse-grab modes.
-# XWayland inherits X11's cursor-warp semantics so the emulator's mouse
-# handling works.  Override to wayland-native if you don't need mouse
-# grab: QT_QPA_PLATFORM=wayland $launcher
+# Override to wayland-native if you don't need mouse grab:
+#   QT_QPA_PLATFORM=wayland $launcher
 set -e
 export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-xcb}"
-cd "$RPCEMU_SRC_DIR"
+cd "$RPCEMU_BUILD_DIR"
 if [[ -x ./rpcemu-recompiler ]]; then
   exec ./rpcemu-recompiler "\$@"
 else
@@ -216,19 +227,17 @@ print_first_run_hints() {
   settings for parity with the user's physical RISC PC:
 
     Machine:        Risc PC
-    CPU:            StrongARM (SA-110)
-                    (switch to ARM710 later for cross-core comparison;
-                     same binary, different timing — that's the point)
+    CPU:            StrongARM (SA-110) — or ARM710 for comparison
     RAM:            64 MB
-    VRAM:           2 MB
-    ROM:            $RPCEMU_SRC_DIR/roms/ROM
-                    (this is the symlink to $ROM_SOURCE)
+    VRAM:           2 MB  (authentic; bump to 8 MB for Phase 5 stretch)
+    ROM:            $RPCEMU_BUILD_DIR/roms/ROM
+                    (symlink to $ROM_SOURCE)
 
   Once the desktop boots, mount this repo via HostFS:
     Configure -> HostFS -> set path to:
       $PROJECT_ROOT
 
-  RPCEmu writes its config to $RPCEMU_SRC_DIR/rpc.cfg after first run.
+  RPCEmu writes rpc.cfg / rpclog.txt / cmos.ram in $RPCEMU_BUILD_DIR.
 
   Launch:
     $RPCEMU_ROOT/rpcemu.sh
@@ -237,14 +246,14 @@ EOF
 }
 
 main() {
-  local stages=(deps source build rom launch)
+  local stages=(deps sync build rom launch)
 
   case "${1:-}" in
-    deps|source|build|rom|launch)
+    deps|sync|build|rom|launch)
       stages=("$1")
       ;;
     -h|--help)
-      sed -n '2,35p' "$0"
+      sed -n '2,40p' "$0"
       exit 0
       ;;
     "")
