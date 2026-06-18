@@ -13,7 +13,9 @@
 #   deps    - install Qt5 + build deps via apt
 #   source  - download + extract the RPCEmu 0.9.5 source tarball
 #   build   - run buildit.sh + make; enables dynarec on x86_64
-#   rom     - symlink ROMS/merged.bin into the emulator's roms/ dir
+#   rom     - symlink the project's pristine RISC OS 3.60 ROM dump into the
+#             emulator's roms/ dir (exactly one file — RPCEmu concatenates
+#             everything in roms/).  Override which ROM via ROM_SOURCE=...
 #   launch  - write a launcher script that puts everything on PATH
 #
 # Usage:
@@ -44,7 +46,13 @@ APT="${APT:-sudo apt-get}"
 # Resolve project root from this script's path: tools/raster-lab/scripts/ -> repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-ROM_SOURCE="${ROM_SOURCE:-$PROJECT_ROOT/ROMS/merged.bin}"
+# Default to the pristine RISC OS 3.60 dump.  Matches the version pinned by
+# the external/Kernel/ submodule (RO_3_60), so kernel source and OS behaviour
+# in the emulator line up.  The project's physical-machine merged.bin has
+# bit errors that prevent VIDC20 init from completing — use that explicitly
+# via ROM_SOURCE=... if you want to test emulation against the hardware's
+# actual ROM state (e.g. for cross-checking bit-error diagnosis).
+ROM_SOURCE="${ROM_SOURCE:-$PROJECT_ROOT/ROMS/dump/RiscOS_3.60.rom}"
 
 RPCEMU_SRC_DIR="$RPCEMU_ROOT/rpcemu-$RPCEMU_VERSION"
 
@@ -147,19 +155,19 @@ stage_rom() {
   mkdir -p "$roms_dir"
   local dest="$roms_dir/ROM"
 
+  # RPCEmu's roms.txt: "all files that don't start with '.' or have
+  # extension 'txt' will be joined together in alphabetical order".
+  # So we MUST keep exactly one ROM file here — any second file gets
+  # concatenated and the resulting blob isn't a valid RISC OS ROM.
+  # Remove any stray non-ROM files that might've been left behind.
+  find "$roms_dir" -maxdepth 1 -type l ! -name 'ROM' -delete 2>/dev/null || true
+
   if [[ -L "$dest" ]] && [[ "$(readlink -f "$dest")" == "$(readlink -f "$ROM_SOURCE")" ]]; then
     log "  $dest already points at $ROM_SOURCE"
   else
     rm -f "$dest"
     ln -s "$ROM_SOURCE" "$dest"
     log "  $dest -> $ROM_SOURCE"
-  fi
-
-  # Symlink with a memorable name too, in case the config asks for it
-  local named="$roms_dir/RO371"
-  if [[ ! -L "$named" ]]; then
-    ln -s "$ROM_SOURCE" "$named"
-    log "  $named -> $ROM_SOURCE"
   fi
 
   echo
@@ -175,15 +183,10 @@ stage_launch() {
 #!/usr/bin/env bash
 # Launch RPCEmu from its install dir so it finds roms/ and writes its
 # config alongside the binary.  Picks recompiler if available, falls
-# back to interpreter.
-#
-# Force XWayland: RPCEmu's Qt5 build doesn't render correctly on native
-# Wayland (Pop!_OS COSMIC default).  QT_QPA_PLATFORM=xcb makes Qt use
-# X11 protocol via XWayland — the well-known workaround for Qt5 apps
-# that haven't been ported to wayland-native rendering.  Override by
-# setting QT_QPA_PLATFORM in the environment before invoking this script.
+# back to interpreter.  Override QT_QPA_PLATFORM in the environment if
+# you want to force xcb / XWayland for any reason.
 set -e
-export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-xcb}"
+export QT_QPA_PLATFORM="\${QT_QPA_PLATFORM:-wayland}"
 cd "$RPCEMU_SRC_DIR"
 if [[ -x ./rpcemu-recompiler ]]; then
   exec ./rpcemu-recompiler "\$@"
