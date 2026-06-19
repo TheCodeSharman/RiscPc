@@ -1612,3 +1612,53 @@ Also documents the **RISC OS 16-colour flash-pair palette trap**: indices 8–15
 - "Pixel 3" corruption next to text: **gone**.
 - Mouse-cursor purple line: **gone**.
 - 4-colour grey desktop renders correctly: **yes**.
+
+## Jun 19 — VRAM POST failure traced to D19 (closing the D19 saga)
+
+POST adapter + LA capture of a VRAM fault (`vram fail.txt`):
+
+```
+VRAM  : 00 MByte
+Data  : VRAM-F00080000
+```
+
+Decoded against `TestSrc/Mem1IOMD`:
+- `VRAM-F` + `00080000` is the `ts_Dataline` walking-bit fault mask = **bit 19** (0x80000).
+- Only D19 fails; the other 31 lines pass walking-1 **and** walking-0 → VRAM module is present and otherwise fine (a missing module fails all bits, like the empty DRAM banks showing `Data-FFFFFFFF`).
+- The "00 MByte" is a knock-on: VRAM size detect uses `DistinctAddresses` with pattern `0xAAFF5500`, whose bit 19 is set, so the bad D19 makes the size probe conclude "no VRAM".
+
+Bus topology (Main PCB sheet 3, "DRAM & VRAM"): the VRAM connector takes the **unbuffered system data bus `D<>`** directly for its RAM port (the `Vcd<>` buffered bus via IC33/26/30/22 is the VIDC20 side). So POST "D19" = system D19, shared with the DRAM SIMMs.
+
+Pin map (from schematic):
+- **D19 = SIMM socket pin 9** (SK6 and SK7) — matches the "pin 9" from the Mar 1–3 short saga.
+- **D19 = VRAM expansion connector pin 82** (SK9, connector B).
+
+Root cause = my own earlier rework. When I drilled out SIMM-0 pins 9/10 (chasing the phantom "internal short" that was actually the repair-board PWR-via = D19), I cut the D19 trace. I later bodged D19 **SK6→SK7** to restore DRAM (socket 1 now passes bit 19), but never bodged the leg that carries on to the **VRAM connector** — so the VRAM never saw D19. Card-edge probing confirmed: D0/D1 present, D19 absent.
+
+Fix: bodge D19 from a proven-good node (SK7 pin 9, or ROM-2 pin 20 / CPU-slot D19) to **VRAM connector pin 82**. Not the VRAM die, no replacement chips/board needed. Re-run POST to confirm VRAM reports true size and passes the data-line test.
+
+### Jun 19 — RESOLVED: two independent VRAM-socket contact faults (D19 + Vcd4)
+
+The "VRAM-F00080000" POST fault and the residual display glitch turned out to be **two separate VRAM-socket contact failures on two different buses** — which is why it looked so tangled.
+
+**Key diagnostic principle (the bit that untangled it):**
+- POST's VRAM data-line test exercises the **CPU random port over the unbuffered system data bus `D<>`** (shared with DRAM/ROM).
+- The **displayed image** comes off the VRAM **serial port on the `Vcd<>` bus to VIDC20** — POST never tests this.
+- So: a fault POST *catches* = `D<>` (random/write) path; a stable on-screen glitch POST *misses* = `Vcd<>` (serial/read) path.
+- Confirmed by: with VRAM unplugged the machine uses **DRAM video** (IOMD reads `D<>`, ACT244 buffers drive `Vcd<>`) and the screen was clean → the board-side Vcd buffer + bodge are good → the fault is in the **VRAM-socket-specific leg** of that bit.
+
+**Pixel ↔ data-bit map (RISC OS, leftmost pixel = LSB):**
+- 1 bpp (MODE 25): pixel N (every 32 px) = bit N.
+- 2 bpp (MODE 26): pixel N = bits 2N, 2N+1.
+- e.g. D19/Vcd19 = 2bpp pixel 9; Vcd4 = 1bpp pixel 4 ("just after first half" of an 8-wide M, recurring every 4th char).
+- Distinguish D vs Vcd with a CPU readback (POINT / `!screen`): framebuffer reads clean but screen wrong ⇒ Vcd (serial); framebuffer reads wrong ⇒ D (random).
+
+**Pin map (Main PCB sheet 3):** D19 = SIMM socket pin 9 / VRAM connector pin 82; Vcd4 ≈ VRAM connector pin 74.
+
+**Faults & fixes:**
+1. **D19** (random port): trace cut by my earlier SIMM-0 pin 9/10 drill-out; I'd bodged SK6→SK7 for DRAM but never reconnected the VRAM leg. Re-fed D19, then the socket spring broke — **re-formed the broken spring stub** until it contacts the card.
+2. **Vcd4** (serial/video port): socket contact **broken clean off** (initially unnoticed). Board trace intact; **re-formed the broken spring** the same way as D19.
+
+Result: **POST passes, display clean, no corruption.** Card still removable.
+
+**Caveat:** both are re-bent broken springs = mechanically marginal. Socket is shedding contacts (D19, Vcd4, several bent pins). Monitor for flicker under heat/vibration; consider non-conductive epoxy to stop the re-formed springs relaxing, or targeted jumpers if more contacts fail.
