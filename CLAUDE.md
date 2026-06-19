@@ -106,3 +106,13 @@ and follow its CLAUDE.md rather than duplicating the detail here.
 The one fact worth carrying on this side: **use the interpreter build, not
 the recompiler** — the dynarec is unstable (RISC OS throws spurious errors
 like "no such SWI"); the interpreter runs clean.
+
+### Other RPCEmu forks
+
+- [riscoscloverleaf/rpcemu](https://github.com/riscoscloverleaf/rpcemu) — a
+  host-integration / usability fork of RPCEmu 0.9.4 (mouse-wheel scroll,
+  full-screen + exit-on-shutdown options, bidirectional text/image clipboard,
+  macOS support; release 0.5, Mar 2022, little ongoing dev). "Cloverleaf" is
+  just the patch-set name. Handy as a daily-driver emulator, but it does
+  **not** change the CPU/memory model — still functional-only (no cache /
+  write-buffer / pipeline), so it's no use as a raster-lab timing reference.
