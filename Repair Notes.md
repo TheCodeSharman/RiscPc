@@ -1662,3 +1662,9 @@ The "VRAM-F00080000" POST fault and the residual display glitch turned out to be
 Result: **POST passes, display clean, no corruption.** Card still removable.
 
 **Caveat:** both are re-bent broken springs = mechanically marginal. Socket is shedding contacts (D19, Vcd4, several bent pins). Monitor for flicker under heat/vibration; consider non-conductive epoxy to stop the re-formed springs relaxing, or targeted jumpers if more contacts fail.
+
+### Jun 19 — other fixes this session + VRAM recognition confirmed
+
+- **Reset button replaced** (the original was mechanically dead — see early notes where removing it brought the machine out of reset).
+- **Two missing fuses fitted.**
+- **VRAM now recognised:** Task Manager reports **9216K** total with the VRAM card in (8 MB DRAM + 1 MB VRAM) vs **8192K** with it unplugged. The displayed image looks identical either way, but with VRAM fitted the display DMA reads the **VRAM serial port** (independent of the CPU random port), so video refresh no longer steals system-bus cycles — more CPU/system-bus bandwidth than DRAM-video mode (and it enables higher-bandwidth modes DRAM video can't sustain). Confirms the VRAM→VIDC path is fully working after the D19 + Vcd4 contact repairs.

@@ -70,7 +70,13 @@ Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
 
 ## Workflow: feature branches + self-review PRs
 
-For any non-trivial change (more than a small typo / single-file tweak):
+This branch-and-PR discipline applies to the **code subprojects** —
+`tools/raster-lab/`, `decoders/`, and the customised RPCEmu fork (which has
+its own, more elaborate model; see below).  It does **not** apply to routine
+work on the main repo such as `docs/`, `Repair Notes.md`, `ACORN_POST.md`, or
+other single-file note/markdown tweaks — those can go straight to `main`.
+
+For non-trivial changes within those subprojects:
 
 1. **Branch off `main`.**  Name with a `feature/` or `fix/` prefix
    (e.g. `feature/raster-lab-phase1`, `fix/setup-script-shebang`).
