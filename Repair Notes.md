@@ -1736,6 +1736,15 @@ With a disc (so an MDF is loaded) the high-colour modes the built-in tables coul
 - **800×600 @ 32bpp (16M colours) renders clean**, using **~1.8 MB of screen memory** (800×600×4 = 1.92 MB). That framebuffer is **>1 MB so it can't fit the old single bank — it's in the second VRAM bank**, and it's clean. This exercises *both* the CPU random port (`D<>`) and the video serial port (`Vcd<>`), and 32bpp only became selectable because of the 2 MB bandwidth.
 - **Conclusion: the 2 MB VRAM and its bus path are fully good** — the AliExpress chips, their decoupling, and the earlier D19 + Vcd4 socket repairs all confirmed working under real video load.
 
-**1024×768 is corrupted, but that's the monitor, not the VRAM.** 800×600 @ 32bpp (1.8 MB) exercises *more* VRAM than 1024×768 @ 16bpp (1.5 MB) and is clean, so the second bank isn't at fault. What changes at 1024×768 is the **horizontal scan rate** (~48 kHz vs ~37.8 kHz at 800×600@60) — the monitor can't lock to it. A lower-refresh 1024×768 MDF entry (e.g. 56 Hz) *might* sync; otherwise it's a hard monitor scan-rate ceiling, nothing wrong with the machine.
+**High-res modes garble, but it's the LCD monitor's analog sampling, not the machine.** (Earlier guesses of "scan-rate ceiling" then "MDF horizontal timing" were both wrong — corrected here after more testing.)
+
+Symptoms at 1024×768 and above: a stable image (so it *is* syncing), the right ~1/3 copied onto the left, and a **periodic horizontal pixel mis-ordering** (e.g. pixel 4 swapped with pixel 6 within a ~16-pixel span) — but **identical top-to-bottom (no shear) and vertical lines clean**. Decisive evidence it's the monitor:
+
+- **Resolution-dependent, bpp-independent:** works at **256, 32K *and* 16M colours at low resolution**, and fails at **all** depths at high resolution. A fault in the RISC PC pixel path (VRAM / Vcd bus / VIDC unpacking) would track **bpp** (packing differs per depth); this tracks **pixel rate** instead → it's downstream of the machine.
+- **Mechanism:** the RISC PC outputs **analog VGA**; the LED monitor must recover the pixel clock and sample it. A slightly-off **sampling Clock** mis-samples pixels in a periodic pattern (the 16-pixel swap); wrong **Phase** smears. Vertical is unaffected (purely horizontal sampling). Worse at high res because the faster pixel clock leaves less sampling margin — which is why **800×600 and below are clean at every depth**.
+
+**Fix is in the monitor OSD, not the RISC PC:** show a full-screen high-detail image, run **Auto Adjust**, then tune **Clock** (kills the periodic swap) and **Phase** (sharpens). Or use a monitor/scaler with better analog lock.
+
+**RISC PC, 2 MB VRAM, and the Vcd bus are fully exonerated** — the machine renders correct pixels; the monitor mis-samples them at high pixel rates.
 
 **Milestone: RISC PC boots from its own HDD, on its own validated PSU, with working 2 MB VRAM in 16M-colour modes.**
