@@ -1712,3 +1712,17 @@ To plug in drives I need the **stock PSU** (the motherboard's been running off t
 - The meter reports both a **series R (ESR)** and **parallel R (leakage/Rp)** — read **series** for electrolytics, **parallel** for film/ceramic and especially Y-caps (leakage is the safety-critical property there).
 
 **Remaining before reconnecting to the motherboard:** bench the PSU **standalone into a dummy load**, scope each rail for **ripple**, and bring it up the first time behind an **RCD + dim-bulb limiter**. Only then connect the board and plug in the drives.
+
+### Jun 21 — Stock PSU bench test PASSED; machine running off its own supply
+
+Restored the cut power harness first — **re-spliced and soldered** every conductor, heat-shrink over each joint (soldered, not twisted, so it carries the +5 V rail's current without drop). Checked rail→ground / rail→rail for shorts before applying power.
+
+PSU label ratings: **+5.1 V @ 7.9 A, +12 V @ 2.05 A, −12 V @ 0.25 A** (3 A mains in). +5 V is the sensed/regulating rail; the 12 V rails are semi-regulated and follow it. **No soft-power on the RISC PC** — it's a hard-switched PSU, mains-on = rails up, no enable line to assert.
+
+Bench test (no dim-bulb available — no bulbs to hand; relied on the clean static inspection + RCD):
+
+- **Powers up clean** — no short, no smoke.
+- **All three rails at correct voltage** (loaded only by a 12 V fan; this supply regulates well even with the +5 V rail lightly loaded — better than the expected no-load high-12 V behaviour).
+- **Ripple on +5 V = 10 mV p-p** under ~0.7 A load (board connected, no drives yet), properly measured. First pass read 60 mV but that was almost entirely **ground-lead-injected switching spikes** — with a short ground (improvised after breaking the spring clip: probe ground collar + short wire) and 20 MHz BW limit it dropped to a genuine **10 mV**, a fifth of the ATX guideline. Confirms the secondary caps are healthy (a tired cap would show hundreds of mV).
+
+**Verdict: PSU fully validated** — static inspection + clean startup + correct rails + 10 mV ripple. The machine now **runs off its own restored stock PSU** (was on the bench supply since the Jul 3 "tingly fingers" scare, now explained as benign floating-earth Y-cap leakage). Clear to plug in the drives and load an MDF for the VRAM torture test.
