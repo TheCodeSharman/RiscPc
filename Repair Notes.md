@@ -1726,3 +1726,16 @@ Bench test (no dim-bulb available — no bulbs to hand; relied on the clean stat
 - **Ripple on +5 V = 10 mV p-p** under ~0.7 A load (board connected, no drives yet), properly measured. First pass read 60 mV but that was almost entirely **ground-lead-injected switching spikes** — with a short ground (improvised after breaking the spring clip: probe ground collar + short wire) and 20 MHz BW limit it dropped to a genuine **10 mV**, a fifth of the ATX guideline. Confirms the secondary caps are healthy (a tired cap would show hundreds of mV).
 
 **Verdict: PSU fully validated** — static inspection + clean startup + correct rails + 10 mV ripple. The machine now **runs off its own restored stock PSU** (was on the bench supply since the Jul 3 "tingly fingers" scare, now explained as benign floating-earth Y-cap leakage). Clear to plug in the drives and load an MDF for the VRAM torture test.
+
+### Jun 21 — Boots from HDD; 2 MB VRAM torture test PASSED
+
+Connected the IDE drive (pin 1 = the `1` silkscreen on the **left** of the motherboard socket; red stripe to that end, and toward the Molex at the drive end — the cable's existing folds also wanted that orientation). **Machine boots from the old hard drive** off its own PSU.
+
+With a disc (so an MDF is loaded) the high-colour modes the built-in tables couldn't offer are now available, and the VRAM torture test passes:
+
+- **800×600 @ 32bpp (16M colours) renders clean**, using **~1.8 MB of screen memory** (800×600×4 = 1.92 MB). That framebuffer is **>1 MB so it can't fit the old single bank — it's in the second VRAM bank**, and it's clean. This exercises *both* the CPU random port (`D<>`) and the video serial port (`Vcd<>`), and 32bpp only became selectable because of the 2 MB bandwidth.
+- **Conclusion: the 2 MB VRAM and its bus path are fully good** — the AliExpress chips, their decoupling, and the earlier D19 + Vcd4 socket repairs all confirmed working under real video load.
+
+**1024×768 is corrupted, but that's the monitor, not the VRAM.** 800×600 @ 32bpp (1.8 MB) exercises *more* VRAM than 1024×768 @ 16bpp (1.5 MB) and is clean, so the second bank isn't at fault. What changes at 1024×768 is the **horizontal scan rate** (~48 kHz vs ~37.8 kHz at 800×600@60) — the monitor can't lock to it. A lower-refresh 1024×768 MDF entry (e.g. 56 Hz) *might* sync; otherwise it's a hard monitor scan-rate ceiling, nothing wrong with the machine.
+
+**Milestone: RISC PC boots from its own HDD, on its own validated PSU, with working 2 MB VRAM in 16M-colour modes.**
