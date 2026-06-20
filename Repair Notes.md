@@ -1676,3 +1676,39 @@ Populated the **empty side of the VRAM card** — soldered on the second bank of
 Result: machine boots with **10 MB visible** (8 MB DRAM + 2 MB VRAM = 10240K) and **POST reports VRAM = 2 MByte**. Both numbers agreeing confirms the new bank is being addressed and mapped, not merely detected.
 
 POST's data-line test exercises the new chips over the CPU random port (`D<>`), so a 2 MB pass means the upper bank's `D<>` connections are good. Still worth a functional check of the **serial/video** side of the new bank: select a mode that *needs* >1 MB VRAM (e.g. 1280×1024 @ 16bpp, 1600×1200, or 1024×768 in 16M colours) and look for clean output with no corruption banding in the region the new bank backs — that exercises the `Vcd<>` serial-port path POST never tests.
+
+### Jun 20 — VRAM torture-test attempt blocked by missing MDF (no hard drive)
+
+Tried to exercise the new second VRAM bank with a >1 MB framebuffer mode, but **can't get any high-colour mode without a hard drive.** Findings:
+
+- **The torture-test logic:** the RISC PC puts the framebuffer in VRAM only if it *fits*, else it falls back to DRAM video. So to force the **second bank** into use you want a framebuffer **between 1 MB and 2 MB** — that simply couldn't have happened on the old 1 MB card. Routes: high depth at low res (640×480 @ 32bpp = 1.17 MB) or high res at 16bpp (1024×768 @ 16bpp = 1.5 MB).
+- **`*WimpMode` silently substitutes** the nearest available mode instead of erroring — it kept dropping back to 256 colours. Test in **BASIC** (`MODE "X640 Y480 C16M F60"`) where failures show as visible errors.
+- **Reading back the actual mode** (don't trust the icon): `SYS "OS_ReadModeVariable",-1,N TO ,,V%` — var **9** = Log2BPP (3=8bpp/256, 4=16bpp/32K, 5=32bpp/16M), vars **11/12** = pixel W/H, var **7** = ScreenSize bytes (>1 MB ⇒ second bank in use).
+- **Result: Log2BPP stayed at 3** (256 colours) no matter what — RISC OS won't synthesise a high-colour mode. Root cause confirmed: with **no MDF loaded**, the OS is on the **sparse built-in MonitorType timing tables**, which only enumerate 256-colour variants at these resolutions. The VIDC timings (and the available high-colour/high-res modes) come from the **monitor definition file**, not the mode-selector string — the string only picks resolution + depth. No disc → no MDF → capped at 256.
+- **Plan:** plug in drives (needs the stock PSU — see PSU inspection below), load an MDF, then select a >1 MB framebuffer mode and look for corruption banding to confirm the second bank's serial/video path. `*Configure MonitorType Auto` (DDC) is a possible no-disc workaround worth a try.
+- Aside: screen memory **auto-expands** to the mode — no manual allocation needed; with VRAM fitted the framebuffer maps onto VRAM up to 2 MB automatically (the DRAM "Screen memory" config is moot unless a mode exceeds VRAM).
+
+### Jun 20 — Stock PSU inspection (pre-recommission)
+
+To plug in drives I need the **stock PSU** (the motherboard's been running off the bench supply since the "tingly fingers" scare — see Jul 3). Gave it a full static inspection before trusting it. **Verdict: passes — nothing unsafe, failing, or missing.**
+
+**The tingle is explained and benign.** Earth bond (mains earth pin → chassis) measures **0.2 Ω** — solid. The tingling felt during earlier bench testing was **normal Y-cap leakage current sitting on the chassis because the earth was floating** (poor plug seating), *not* a failing cap. With a proper earth that leakage is shunted to ground as designed — standard Class-I behaviour. Confirmed by physically tracing a Y-cap pin to the chassis-bonding screw.
+
+**Mains-side components — all identified, safety-rated, healthy:**
+
+- **SCK-103** NTC inrush current limiter — 10 Ω cold / 3 A (drops to ~0.3 Ω hot). Green disk, in series with mains, soft-starts the bulk-cap charge. (Needs ~30 s to cool between power cycles to limit inrush each time.)
+- **KBL04G** bridge rectifier — 4 A / 400 V glass-passivated. The mains→DC front end feeding the bulk cap.
+- **X-cap** — 0.47 µF X2 250 V across L-N. Measured 452 nF (−4%, in tol), phase −89° @ 100 kHz = low loss. Healthy. (250 VAC is slightly low margin for 230/240 V mains; if ever replaced, fit 275 VAC.)
+- **Y-caps** — the cluster of three **orange ceramic safety caps** (CSA / SEV / Nordic approvals, ~250 V Y2, value `47x`). One pin to the chassis-bonding screw confirms they're the L/N→earth Y-caps. **This was the "missing Y-cap" — orange ceramic, not blue, and the source of the (benign) chassis leakage.**
+- **Primary bulk cap** — 150 µF / 400 V, **ESR ≈ 0.2 Ω @ 100 kHz** = healthy for an HV cap (these run higher ESR than low-V low-ESR types; a dried-out one would read whole ohms). Capacitance ~140–150 µF. *(In-circuit + near its self-resonance the meter's phase reads a shallow −25° — that's expected physics for a big cap at 100 kHz, not a fault.)*
+- **Isolation barrier** — main transformer + **Sharp PC111** optocoupler (DIP-6, long-creepage, 5 kV isolation) carrying the regulation feedback across the barrier. Well-handled isolation; consistent with there being no *separate* blue Y-cap.
+- **Secondary electrolytics** — no visible bulging/venting/leakage. In-circuit ESR is unreliable here (output choke / winding shunts the reading to ~0), so **verify by ripple test rather than poking each cap** — lift a leg only if a rail shows bad ripple.
+
+**LCR-meter lessons banked (for next time):**
+
+- **ESR is only a meaningful health metric for electrolytics** — they fail by ESR rise (electrolyte dries out). Film/ceramic don't fail that way; judge those by **capacitance + dissipation factor / leakage (Rp)** and visual cracks.
+- **Electrolytics: measure ESR @ 100 kHz** (reactance negligible, pure series R) and **capacitance @ 120 Hz** (the datasheet frequency; high-freq µF on a big cap is garbage from ESL/self-resonance). A tired cap can fail *either* metric.
+- **Do OPEN + SHORT compensation at the test frequency** before trusting 100 kHz — an impossible phase (>90°, e.g. the −100° artifact seen here) means uncompensated leads, not a weird cap. Clean probe contacts matter at 100 kHz (DeoxIT fixed it).
+- The meter reports both a **series R (ESR)** and **parallel R (leakage/Rp)** — read **series** for electrolytics, **parallel** for film/ceramic and especially Y-caps (leakage is the safety-critical property there).
+
+**Remaining before reconnecting to the motherboard:** bench the PSU **standalone into a dummy load**, scope each rail for **ripple**, and bring it up the first time behind an **RCD + dim-bulb limiter**. Only then connect the board and plug in the drives.
