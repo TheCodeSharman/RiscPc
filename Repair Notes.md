@@ -1668,3 +1668,11 @@ Result: **POST passes, display clean, no corruption.** Card still removable.
 - **Reset button replaced** (the original was mechanically dead — see early notes where removing it brought the machine out of reset).
 - **Two missing fuses fitted.**
 - **VRAM now recognised:** Task Manager reports **9216K** total with the VRAM card in (8 MB DRAM + 1 MB VRAM) vs **8192K** with it unplugged. The displayed image looks identical either way, but with VRAM fitted the display DMA reads the **VRAM serial port** (independent of the CPU random port), so video refresh no longer steals system-bus cycles — more CPU/system-bus bandwidth than DRAM-video mode (and it enables higher-bandwidth modes DRAM video can't sustain). Confirms the VRAM→VIDC path is fully working after the D19 + Vcd4 contact repairs.
+
+### Jun 20 — VRAM upgraded 1 MB → 2 MB (second bank populated)
+
+Populated the **empty side of the VRAM card** — soldered on the second bank of VRAM chips (sourced from AliExpress) plus their SMD 100n decoupling caps. The card now carries both banks (2 MB, the RISC PC maximum).
+
+Result: machine boots with **10 MB visible** (8 MB DRAM + 2 MB VRAM = 10240K) and **POST reports VRAM = 2 MByte**. Both numbers agreeing confirms the new bank is being addressed and mapped, not merely detected.
+
+POST's data-line test exercises the new chips over the CPU random port (`D<>`), so a 2 MB pass means the upper bank's `D<>` connections are good. Still worth a functional check of the **serial/video** side of the new bank: select a mode that *needs* >1 MB VRAM (e.g. 1280×1024 @ 16bpp, 1600×1200, or 1024×768 in 16M colours) and look for clean output with no corruption banding in the region the new bank backs — that exercises the `Vcd<>` serial-port path POST never tests.
