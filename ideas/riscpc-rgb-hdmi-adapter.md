@@ -38,6 +38,50 @@ many other types of display to be driven." ARM even wrote an application
 note ("Using VIDC20 with LCDs"; ARM7500 sibling DAI0035B "LCDs on 7500")
 on doing exactly this. Our HDMI box is just "another type of display."
 
+## What the genlock port is actually for (and why it resists capture)
+
+Important framing: this connector was **not** designed to get a clean display
+*out* of the RISC PC. It's a **video-overlay subsystem** — built to lock the
+RISC PC's raster to an *incoming* video source and key its graphics *over* that
+video, pixel by pixel (an Amiga-style video titler / character generator;
+third-party Acorn genlock cards used exactly this). Every signal on the header
+is one piece of that single job:
+
+- **SINK** (in) — resets VIDC's vertical counter to raster 0 → **vertical lock**
+  to the external field.
+- **External VCO + phase comparator → Hclk** — phase-locks VIDC's *pixel clock*
+  to the external HSYNC → **horizontal lock**. (This is the same VCO that needs
+  the **+12V rail** — it only exists to slave the pixel clock to incoming video.)
+- **FLYBK** (out) — tells the external mixer where VIDC vertical blanking is.
+- **Supremacy / "alpha" key** — the **4-bit Ext LUT** value, output on `ED[3:0]`
+  (delayed one pixel via `dac=1` to align with the analogue RGB), is a **per-
+  pixel key**: for each pixel, show RISC PC graphics vs. let external video
+  through (or a fade level). VIDC20's 1994 alpha/chroma-key.
+
+Sync **in**, timing **out**, analogue RGB **out**, per-pixel key **out** → an
+external mixer composites the two sources. The chip is pushing RISC PC graphics
+*into* a video chain, slaved to someone else's timing — the **inverse** of our
+capture goal.
+
+This explains every contortion in this doc: the **8-bit muxed port** (no need
+for full parallel digital RGB when an external analogue mixer does the
+compositing), the **supremacy keying**, the **sync-*in* orientation**, and
+**ESEL tied to static EREG** (the host only ever needed to pick one fixed
+output role in software, never to sweep it per pixel). We are repurposing a
+video-production *overlay output* as a *capture tap* — which is why it fights us.
+
+### Aside — the "wasted alpha" in 32bpp is half-real
+
+In 32 bits/pixel, the 32-bit logical pixel splits (§7.0): 24 bits → R/G/B LUTs,
+**bits 27:24 → the Ext LUT**, bits 31:28 **discarded**. So the spare "alpha
+byte" isn't fully wasted — its lower nibble is the supremacy key and *does* come
+out `ED[3:0]`. Notably this **4-bit per-pixel channel is the one thing you can
+capture with no board mod**: it streams continuously at a *static* `ESEL=3`
+(set via a plain `EREG=3` register write), because the per-pixel variation comes
+from framebuffer→Ext LUT→ED[3:0], not from sweeping ESEL. Trade-off: while
+ESEL=3 you get the 4-bit key *instead of* RGB (still one 8-bit port). So:
+"alpha, non-invasively" **or** "RGB, with the pin mod" — never both at once.
+
 ## How the ED port works (mechanism)
 
 VIDC20 has an **8-bit output port `ED[7:0]`**, a synchronous output clock
