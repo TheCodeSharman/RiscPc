@@ -227,11 +227,18 @@ fine wire to a lifted leg or cut stub fatigues and rips the joint otherwise.
 Drive the **chip side** of any cut (ESEL is an input); confirm isolation with
 a meter (ESEL pin no longer continuous to its EREG pin) before powering on.
 
-### Option C — per-component frame capture (static only)
+### Option C — per-component frame capture (static screen only)
 
-Set EREG to one component, capture a whole frame, repeat for G and B over 3
-frames. Trivial wiring; **only valid for static images.** Useless for live
-desktop. Listed for completeness.
+Hold ESEL fixed (static `EREG`), capture a whole Red frame, then Green, then
+Blue, and recombine. Zero wiring/mod and **scales to 1280×1024** (one component
+per pixel per frame at 1× ECLK — no sub-pixel mux, so the settle ceiling never
+applies). The catch: R/G/B come from **three successive VSYNCs** (~33 ms spread
+R→B at 60 Hz), so it's a **still-*screen* grabber** — anything moving in that
+window (mouse pointer, caret blink, animation, video) tears into **colour
+fringes**. Mitigations make it solid for its real job: hide the pointer, hold
+still, and grab a **4th verification frame** — reject the capture (or just the
+changed regions) if anything moved, so only motion-free stills are kept. For
+deliberate archival screenshots the fringing simply never appears.
 
 ### Option D — just digitise analogue RGB (the escape hatch)
 
@@ -292,6 +299,59 @@ Pixel-clock reference points (×3 sampling for Option B):
 - 800×600 ≈ 40 MHz → 120 MHz: edge (RP2350 / more overclock)
 - 1024×768 ≈ 65 MHz → 195 MHz: FPGA only
 - 1280×1024 ≈ 108 MHz → 324 MHz: out of reach for cheap parts
+
+### The settle time is a *hard chip ceiling* on live mux, not just a sampler limit
+
+Crucially, `Ted` ≈ 5–7 ns isn't only your sampler's problem — it's how long the
+ED mux+pad needs to present a valid byte after the selected source changes. So
+**ESEL transitions physically cannot be spaced closer than ~5–7 ns** — the ED
+output won't have settled. Per phase ≈ settle + sample ≈ ~8–10 ns; full RGB =
+3 phases → **~25–30 ns/pixel floor → ~35–40 Mpix/s max for muxed RGB**:
+
+- 640×480 (25 MHz): comfortable
+- 800×600 (40 MHz): right at the edge
+- 1024×768 (65 MHz) and up: **over the line — impossible on this port**
+
+**No faster FPGA rescues this** — the bits aren't *valid on ED* fast enough.
+It's a limit of the 1990s-rate external port, not of the capture electronics.
+So **live multiplexed full-RGB tops out around 640×480–800×600 by hard chip
+limit.** Higher-res full colour is only reachable *without* sub-pixel muxing —
+i.e. the static 3-frame path (Option C), which samples one component per pixel
+at 1× ECLK and so never hits the settle wall.
+
+## Capture approaches & their hard limits (the ED-port trilemma)
+
+ED is an **8-bit, one-component-at-a-time** port, and that single fact forces a
+trilemma: you can have at most **two of {full resolution, same-instant colour,
+non-invasive}**.
+
+|  | full-res | same-instant | non-invasive |
+|---|:---:|:---:|:---:|
+| **ED — live mux** (3× ESEL/pixel) | ✗ (≤~800×600, settle ceiling) | ✓ | ✗ (pin mod) |
+| **ED — 3-frame static** (Option C) | ✓ (to 1280×1024) | ✗ (fringes on motion) | ✓ |
+| **Memory-bus sniff** | ✓ | ✓ | ✓ (SIMM interposer) |
+| **Analogue (GBS-C/dongle)** | ✓ | ✓ | ✓ | 
+
+- **Live mux:** same-instant colour but capped at ~640–800 by the ED settle
+  time, and needs the invasive ESEL pin mod.
+- **3-frame static:** full-res and plug-in, but still-screen only. **This is
+  the genuine sweet spot** — a pristine archival stills grabber.
+- **Memory-bus sniff** gets everything (same-instant full-res live) and is even
+  non-invasive to the VIDC20 (SIMM interposer) — **but it's a no-go as a
+  device.** High-colour/high-res modes use the full **64-bit** data bus, so you'd
+  capture 64 data lines + control *every memory cycle* (multi-GB/s →
+  logic-analyser / wide-fast-FPGA + external RAM), **and** re-implement VIDC's
+  front-end (which DMA cycles are video vs CPU/sound/cursor, the quad-word FIFO,
+  scan order, bpp/mode, and the palette for ≤8bpp). ED's whole *value* was doing
+  all that decode for you. Different league of project — closer to the
+  MAME-accuracy / logic-analyser work than to a dongle.
+- **Analogue (GBS-C)** already does live full-res well enough; its only flaw is
+  the ADC sampling artifacts this idea set out to avoid.
+
+**Bottom line:** there's no free lunch on this hardware. The ED-port **static
+stills grabber** is the novel, practical contribution; live high-quality display
+is already solved acceptably by the analogue scaler; and "perfect digital live"
+only exists at the memory-bus cost nobody sane pays for a 1994 desktop.
 
 ## Open questions / risks
 
