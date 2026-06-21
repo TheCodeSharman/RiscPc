@@ -330,7 +330,12 @@ non-invasive}**.
 | **ED — live mux** (3× ESEL/pixel) | ✗ (≤~800×600, settle ceiling) | ✓ | ✗ (pin mod) |
 | **ED — 3-frame static** (Option C) | ✓ (to 1280×1024) | ✗ (fringes on motion) | ✓ |
 | **Memory-bus sniff** | ✓ | ✓ | ✓ (SIMM interposer) |
-| **Analogue (GBS-C/dongle)** | ✓ | ✓ | ✓ | 
+| **CPU-slot framebuffer shadow** | ✓ | ✓ | ✓ (2nd processor slot) |
+| **Analogue (GBS-C/dongle)** | ✓ | ✓ | ✓ |
+
+The bottom three rows *escape* the trilemma — but only by **leaving the ED port
+entirely** for a much bigger build. The trilemma is specifically a property of
+the 8-bit ED port; the escapes cost you a full subsystem.
 
 - **Live mux:** same-instant colour but capped at ~640–800 by the ED settle
   time, and needs the invasive ESEL pin mod.
@@ -345,8 +350,31 @@ non-invasive}**.
   scan order, bpp/mode, and the palette for ≤8bpp). ED's whole *value* was doing
   all that decode for you. Different league of project — closer to the
   MAME-accuracy / logic-analyser work than to a dongle.
+- **CPU-slot framebuffer shadow** is the cleverest "have it all": sit in the
+  **second processor slot** (a *designed* connector — non-invasive), snoop CPU
+  writes to screen RAM (RISC OS does all 2D in software — no blitter — so CPU
+  writes capture the whole framebuffer) plus VIDC register writes (screen base,
+  mode, palette), mirror the framebuffer, and render it yourself. 32-bit bus
+  (not 64), same-instant/full-res/live — it breaks the trilemma. But you must
+  re-implement VIDC's pixel pipeline (LUT/palette, the 1–32 bpp mode mappings,
+  geometry/timing, hardware cursor) — i.e. you've built a **shadow GPU**. It's
+  one step from a true **RTG card** that bypasses VIDC and drives HDMI natively.
+  Caveats: write-buffer/cache coherency of screen RAM (esp. StrongARM — ties to
+  [sa110-cache-analyzer.md](sa110-cache-analyzer.md)) and seeding the mirror's
+  initial state. It's essentially *half a hardware MAME* (snoop CPU bus + model
+  VIDC), converging with [mame-riscpc-driver.md](mame-riscpc-driver.md).
 - **Analogue (GBS-C)** already does live full-res well enough; its only flaw is
   the ADC sampling artifacts this idea set out to avoid.
+
+**The philosophical ceiling.** The shadow-GPU / RTG path crosses from *capturing
+the RISC PC* into *replacing its graphics subsystem* — and that defeats the
+reason for using the machine at all. If you want a modern display experience,
+the honest move is to **buy a modern machine**; you run a RISC PC for the
+*authentic* hardware. So the practical project space really does collapse to the
+two ends: the **ED-port static stills grabber** (minimal, authentic, archival —
+the thing worth building) and, if you just want a screen on a desk, the
+**analogue scaler** (already good enough). Everything in between is either
+physically capped (ED live mux) or a different machine wearing a RISC PC case.
 
 **Bottom line:** there's no free lunch on this hardware. The ED-port **static
 stills grabber** is the novel, practical contribution; live high-quality display
