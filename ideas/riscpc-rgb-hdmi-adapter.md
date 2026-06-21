@@ -136,8 +136,29 @@ Note: **no single-wire trick yields a 0→1→2 cycle.** Wiring ESEL[0]=ECLK
 sequence fundamentally needs a counter driving *both* ESEL bits.
 
 - ✅ True 8:8:8, live; standalone VIDC20 lets you wire ESEL as you choose.
-- ❌ Fine-pitch soldering at VIDC20 pins 9/7/6/5 (cut tie, inject ESEL drive);
-  3–4× pixel-clock sampling caps resolution (see budget).
+- ❌ Fine-pitch (0.65 mm) rework at the VIDC20 to break the tie + inject ESEL
+  drive; 3–4× pixel-clock sampling caps resolution (see budget).
+
+#### Breaking the EREG→ESEL tie — technique trade-off
+
+You only need to isolate the **2 ESEL *inputs* (pins 9, 7)** — the EREG
+outputs (pins 6, 5) can stay put driving a now-dead-end track. (Option A's
+R/G-only variant needs just pin 9.) The track layer is unknown from the
+schematic; the RPC board is multilayer and a short adjacent-pin tie is
+plausibly on an **inner layer** (cannot be cut). That picks the method:
+
+| Situation | Method | Why |
+|---|---|---|
+| Tie is **surface** copper, positively located (loupe) | **Cut the track** | Pin stays seated; solder bodge wire to the intact pad — mechanically easiest |
+| Layer unknown/internal, want **reversibility** | **Lift** pins 9 & 7 | Layer-agnostic; re-seatable; but pad-tear/heat/cracked-lead risk; whole freed leg to solder |
+| Layer unknown/internal, want **no pad risk** | **Cut** pins 9 & 7 | Layer-agnostic; no heat/force on pad; cut the gull-wing *slope*, solder wire to the chip-side stub (drive the input). Smallest solder target; permanent |
+
+Check for a surface **via** on the ESEL nets near the pins — a friendlier
+cut/inject target than the fine-pitch leg, if present. **Strain-relief is
+mandatory:** epoxy/UV-glue the bodge wire immediately — a fine wire to a
+lifted leg or cut stub fatigues and rips the joint otherwise. Drive the
+**chip side** of any cut (ESEL is an input); confirm isolation with a meter
+(ESEL pin no longer continuous to its EREG pin) before powering on.
 
 ### Option C — per-component frame capture (static only)
 
@@ -151,9 +172,14 @@ What the GBS-C and £10 dongles do. Sidesteps ESEL entirely but reintroduces
 the ADC sampling-artifact class this whole idea exists to avoid. Fallback,
 not the goal.
 
-**Working plan:** prototype with **A** (cheap, non-invasive, proves the
-capture/HDMI chain at reduced colour), then graduate to **B** for full RGB
-once the pipeline is proven.
+**Working plan (risk ladder):** **C-static first** (zero board mod — proves
+the entire ED decode/capture chain via the existing connector), then **A**
+(1-pin isolation, R/G live), then **B** (2-pin isolation, full RGB live).
+Each step earns the next; don't touch a pin until the zero-mod grab shows
+clean, correctly-decoded pixels. The digital tap's unique value (no analogue
+sampling artifacts) is *already fully realised* by the zero-mod per-frame
+grab as a **pristine screenshot/framegrabber** — the invasive live versions
+are only worth the board risk if you specifically need motion.
 
 ## Reconstruction + output architecture
 
@@ -231,10 +257,20 @@ Pixel-clock reference points (×3 sampling for Option B):
 1. **Bench-characterise** the port: enable ECLK (`EREG[2]=1`), scope
    ECLK/ED/sync on the feature connector, confirm `Ted` and pixel timing on
    *this* board.
-2. **Capture-only PoC** (Option A): RP2350 PIO grabs ED on ECLK phases →
-   dump frame over USB → verify pixels match the screen (R+G).
+1.5. **Zero-mod per-frame validation (gate before any rework):** with no
+   board modification, poke `EREG=0/1/2` (Ext register `&C`) from RISC OS,
+   grab three frames off ED via the existing feature connector, recombine
+   into one 24-bit still. If it reconstructs a clean, correctly-decoded
+   image, the entire ED decode/capture chain is proven — *and* you have a
+   working pristine screenshot grabber with zero risk to the board. Only
+   proceed to pin work if this passes and you actually need live video.
+   While here, loupe VIDC20 pins 5–9: surface track vs internal? via present?
+   — this picks cut-track / lift-pin / cut-pin (see Option B table).
+2. **Capture-only live PoC** (Option A, 1-pin isolate): RP2350 PIO grabs ED
+   on ECLK phases → dump over USB → verify pixels match the screen (R+G).
 3. **HDMI out:** add HSTX/TFP410, get a picture on a monitor at 640×480.
-4. **Full colour** (Option B): tap VIDC20 ESEL, 3× sequence, true 24-bit.
+4. **Full colour** (Option B, 2-pin isolate): drive VIDC20 ESEL 0→1→2 via a
+   2-bit sequencer at 3–4× ECLK, true 24-bit.
 5. **Productise:** timing conversion, more modes, tidy board.
 
 ## References (in-repo)
