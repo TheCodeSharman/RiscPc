@@ -74,9 +74,17 @@ settle it:
 1. **Standalone VIDC20 (the RISC PC's actual chip):** `ESEL[1:0]` *are* real
    input pins on the package — but the **Video Feature Connector does NOT
    bring them out.** RPC TRM Table 2.30 pinout is only: H/C Sync, V/C Sync,
-   Sink, `ED[0:7]`, `ECLK`, GND. On the board `EREG[1:0]` (VIDC outputs) are
-   wired to `ESEL[1:0]`, so ESEL is effectively **software-controlled via the
-   EREG register** unless you tap the chip pins directly.
+   Sink, `ED[0:7]`, `ECLK`, GND. **Verified from the schematic** (Main PCB
+   Circuit Diagram sheet 5/7, VIDC20): `EREG[1:0]` (VIDC outputs, pins 6/5)
+   are tied by short local tracks straight to `ESEL[1:0]` (inputs, pins 9/7)
+   — i.e. `Ereg<0>→Esel<0>`, `Ereg<1>→Esel<1>`. `ECLK` (pin 22) routes
+   separately to the feature connector and is *not* part of the tie. So out
+   of the box ESEL is **software-controlled via the EREG[1:0] field** of the
+   Ext register (`&C`) — and that field is **static**: each change is a CPU
+   register write, with no VIDC-internal sequencer (the ARM7500 `VIDMUX`
+   ESEL[0]=ECLK auto-toggle does **not** exist on the standalone part).
+   Consequence: VIDC can select *one* component at a time, changeable only
+   per-frame — **it cannot cycle ESEL 0→1→2 per pixel by itself.**
 2. **ARM7500 (A7000/A7000+, Stork):** worse — `ESEL` isn't a pin at all.
    "EREG[1:0] are internally mapped to drive esel[1:0] by ARM7500"
    (DDI0050C §9.25). Software-only.
@@ -97,26 +105,39 @@ externally on ECLK phase.
   ESEL=2, i.e. EREG[1]=1, which then pairs B with Ext). No single-pass
   24-bit.
 
-**Note — this isn't ARM7500-only.** On the standalone VIDC20 the VIDMUX
-trick is just *external wiring*: VIDC20 §11.1 says "EREG[1:0] are always
-driven, so it is possible to connect EREG[1:0] to ESEL[1:0]". ESEL[1:0] and
-EREG[1:0] are both real pins, so you choose the connection — tie
-`ESEL[0]=ECLK`, `ESEL[1]=EREG[1]` and you've replicated the ARM7500
-colour-LCD mux externally, no special silicon. The ARM7500 only *needed*
-VIDMUX because it buried ESEL internally.
+**Note — this isn't ARM7500-only, but the RISC PC isn't wired for it
+either.** On the standalone VIDC20 the VIDMUX trick is just *external
+wiring*: VIDC20 §11.1 says "EREG[1:0] are always driven, so it is possible
+to connect EREG[1:0] to ESEL[1:0]". Both are real pins, so the connection is
+yours to choose — but **Acorn chose the plain `EREG→ESEL` tie** (verified;
+see Option B), so on the RISC PC `ESEL[0]` is driven by *static* `EREG[0]`,
+not ECLK. To get even the R/G auto-toggle you'd cut `EREG[0]→ESEL[0]` and
+inject ECLK onto `ESEL[0]` (leaving `ESEL[1]=EREG[1]`). So Option A on real
+hardware is *also* a track-cut — just a smaller one than Option B.
 
-### Option B — tap/drive the VIDC20 ESEL pins directly (full colour, invasive)
+### Option B — cut the EREG→ESEL tie and drive ESEL directly (full colour, invasive)
 
-Lift the on-board `EREG→ESEL` link at the VIDC20 and drive `ESEL[1:0]` from
-the capture logic, sequencing 0→1→2 at **3× pixel rate**, sampling ED each
-phase. This is the only route to **live full 24-bit RGB** — and on the
-standalone VIDC20 it's "merely" a wiring problem: the ESEL pins are *yours*
+**Cut the on-board `EREG[1:0]→ESEL[1:0]` tracks** at the VIDC20 (the verified
+tie: pins 6→9 and 5→7) and drive `ESEL[1:0]` from the capture logic with a
+**2-bit sequencer clocked off ECLK**, sampling ED each phase. This is the
+only route to **live full 24-bit RGB** — and on the standalone VIDC20 it's
+"merely" a wiring problem: the ESEL pins are real inputs you can commandeer
 (unlike ARM7500, which maps them internally with no escape). No silicon
 barrier, just physical access at the chip.
 
-- ✅ True 8:8:8, live; standalone VIDC20 was *designed* to let you wire ESEL.
-- ❌ Fine-pitch soldering to VIDC20 pins (cut the board's EREG→ESEL tie);
-  3× pixel-clock sampling caps resolution (see budget).
+Sequencer options:
+- **mod-4 at 4× ECLK** → ESEL = 0,1,2,3 = R,G,B,Ext per pixel. Dead simple
+  (free-running 2-bit counter); ignore the ESEL=3 sample. Costs 4× pixel-clk.
+- **mod-3 at 3× ECLK** → 0,1,2 = R,G,B. Tighter bandwidth; needs a tiny
+  state machine (00→01→10→00) rather than a plain counter.
+
+Note: **no single-wire trick yields a 0→1→2 cycle.** Wiring ESEL[0]=ECLK
+(the ARM7500 mux) only toggles two states (R/G), never Blue — a three-phase
+sequence fundamentally needs a counter driving *both* ESEL bits.
+
+- ✅ True 8:8:8, live; standalone VIDC20 lets you wire ESEL as you choose.
+- ❌ Fine-pitch soldering at VIDC20 pins 9/7/6/5 (cut tie, inject ESEL drive);
+  3–4× pixel-clock sampling caps resolution (see budget).
 
 ### Option C — per-component frame capture (static only)
 
@@ -186,9 +207,14 @@ Pixel-clock reference points (×3 sampling for Option B):
   connect EREG→ESEL however you like, so ESEL[0]=ECLK (Option A) *and* full
   external ESEL[1:0] drive (Option B) are both available; the pins are
   exposed. The RISC PC is the *more* capable target than the ARM7500 here.
-- **Board access:** locate the RISC PC's `EREG→ESEL` tie near the VIDC20 and
-  confirm it's cuttable / interceptable without collateral; check whether
-  anything else on the board depends on the existing EREG-driven ESEL.
+- ~~Board access: locate the RISC PC's EREG→ESEL tie.~~ **Resolved:** the tie
+  is short local tracks at the VIDC20 (pins 6→9, 5→7), verified on Main PCB
+  Circuit Diagram sheet 5/7. ECLK (pin 22) is separate. Remaining: confirm on
+  the physical board that the tracks are accessible/cuttable and that nothing
+  else taps the ESEL nets; plan how to inject the external ESEL drive (fine
+  soldering / interposer at pins 9/7).
+- **Sequencer detail:** mod-3 (3×) vs mod-4 (4×) ECLK — pick per resolution
+  budget; verify ED is valid for the full ECLK phase at the chosen rate.
 - **Per-ESEL pipeline alignment:** ESEL=2/hrm and ESEL=3/dac add a 1-pixel
   delay; plain ESEL 0/1/2 should be co-timed — verify on a scope.
 - **Non-standard RISC OS timings:** need at least a line buffer to reclock
