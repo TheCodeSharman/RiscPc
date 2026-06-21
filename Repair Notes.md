@@ -1781,3 +1781,14 @@ The sequence, and the gotchas that ate the time:
 PCF8583 CMOS confirmed **fully working** (settings persist for days — the RTC repair is done; not re-suspected here, despite an early wrong guess this session).
 
 **Milestone: the RISC PC now cold-boots on its own to a fully-furnished RISC OS 3.7 / StrongARM desktop** — correct resolution, working mode switcher, pinboard texture, the lot. Restoring `!Boot` was the prerequisite for the planned MDF work (MDFs live in `!Boot.Resources.Configure.Monitors`, selected via Configure → Screen) to tune the VIDC output for the GBSC.
+
+### Jun 21 — GBSC display path validated; closes out the "high-res garble = LCD sampling" diagnosis
+
+With the machine now booting to a full desktop, exercised the demanding high-res/high-colour modes through the **RetroScaler GBSC** (rather than the bare LCD). All render **clean**:
+
+- **1024×768 @ 32K colours (16bpp)** — 1.5 MB framebuffer (second VRAM bank), ~65 MHz pixel clock.
+- **800×600 @ 16M colours (32bpp)** — 1.9 MB framebuffer (both VRAM banks).
+
+These are exactly the modes that **garbled when fed direct into the LCD** (the periodic pixel-swap recorded in the Jun 21 HDD/VRAM entry). Feeding the *identical* signal into the GBSC — which digitises and reclocks via a frame buffer instead of analog-sampling the recovered pixel clock — renders them clean. That **experimentally confirms the earlier conclusion**: the high-res garble was the **LCD's analog sampling**, not the RISC PC. The machine outputs correct pixels at high resolution, deep colour *and* high pixel rate; the LCD's built-in sampler couldn't recover them, the GBSC can.
+
+So the **GBSC is the display path of record** for this machine, and **1024×768 is a confirmed-clean anchor resolution** for the upcoming MDF work. GBSC manual archived at `docs/RetroScaler GBS Pro.pdf`.
