@@ -296,6 +296,56 @@ Pixel-clock reference points (×3 sampling for Option B):
    2-bit sequencer at 3–4× ECLK, true 24-bit.
 5. **Productise:** timing conversion, more modes, tidy board.
 
+## Viability as a community device
+
+Verdict: **the live full-colour version is too invasive to be a mass community
+device; the zero-mod framegrabber is the part that could actually spread.** The
+project splits cleanly into two products with very different viability.
+
+**Why the full-colour mod won't fly as a product.** Community retro devices
+succeed when they're plug-in, reversible, and idiot-safe (socketed ROM/CPU
+swaps, podules, GBS-C-into-VGA, PiStorm-into-socket, CF-for-IDE) — they never
+ask the user to risk the irreplaceable part. This mod does the opposite on the
+worst possible chip: **irreversible 0.65 mm surgery on the VIDC20**, for which
+there is no replacement (brick it → dead machine, not a £20 part). Via/layer
+placement isn't guaranteed identical board-to-board, so there's no single
+documented "cut here" — every install is a judgement call. And the RISC PC
+community is small, aging, and rightly protective of surviving machines: "cut
+into your VIDC20" is a near-universal no, even among capable solderers. At best
+the live version is a **send-in mod service** or a few expert self-installs.
+
+**The community-viable part.** The **zero-mod per-frame framegrabber**
+(milestone 1.5) plugs into the existing Video Feature Connector — no cutting,
+fully reversible, can't damage anything — and delivers the one thing analogue
+scalers can't: **pixel-exact, artifact-free digital capture**. That is exactly
+what the archival / screenshot / documentation use-case wants, and its only
+limit (static frames, not live motion) is precisely what that use-case doesn't
+care about. This is a real, safe, shippable device.
+
+**Market reality for the live version.** The live-HDMI niche is *already*
+served by the GBS-C and generic ~£10 active VGA→HDMI dongles (the GBS-C wins in
+the community because cheap dongles only lock to standard DMT/CEA timings and
+choke on RISC OS's non-standard modes). The digital tap's *only* edge over them
+is cleaner pixels — asking someone to risk an irreplaceable chip for a quality
+bump most won't notice on a desktop is an upside-down value/risk ratio. It only
+makes sense for someone who specifically wants perfection and owns the risk.
+
+**No non-invasive escape for full colour, by construction.** EREG drives ESEL
+with a CMOS push-pull output, so you cannot take control by overpowering it
+(contention/possible damage) — you *must* physically disconnect it. "Full
+colour" and "non-invasive" are therefore mutually exclusive on this hardware.
+
+**Recommendation — ship as two things:**
+1. **Community device:** the connector-only digital framegrabber. Safe,
+   plug-in, unique value (artifact-free stills). The one that can spread.
+2. **Personal / expert build:** the live full-colour HDMI box with the VIDC20
+   pin mod. Worth doing for yourself and documenting thoroughly, but pitched as
+   advanced / irreversible / at-your-own-risk — never a general-audience kit.
+
+This also de-risks the effort: milestone 1.5 is both the validation step *and*
+a finished shippable product, so there's something real in hand before any pin
+is ever touched.
+
 ## References (in-repo)
 
 - `docs/ARM7500 Data Sheet (DDI0050C 1995-10).pdf` — integrated VIDC20
