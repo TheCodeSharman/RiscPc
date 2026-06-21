@@ -1748,3 +1748,36 @@ Symptoms at 1024×768 and above: a stable image (so it *is* syncing), the right 
 **RISC PC, 2 MB VRAM, and the Vcd bus are fully exonerated** — the machine renders correct pixels; the monitor mis-samples them at high pixel rates.
 
 **Milestone: RISC PC boots from its own HDD, on its own validated PSU, with working 2 MB VRAM in 16M-colour modes.**
+
+### Jun 21 — Keyboard sticky keys revived (NMB Hi-Tek 725 "Space Invader" switches)
+
+Down, Space and numpad-`+` were **stuck-repeating** — a key would fire then auto-repeat until pressed again. Signature is a **lost key-release (break) code**: the RISC PC keyboard sends *make* on press and *break* on release, and RISC OS auto-repeats while it believes a key is held; a dropped break → runaway repeat, cleared by a fresh press (which sends a new break). So it's a **dirty/tired contact opening "dirty" on release**, not a physically jammed switch.
+
+The board is an **NMB Technologies** keyboard (Acorn part 0391,400/01) using **Hi-Tek Series 725 "Space Invader"** clicky mechanical switches. The Down key had also **lost its click** (= failed click leaf), the worst-affected.
+
+**Fix: worked DeoxIT into the switches** — D5 (red) to clean/deoxidise the contact leaf, then G5 (gold) as the conditioning/preserving pass, cycling each key ~20–30× to wipe the film onto the wiping contacts. Reliability restored, no desolder/donor needed. (No new replacements exist; if a switch ever relapses, harvest from a donor NMB RT-series board.)
+
+### Jun 21 — RetroScaler GBSC living-room display: heat, not a fault
+
+Running the RISC PC on the big TV via the **RetroScaler GBSC** (a GBS-Control / Tvia 5725 upscaler). Chased flaky behaviour for a while — ESP web UI wedging, scaled modes refusing to lock and reverting to passthrough — that *felt* like a developing fault. **Root cause: the unit was sitting on carpet**, insulating its base and blocking the underside vents → the scaler chip overheated. On a hard, ventilated surface it's stable.
+
+Lessons banked:
+- **Hot scaler = marginal PLL**: scaled modes drop to passthrough while passthrough (low-effort) keeps working. That asymmetry is a heat tell, not a board fault.
+- **Output res**: **1280×1024 is the pick** once cool — a standard RISC OS desktop res (clean near-integer scale) whose 5:4 aspect suits the non-widescreen desktop. (An earlier "TVs reject 1280×1024" theory was wrong — that blank-then-revert was *also* the heat.)
+- **Web UI**: reachable on the home Wi-Fi at `http://gbscontrol.local` / its DHCP IP; mDNS is flaky, prefer a router-reserved IP. Default AP is SSID `gbscontrol` / WPA2 `qqqqqqqq`.
+- Firmware update (gbsc-pro v1.3) deferred — reverse-engineered that the AV-module flasher is just **YMODEM to an HC32F460 (Cortex-M4) over USB-CDC** (commodity, fully Linux-doable via the recovered `HCMGBoot.`→`U`→`1`→YMODEM handshake), but not needed right now.
+
+### Jun 21 — RESOLVED: !Boot restored on secondary drive; full RO 3.7 / StrongARM desktop auto-boots
+
+The original boot drive's `!Boot` was corrupt. Reinstalled the disc-side RISC OS onto the **secondary drive** (`ADFS::4` — the old ARM-Linux dual-boot drive; deleted the ARMLinux/RedHat-ARM utils to free its FileCore partition, kept the partition itself for later imaging).
+
+The sequence, and the gotchas that ate the time:
+
+1. **3.7 disc `!Boot` won't run on 3.6 ROMs** ("this !Boot structure is only suitable for RO 3.7"). Fitted the **3.7 ROMs** (`1203,191`→ROM 1, `1203,192`→ROM 2) and swapped in the **SA110** at the same time. Machine POSTs and runs 3.7/StrongARM.
+2. **Bare machine: `!Installer` errors "requires !System"** — with no `!Boot`, `System$Path` is unset. Bootstrapped a **minimal `!System` from the command line**: `*BUILD` an Obey `!Boot` doing `Set System$Path <Obey$Dir>.` + an empty `Modules` dir, `*SetType … Obey`, `*Obey` it. Installer then ran; deleted the bootstrap afterwards (the real `!System` lives in `!Boot.Resources`).
+3. **Auto-boot needs BOTH halves** — `*Configure Boot` / `FileSystem ADFS` / `Drive 4` (CMOS, machine-wide) **and the disc's own boot option `*Opt 4,2` (Run)**. The disc was `Option 00 (Off)`, so the machine *tried* to boot but refused to run `!Boot`. Setting **`*Opt 4,2`** (Run — *not* Exec/`4,3`; `!Boot` is an application directory, not a BBC-era command script) was the final missing piece. Confirm via `*Cat ADFS::4.$` first line = `Option 02 (Run)`.
+4. Red herring: **holding Shift at power-on *suppresses* the boot** when `Boot` is configured (polarity inverts vs NoBoot, where Shift *forces* it). Boot clean with no keys held.
+
+PCF8583 CMOS confirmed **fully working** (settings persist for days — the RTC repair is done; not re-suspected here, despite an early wrong guess this session).
+
+**Milestone: the RISC PC now cold-boots on its own to a fully-furnished RISC OS 3.7 / StrongARM desktop** — correct resolution, working mode switcher, pinboard texture, the lot. Restoring `!Boot` was the prerequisite for the planned MDF work (MDFs live in `!Boot.Resources.Configure.Monitors`, selected via Configure → Screen) to tune the VIDC output for the GBSC.
