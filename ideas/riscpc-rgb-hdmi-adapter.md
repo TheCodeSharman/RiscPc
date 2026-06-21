@@ -335,6 +335,20 @@ with a CMOS push-pull output, so you cannot take control by overpowering it
 (contention/possible damage) — you *must* physically disconnect it. "Full
 colour" and "non-invasive" are therefore mutually exclusive on this hardware.
 
+**It isn't a RetroScaler/GBS-C replacement anyway — it needs a scaler.** A
+clean digital source at *native* RISC OS timing can't just be fed to a modern
+panel: low-res/game modes and 56 Hz / odd-refresh timings are often rejected
+outright (displays want CEA/DMT @ 60 Hz), and even accepted modes come up
+tiny/soft without upscaling. To match the GBS-C you'd have to build the whole
+scaler back-end (framebuffer + line-double/polyphase scaling + output timing
+normalised to e.g. 1080p60). That scaler is **the bulk of the engineering**
+(the ED capture is the small novel part) and a **solved commodity** — you'd be
+reinventing the OSSC/RetroTINK to marginally out-clean a £30 box on an axis
+most users won't perceive. This *strengthens* the framegrabber conclusion: the
+archival/stills use-case **wants native resolution** (no scaling, save true-res
+PNGs), so the very thing that sinks the live-HDMI ambition is irrelevant to the
+use-case where the digital tap is uniquely valuable.
+
 **Recommendation — ship as two things:**
 1. **Community device:** the connector-only digital framegrabber. Safe,
    plug-in, unique value (artifact-free stills). The one that can spread.
