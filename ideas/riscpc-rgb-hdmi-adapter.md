@@ -153,12 +153,22 @@ plausibly on an **inner layer** (cannot be cut). That picks the method:
 | Layer unknown/internal, want **reversibility** | **Lift** pins 9 & 7 | Layer-agnostic; re-seatable; but pad-tear/heat/cracked-lead risk; whole freed leg to solder |
 | Layer unknown/internal, want **no pad risk** | **Cut** pins 9 & 7 | Layer-agnostic; no heat/force on pad; cut the gull-wing *slope*, solder wire to the chip-side stub (drive the input). Smallest solder target; permanent |
 
-Check for a surface **via** on the ESEL nets near the pins — a friendlier
-cut/inject target than the fine-pitch leg, if present. **Strain-relief is
-mandatory:** epoxy/UV-glue the bodge wire immediately — a fine wire to a
-lifted leg or cut stub fatigues and rips the joint otherwise. Drive the
-**chip side** of any cut (ESEL is an input); confirm isolation with a meter
-(ESEL pin no longer continuous to its EREG pin) before powering on.
+**Best case — a via on the ESEL net.** A QFP pad is surface-only (no plated
+barrel), so an *internal* tie can only reach the inner layer via a **via next
+to each pad**. Hence it's nearly a dichotomy: surface route ⇒ no vias (harder
+isolation), internal route ⇒ vias are present *by construction* — the thing we
+hope for. With a via, the **pad→via stub stays surface copper** even if the
+main trace is buried: nick that short stub, solder the inject wire to the now-
+isolated pad, and the pin stays fully seated (no gull-wing work, no pad-tear/
+heat risk). Strictly better than lift-pin or cut-pin. Caveats: vias may be
+tented (scrape mask), via-in-pad is the unfriendly variant, and they're small
+(~0.2–0.3 mm). The schematic can't reveal this — only the board can; **check
+the bottom side too** (vias go through; the back is often less congested).
+
+**Strain-relief is mandatory:** epoxy/UV-glue the bodge wire immediately — a
+fine wire to a lifted leg or cut stub fatigues and rips the joint otherwise.
+Drive the **chip side** of any cut (ESEL is an input); confirm isolation with
+a meter (ESEL pin no longer continuous to its EREG pin) before powering on.
 
 ### Option C — per-component frame capture (static only)
 
