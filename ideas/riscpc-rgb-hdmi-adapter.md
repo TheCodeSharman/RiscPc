@@ -363,6 +363,8 @@ the 8-bit ED port; the escapes cost you a full subsystem.
   [sa110-cache-analyzer.md](sa110-cache-analyzer.md)) and seeding the mirror's
   initial state. It's essentially *half a hardware MAME* (snoop CPU bus + model
   VIDC), converging with [mame-riscpc-driver.md](mame-riscpc-driver.md).
+  **The far more useful reframe of this same hardware is as a debug tool, not a
+  display:** see [riscpc-bus-analyzer-card.md](riscpc-bus-analyzer-card.md).
 - **Analogue (GBS-C)** already does live full-res well enough; its only flaw is
   the ADC sampling artifacts this idea set out to avoid.
 
