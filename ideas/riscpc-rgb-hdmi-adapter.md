@@ -95,19 +95,28 @@ externally on ECLK phase.
 - ✅ Hardware, no invasive mod; ECLK does the sequencing for you.
 - ❌ Only reaches ESEL 0/1 → you get **R+G but not Blue** (Blue needs
   ESEL=2, i.e. EREG[1]=1, which then pairs B with Ext). No single-pass
-  24-bit. The standalone VIDC20's equivalent of this mux needs confirming
-  (the named "Using VIDC20 with LCDs" note is lost; ARM7500 DDI0050C is the
-  recovered substitute).
+  24-bit.
+
+**Note — this isn't ARM7500-only.** On the standalone VIDC20 the VIDMUX
+trick is just *external wiring*: VIDC20 §11.1 says "EREG[1:0] are always
+driven, so it is possible to connect EREG[1:0] to ESEL[1:0]". ESEL[1:0] and
+EREG[1:0] are both real pins, so you choose the connection — tie
+`ESEL[0]=ECLK`, `ESEL[1]=EREG[1]` and you've replicated the ARM7500
+colour-LCD mux externally, no special silicon. The ARM7500 only *needed*
+VIDMUX because it buried ESEL internally.
 
 ### Option B — tap/drive the VIDC20 ESEL pins directly (full colour, invasive)
 
 Lift the on-board `EREG→ESEL` link at the VIDC20 and drive `ESEL[1:0]` from
 the capture logic, sequencing 0→1→2 at **3× pixel rate**, sampling ED each
-phase. This is the only route to **live full 24-bit RGB**.
+phase. This is the only route to **live full 24-bit RGB** — and on the
+standalone VIDC20 it's "merely" a wiring problem: the ESEL pins are *yours*
+(unlike ARM7500, which maps them internally with no escape). No silicon
+barrier, just physical access at the chip.
 
-- ✅ True 8:8:8, live.
-- ❌ Fine-pitch soldering to VIDC20 pins; 3× pixel-clock sampling caps
-  resolution (see budget).
+- ✅ True 8:8:8, live; standalone VIDC20 was *designed* to let you wire ESEL.
+- ❌ Fine-pitch soldering to VIDC20 pins (cut the board's EREG→ESEL tie);
+  3× pixel-clock sampling caps resolution (see budget).
 
 ### Option C — per-component frame capture (static only)
 
@@ -172,10 +181,14 @@ Pixel-clock reference points (×3 sampling for Option B):
 
 ## Open questions / risks
 
-- **Standalone-VIDC20 colour-LCD mux:** does the RISC PC's VIDC20 have an
-  equivalent of the ARM7500 `VIDMUX` ESEL[0]=ECLK trick, or is Option B the
-  only full-colour route on real hardware? (Lost VIDC20 LCD app note would
-  have said; DDI0050C is the closest recovered source.)
+- ~~Standalone-VIDC20 colour-LCD mux: does it have the ARM7500 VIDMUX
+  trick?~~ **Resolved:** yes, as external wiring — VIDC20 §11.1 lets you
+  connect EREG→ESEL however you like, so ESEL[0]=ECLK (Option A) *and* full
+  external ESEL[1:0] drive (Option B) are both available; the pins are
+  exposed. The RISC PC is the *more* capable target than the ARM7500 here.
+- **Board access:** locate the RISC PC's `EREG→ESEL` tie near the VIDC20 and
+  confirm it's cuttable / interceptable without collateral; check whether
+  anything else on the board depends on the existing EREG-driven ESEL.
 - **Per-ESEL pipeline alignment:** ESEL=2/hrm and ESEL=3/dac add a 1-pixel
   delay; plain ESEL 0/1/2 should be co-timed — verify on a scope.
 - **Non-standard RISC OS timings:** need at least a line buffer to reclock
