@@ -1792,3 +1792,30 @@ With the machine now booting to a full desktop, exercised the demanding high-res
 These are exactly the modes that **garbled when fed direct into the LCD** (the periodic pixel-swap recorded in the Jun 21 HDD/VRAM entry). Feeding the *identical* signal into the GBSC — which digitises and reclocks via a frame buffer instead of analog-sampling the recovered pixel clock — renders them clean. That **experimentally confirms the earlier conclusion**: the high-res garble was the **LCD's analog sampling**, not the RISC PC. The machine outputs correct pixels at high resolution, deep colour *and* high pixel rate; the LCD's built-in sampler couldn't recover them, the GBSC can.
 
 So the **GBSC is the display path of record** for this machine, and **1024×768 is a confirmed-clean anchor resolution** for the upcoming MDF work. GBSC manual archived at `docs/RetroScaler GBS Pro.pdf`.
+
+### Jun 21 — VIDC20 mode envelope quantified; monitor/MDF strategy (AKF85 base + AKF50 merge)
+
+Worked out exactly what modes this machine can drive, grounded in the local VIDC20 datasheet (`docs/VIDC20.pdf`, ARM DDI 0030E) and confirmed against live tests.
+
+**VIDC20 hard ceilings (the chip):**
+- **Pixel clock ≤ 100 MHz** (colour DAC rating) — a fixed wall regardless of VRAM.
+- Colour depths 1/2/4/8/16/32 bpp (32bpp = 16M colours).
+- Peak memory bandwidth ~160 MB/s on the 64-bit bus.
+
+**The 2 MB VRAM bandwidth fact (the key one):** on the RISC PC, **1 MB VRAM = 32-bit video bus ≈ 80 MB/s; 2 MB VRAM = 64-bit video bus ≈ 160 MB/s.** The second VRAM bank doesn't just add capacity, it **widens the path 32→64 bit and doubles the bandwidth** — that's the real reason the Jun 20 upgrade unlocked the high-colour modes.
+
+**A mode must satisfy three limits at once** — framebuffer ≤ 2 MB, pixel clock ≤ 100 MHz, and `pixel_clock × bytes/pixel ≤ 160 MB/s`. The bandwidth one binds at depth, so max pixel clock falls as colour deepens: 8bpp→100 MHz, 16bpp→80 MHz, 32bpp→40 MHz. Practical envelope @ ~60 Hz:
+
+| Depth | Max resolution @60 Hz |
+|-------|----------------------|
+| 8bpp (256) | ~1280×1024 |
+| 16bpp (32K/64K) | ~1024×768 |
+| 32bpp (16M) | ~800×600 |
+
+Live tests land *exactly* on this envelope: **800×600@32bpp = 40 MHz × 4 = 160 MB/s, right on the ceiling** (works, just); 1024×768@16bpp = 130 MB/s (works); 1024×768@32bpp impossible (needs 260 MB/s *and* a 3 MB framebuffer > 2 MB).
+
+**1280×1024 @ 8bpp CONFIRMED working** through the GBSC (1.3 MB framebuffer; **256-colours-only** at this res — 16/32bpp don't fit 2 MB). This is the daily-driver desktop, **1:1 with the GBSC's 1280×1024 output** = sharpest possible. It also empirically proves the VIDC20/VCO can synthesise that pixel clock under 100 MHz.
+
+**Monitor / MDF strategy.** The bundled **AKF60** MDF is VGA-only (30–50 kHz, can't scan below VGA). Switched to **AKF85** (30–82 kHz, up to 1280×1024) and the 1280×1024 desktop came straight up. The plan is a **custom merged MDF = AKF85 base + the sub-30 kHz blocks from AKF50** (15–38 kHz, the legacy/15 kHz game modes). Rationale: **the GBSC is effectively the "universal Acorn monitor"** — it accepts the *entire* VIDC20 output range (15–82 kHz) that no single real CRT ever spanned (AKF50 did the low end, AKF85 the high end), and it **outputs 50 Hz natively**, so the 15 kHz/50 Hz game modes (MODE 13 etc.) display at their real refresh with no frame-conversion judder. MDF refs: App Note 254 (MDFs explained), App Note 262 (Risc PC resolutions). Format gotchas: `h_timings` values must be ×2, horizontal total ×4.
+
+**Signal-chain note (clears up "passthrough"):** the RISC PC outputs **analog VGA** (VIDC20 RGB DACs); the GBSC digitises it and re-encodes **digital HDMI/TMDS**. HDMI keeps the whole VGA raster model — pixel clock, H/V sync, blanking — just transmitted digitally (TMDS runs ~10× the pixel clock, so ~0.9 GHz/channel at 1280×1024). GBSC **"passthrough" means "don't rescale," not "analog through"** — it's still digital HDMI, just at the input's native resolution rather than rescaled to a fixed output.
