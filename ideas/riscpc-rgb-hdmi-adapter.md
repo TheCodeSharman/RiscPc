@@ -162,8 +162,21 @@ main trace is buried: nick that short stub, solder the inject wire to the now-
 isolated pad, and the pin stays fully seated (no gull-wing work, no pad-tear/
 heat risk). Strictly better than lift-pin or cut-pin. Caveats: vias may be
 tented (scrape mask), via-in-pad is the unfriendly variant, and they're small
-(~0.2–0.3 mm). The schematic can't reveal this — only the board can; **check
-the bottom side too** (vias go through; the back is often less congested).
+(~0.2–0.3 mm). The schematic can't reveal this — only the board can.
+
+**…but the via may be under the body.** VIDC20 is a peripheral **PQFP** (not a
+BGA), so leads/pads are outboard and most fanout vias land in clear space — but
+a short *same-edge* tie (our case, pins 5/6/7/9) is exactly what a layout might
+route *inboard* on an inner layer, putting the vias **under the package**,
+inaccessible without removing the chip. This does **not** sink the mod: on a
+peripheral package the **lead is always accessible**, so the via is strictly a
+bonus. If it's buried, fall back to lift-pin / cut-pin (9, 7) — same as the
+baseline. Bottom-side nuance: a via goes *through*, so its back-side end may be
+reachable even if its top is under the chip — useful for **injection**, but
+**isolation** still has to happen at an accessible ESEL-side point (the lead),
+since you can't easily sever a buried barrel. So: lead = guaranteed method;
+via = upside if accessible, never a dependency. **Check both sides** under a
+loupe (back is often less congested).
 
 **Strain-relief is mandatory:** epoxy/UV-glue the bodge wire immediately — a
 fine wire to a lifted leg or cut stub fatigues and rips the joint otherwise.
