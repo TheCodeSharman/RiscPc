@@ -1819,3 +1819,35 @@ Live tests land *exactly* on this envelope: **800×600@32bpp = 40 MHz × 4 = 160
 **Monitor / MDF strategy.** The bundled **AKF60** MDF is VGA-only (30–50 kHz, can't scan below VGA). Switched to **AKF85** (30–82 kHz, up to 1280×1024) and the 1280×1024 desktop came straight up. The plan is a **custom merged MDF = AKF85 base + the sub-30 kHz blocks from AKF50** (15–38 kHz, the legacy/15 kHz game modes). Rationale: **the GBSC is effectively the "universal Acorn monitor"** — it accepts the *entire* VIDC20 output range (15–82 kHz) that no single real CRT ever spanned (AKF50 did the low end, AKF85 the high end), and it **outputs 50 Hz natively**, so the 15 kHz/50 Hz game modes (MODE 13 etc.) display at their real refresh with no frame-conversion judder. MDF refs: App Note 254 (MDFs explained), App Note 262 (Risc PC resolutions). Format gotchas: `h_timings` values must be ×2, horizontal total ×4.
 
 **Signal-chain note (clears up "passthrough"):** the RISC PC outputs **analog VGA** (VIDC20 RGB DACs); the GBSC digitises it and re-encodes **digital HDMI/TMDS**. HDMI keeps the whole VGA raster model — pixel clock, H/V sync, blanking — just transmitted digitally (TMDS runs ~10× the pixel clock, so ~0.9 GHz/channel at 1280×1024). GBSC **"passthrough" means "don't rescale," not "analog through"** — it's still digital HDMI, just at the input's native resolution rather than rescaled to a fixed output.
+
+### Jun 22 — No internal-speaker audio: diagnostic plan (analog chain, POST SIRQ unrelated)
+
+Video is now in a good place (GBSC path + mode envelope sorted); next open fault is **no sound from the internal speaker**. POST **SIRQ passes**, but that only exercises the *digital* side — VIDC20 sound DMA + its interrupt. It says **nothing about the analog chain** downstream of the chip, which is where the fault must be.
+
+**Analog sound chain, traced from Main PCB Circuit Diagram Sheet 5 of 7 ("Video & Sound"):**
+
+```
+VIDC20 sound out
+  → IC35 (LM324) reconstruction filters, L & R   (active filter + Q5 BC849C buffers)
+  → C168 / C175 220µF coupling  → LEFT / RIGHT bus
+        ├── AUX AUDIO connectors A/B (LK14)        — internal CD / line in-mix
+        ├── SK12 stereo headphone socket (32Ω, rear)
+        └── internal-speaker amp:
+              LEFT  ─ R225 4K7 ┐
+              RIGHT ─ R229 4K7 ┴─ R218 6K8 → IC36 LM386 (pin3 +)
+              IC36 out(5) → C161 220µF → LK11 → INTERNAL 8Ω SPEAKER
+              (R221 10R + C160 47n = Zobel network; C172 47µF = pin7 bypass)
+```
+
+**Standout suspect — SK12 headphone-socket mute contacts.** The speaker-amp input is **not** tapped off the raw LEFT/RIGHT bus; it routes **through the headphone socket's normally-closed detent switch contacts** (SK12 **pin 3↔11** = left, **pin 10↔2** = right). By design, inserting a jack opens these and mutes the speaker. **Failure mode: oxidised/dirty detent contacts → speaker permanently muted with nothing plugged in.** This is the *exact* failure class just beaten on the NMB keyboard switches (oxidised wiping contacts), and a rarely-used rear socket is a prime candidate.
+
+**Diagnostic order (cheap → invasive):**
+1. **Software/config first** — RISC OS `!Configure → Sound`: confirm "Loudspeaker enabled" ticked and volume ≠ 0; `*Audio On`; trigger a beep / play a module. Eliminates the dumb case for free.
+2. **Bisect with the headphone socket** — plug headphones into SK12:
+   - *Sound in headphones, speaker dead* → fault isolated to the **speaker-only branch** (SK12 detent contacts / LK11 / C161 / IC36). Proves filter + VIDC + power all good.
+   - *Silent in headphones too* → fault is **upstream**: IC35 LM324 filter stage, VIDC20 sound output, or CleanVcc power.
+3. **Killer test (no scope):** with **no jack inserted**, measure continuity across SK12 **pin 3↔11** and **pin 10↔2** — both should read ~0Ω. **Open = the mute fault.** Remedy: DeoxIT D5 then G5, and cycle a 3.5mm jack in/out 20–30× to wipe the contacts (may restore it on its own).
+4. **If isolated to the speaker branch, in likelihood order:** SK12 contacts → **C161 220µF** output coupling electrolytic (open = total silence, classic dry-out) → **LK11** link actually fitted (continuity) → **IC36 LM386** dead / speaker voice-coil continuity (~8Ω). (C172 47µF bypass and the R221/C160 Zobel cause *distortion*, not silence.)
+5. **Scope/audio-trace if needed:** probe IC36 pin 3 with a sound playing. Signal at pin 3 but nothing at the speaker → C161 / LK11 / LM386 / speaker. No signal at pin 3 → SK12 detent contacts not passing LEFT/RIGHT (or upstream dead).
+
+Key reference designators all on **Sheet 5/7**: IC35 (LM324) filters, IC36 (LM386) speaker amp, C161 (220µF) output cap, LK11 (speaker link), SK12 (headphone socket + mute switch), R218/R225/R229 (input summing).
