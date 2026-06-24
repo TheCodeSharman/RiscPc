@@ -5,7 +5,7 @@
 **Date:** 2026-06-22
 **Related:** [mame-riscpc-driver.md](mame-riscpc-driver.md),
 [sa110-cache-analyzer.md](sa110-cache-analyzer.md). Hardware sibling to the
-ongoing video-path repair work (see `Repair Notes.md`).
+ongoing video-path repair work (see `Dev Diary.md`).
 
 ## One-line pitch
 
@@ -21,7 +21,7 @@ Everything currently driving a modern display off this machine goes
 That ADC round-trip is exactly the failure class we've been fighting: the
 recent high-res garble turned out to be an **LCD analogue-sampling
 artifact** (sampling-phase / bandwidth, not a board fault — see
-`Repair Notes.md`). A digital tap off `ED[7:0]` never goes through a
+`Dev Diary.md`). A digital tap off `ED[7:0]` never goes through a
 DAC→ADC round-trip, so it's **pixel-exact** and that whole artifact class
 disappears.
 

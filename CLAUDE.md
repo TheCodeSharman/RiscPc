@@ -14,7 +14,7 @@ This repository documents the repair and diagnostics of a vintage Acorn RISC PC 
 - **Technical documentation** in `docs/` (CPU datasheets, RISC OS programmer manuals)
 - **VS Code aasm syntax extension** (`tools/vscode-aasm/`) for browsing the RISC OS assembly sources
 
-The POST protocol is documented in `ACORN_POST.md`. Repair history is in `Repair Notes.md`.
+The POST protocol is documented in `ACORN_POST.md`. Repair history is in `Dev Diary.md`.
 
 ## Sigrokdecode Decoders
 
@@ -73,7 +73,7 @@ Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
 This branch-and-PR discipline applies to the **code subprojects** —
 `tools/raster-lab/`, `decoders/`, and the customised RPCEmu fork (which has
 its own, more elaborate model; see below).  It does **not** apply to routine
-work on the main repo such as `docs/`, `Repair Notes.md`, `ACORN_POST.md`, or
+work on the main repo such as `docs/`, `Dev Diary.md`, `ACORN_POST.md`, or
 other single-file note/markdown tweaks — those can go straight to `main`.
 
 For non-trivial changes within those subprojects:

@@ -251,4 +251,4 @@ RISC PC takes over. Only /WE needs switching.
 - `external/one-rom/rust/config/json/fire-40-a.json` — GPIO assignments
 - `external/one-rom/docs/RP2350.md` — RP2350 timing and memory analysis
 - `ACORN_POST.md` — POST protocol documentation
-- `Repair Notes.md` — Hardware repair log
+- `Dev Diary.md` — Hardware repair log

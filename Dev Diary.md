@@ -1,8 +1,9 @@
 # RISC PC Repair — Dev Diary
 
 A succinct, chronological log of the Acorn RISC PC motherboard repair: what was
-tried, what was found, and where I went wrong. (Supersedes the older, unwieldy
-`Repair Notes.md`, which is kept only as the raw archive.)
+tried, what was found, and where I went wrong. (Distilled from the older,
+unwieldy `Repair Notes.md` — now removed; the raw original is in git history if
+the full blow-by-blow is ever needed.)
 
 ---
 

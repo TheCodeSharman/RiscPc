@@ -291,7 +291,7 @@ weeks, and is useful to MAME maintainers regardless of how far this goes.
 - MAME: `src/mame/acorn/riscpc.cpp`,
   `src/devices/machine/arm_iomd.{cpp,h}`,
   `src/devices/machine/acorn_vidc.{cpp,h}`, `src/mame/.../ssfindo.cpp`
-- This repo: `ACORN_POST.md`, `decoders/acorn_post*`, `Repair Notes.md`,
+- This repo: `ACORN_POST.md`, `decoders/acorn_post*`, `Dev Diary.md`,
   `docs/Application Note 17 - VIDC20 clock sources.pdf`, `external/Kernel`
   (RISC OS 3.6.0 POST source)
 - RPCEmu fork (`~/Projects/RpcEmu`) as a cross-check oracle for
