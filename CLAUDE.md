@@ -20,20 +20,39 @@ The POST protocol is documented in `ACORN_POST.md`. Repair history is in `Dev Di
 
 Two stacked decoders implement the Acorn POST protocol:
 
-1. **`decoders/acorn_post_wire/`** — Low-level wire decoder
+1. **`acorn-post/decoders/acorn_post_wire/`** — Low-level wire decoder
    - Decodes pulse-based serial on A23 and D0 pins
    - 1 pulse = '1' bit, 2 pulses = '0' bit, 3+ pulses = command/input
    - Timing windows: 3μS (bit) and 164μS (byte boundary)
 
-2. **`decoders/acorn_post/`** — High-level protocol decoder (stacks on `acorn_post_wire`)
+2. **`acorn-post/decoders/acorn_post/`** — High-level protocol decoder (stacks on `acorn_post_wire`)
    - Decodes LCD display commands and reconstructs text output
    - Parses 5-bit command + 3-bit parameter; assembles nibble pairs into ASCII
 
-**Installation:** Copy (or symlink) both decoder directories into your sigrok decoders path, e.g.:
-```
-~/.local/share/sigrok-decoders/
-```
-Then load in PulseView or use with `sigrok-cli`.
+**Capture/analysis tool:** the logic-analyzer is a DSLogic, driven by **DSView**
+(DreamSourceLab's sigrok fork — *not* PulseView; captures are `.dsl`). DSView
+bundles its own decoder runtime, `libsigrokdecode4DSL`.
+
+**Installation:** DSView (per its `srd_init()`) loads decoders from every search
+path it knows and *stacks* them, so adding ours never hides the bundled set. Two
+writable locations work — pick one:
+
+- **Permanent (per-user):** symlink both decoder dirs into the XDG user data dir:
+  ```
+  ~/.local/share/libsigrokdecode4DSL/decoders/
+  ```
+  e.g. `ln -s "$PWD"/acorn-post/decoders/acorn_post{,_wire} ~/.local/share/libsigrokdecode4DSL/decoders/`
+- **Per-session (e.g. a dev shell):** point `SIGROKDECODE_DIR` at the directory
+  *containing* the decoder packages:
+  ```
+  export SIGROKDECODE_DIR="$PWD/acorn-post/decoders"
+  ```
+
+The old `~/.local/share/sigrok-decoders/` path was for upstream PulseView/sigrok
+and does **not** apply to DSView. On NixOS the compiled-in `DECODERS_DIR` lives in
+the read-only Nix store, so it can't be written to directly — use one of the two
+paths above. (DSView itself is built from the `TheCodeSharman/DSView` fork via
+`nix-config`'s `modules/nixos/electronics.nix`.)
 
 ## ROM Images
 
@@ -71,7 +90,7 @@ Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
 ## Workflow: feature branches + self-review PRs
 
 This branch-and-PR discipline applies to the **code subprojects** —
-`tools/raster-lab/`, `decoders/`, and the customised RPCEmu fork (which has
+`tools/raster-lab/`, `acorn-post/decoders/`, and the customised RPCEmu fork (which has
 its own, more elaborate model; see below).  It does **not** apply to routine
 work on the main repo such as `docs/`, `Dev Diary.md`, `ACORN_POST.md`, or
 other single-file note/markdown tweaks — those can go straight to `main`.
