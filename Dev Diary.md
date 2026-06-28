@@ -414,3 +414,45 @@ the full blow-by-blow is ever needed.)
   test:** with no jack inserted, measure SK12 pin 3↔11 and 10↔2 (should be ~0 Ω;
   open = the mute fault) → DeoxIT + cycle a jack; (4) else suspect C161 220 µF
   output coupling cap, LK11, or the LM386. All on Sheet 5/7.
+
+### Jun 28–29 — no-sound RESOLVED (half): corroded vias in the op-amp +12V feed
+- **The Jun 22 plan was chasing the wrong board.** The TRM schematic (drawing
+  0197,000) is the basic-sound Medusa; this board is **drawing 1208,000, the
+  16-bit-sound revision** — different audio design, different chips, and
+  **component designators that do NOT match the TRM**. No public schematic exists
+  for the 700/1208,000 board (Acorn went board-swap-only — confirmed on stardot),
+  so the whole audio section had to be reverse-engineered by probing + USB scope.
+- **This board's audio chain (reverse-engineered):** `VIDC20 →(I²S)→ TDA1545A
+  (Philips dual 16-bit DAC) → 2× TL074C quad op-amps → SK12 (headphone) /
+  IC36 LM386 → speaker`. Op-amps run **dual ±12V** (the TRM design was single
+  +12V/0V); IC36 runs on +5V. The board's silkscreen **IC35 is a 74ACT08
+  (logic), not the LM324** — a red herring that cost hours until the chip was
+  read under the microscope.
+- **Root cause: corroded/broken vias in the +12V feed to the TL074 V+ pins.**
+  Op-amp V+ floated at **≈−9V** (dragged toward the −12V rail) while +12V was
+  healthy on the main rail and through the ±12V supply chokes (L13 +12V / L14
+  −12V, 2µH2 each). A dual-supply op-amp with no +12V is dead → silence, both
+  channels. (POST SIRQ passes because that's the digital side only.)
+- **Key diagnostic lever — symmetry.** −12V (L14 → V−) was intact; +12V (L13 →
+  V+) was open. With no schematic, *the working −12V path is the schematic for
+  the broken +12V path*: trace how −12V reaches V−, and the +12V mirror that
+  fails to match is the break. This is what finally located the open via.
+- **Pitfalls banked:** (a) oxidised SMD pins give false floating readings —
+  scratch to bright metal or the meter lies (chased a phantom −12V for ages);
+  (b) the continuity buzzer false-triggers on *every* supply node — decoupling
+  caps charge (brief beep), internal ESD/junction diodes conduct one-way — so
+  use **powered voltage** to settle supply questions, never the beeper; (c) an
+  open in a **series** path (via/trace) floats the node negative; a *parallel*
+  cap (open or shorted) cannot — that distinction killed several wrong theories.
+- **Repair:** drilled out the eaten via barrel and **stitched a wire through it**
+  (re-establishing the inter-layer link), soldered both ends. Proper in-place via
+  repair, not a flying bodge.
+- **Status: op-amp #1 done — V+ now +11.47V** (was −9V), only ~0.2 V below the
+  main rail → low-resistance repair. **Op-amp #2 still open** — a *second* eaten
+  via in its independent +12V feed (corrosion ate more than one). Fix next the
+  same way, then test L vs R: the two TL074s may split per-channel, so #1 alone
+  could already give one channel of audio.
+- Full write-up + 12 microscope photos: `repair/riscpc-sound-repair/`.
+- **Lesson:** post-leak via corrosion is invisible from the surface (HASL/solder
+  still shiny) but opens inner-layer links; on a board with no schematic, the
+  *good* mirror rail is the most powerful tool you have.
