@@ -456,3 +456,82 @@ the full blow-by-blow is ever needed.)
 - **Lesson:** post-leak via corrosion is invisible from the surface (HASL/solder
   still shiny) but opens inner-layer links; on a board with no schematic, the
   *good* mirror rail is the most powerful tool you have.
+
+### Jun 30 — sound: full audio section reverse-engineered; real root causes found
+- **The Jun 28–29 "two TL074s split per-channel" guess was wrong.** Reverse-
+  engineered the *whole* audio section by probing (no schematic for the
+  1208,000 board). The real topology:
+  ```
+                            ┌→ Sections C/D + Q1/Q4 → SK12 → HEADPHONES (stereo)
+  DAC (TDA1545A) → op-amp #1 ┤   (I/V: B = left, A = right)
+   IOL→pin6, IOR→pin2        └→ Q1 (left) → op-amp #2 → LM386 (IC36) → SPEAKER
+  ```
+  - **op-amp #1 = stereo HEADPHONE amp** — uses *all four* TL074 sections: I/V
+    converters (Section B = left, −in pin 6 ← DAC IOL; Section A = right, −in
+    pin 2 ← DAC IOR) + output drivers (Section C → left ear, Section D → right
+    ear), current-boosted by output transistors **Q1 (left) / Q4 (right)**.
+  - **op-amp #2 = mono SPEAKER amp** — 2-stage, tapped off op-amp #1's Q1
+    (left) → LM386 → speaker; its other 2 sections have grounded inputs (unused,
+    tied off against oscillation). So **op-amp #1 is upstream of *both* outputs.**
+  - They split per-**function** (headphone vs speaker), not per-channel.
+- **DAC reference confirmed against the datasheet** (`docs/TDA1545A.pdf`). The
+  I/V virtual ground = VREF = ⅔·VDD ≈ 3.33V (measured 3.41V ✓); IREF (pin 7) =
+  VDD·RREF/(R3+R4+RREF) ≈ 0.83V (measured 0.76V ✓). Both bang-on → DAC + its
+  reference network are healthy; fault is downstream/analog. (TDA1545A IOL/IOR
+  are *current* outputs sitting at the op-amp's virtual ground — can't be scoped
+  for a waveform; the audio appears at the op-amp OUTPUT, not the DAC pin.)
+- **op-amp #2 (speaker amp) — +12V via repaired.** The Jun 28-29 "second eaten
+  via" was a **corroded via-to-pin-4 tap**: +12V reached the via (barrel intact)
+  but the short tap to the V+ pin was eaten open → V+ sat at −12V (chip dead).
+  Removed op-amp #2 (hot air, no lifted pads), cleaned the corroded footprint
+  underneath (worst-hit spot — trapped electrolyte), **bridged via-top-pad → pin
+  4 with a wire**, refitted; verified +12V from L13 → pin 4. This also explained
+  the **85°C heat / finger-burning 680Ω**: op-amp #2's bias net sat +5V→(dead
+  −12V V+) = 17V/680Ω ≈ 0.42W; with V+ restored to +12V it's 7V ≈ 0.07W → cold.
+  (op-amp #2 itself undamaged — its inputs floated above the dead rail, but with
+  no low-Z sink to −12V the clamp current self-limited.)
+- **op-amp #1 (headphone amp) — Section A (right I/V) damaged → must replace.**
+  The actual "no sound" cause. Right I/V never held (DAC IOR / pin 2 floated at
+  −0.6V from day one). Confirmed by elimination, all measured *at the chip
+  leads*: +input (pin 3) = 3.4V (VREF ✓), feedback intact (pin 1↔2 = 2.1kΩ ✓),
+  DAC IOR lifted (ruled out — still railed; IOR since re-soldered back), power
+  +12V ✓ — a clean closed-loop
+  buffer that **cannot rail if healthy**, yet output pegged at −9V → internal
+  damage. Left I/V (Section B) works (held pin 6 at 3.4V). **Signal-injection
+  cross-check:** probing op-amp #1 outputs pin 8 / pin 14 with the meter (power
+  *off*) clicks the left / right ear → output drivers, SK12 wiring, headphone
+  path all confirmed GOOD, so a fresh TL074C should give both channels. Removed
+  op-amp #1; via field underneath heavily crusted but vias read connected
+  (mostly solder-mask discolouration, not open). **Awaiting TL074C (SOIC-14).**
+- **Intermittent corroded −input contacts.** Both I/V virtual grounds had gone
+  bad (left pin 6 → 5V, right pin 2 → −0.6V); cleaning restored the left to 3.4V
+  but it regressed → the corroded contacts are *intermittent*. Pad-to-pad
+  feedback reads fine (2.1kΩ) while the op-amp's actual −input is starved — a
+  contact that lies to the meter **and** breaks the loop in operation.
+- **Speaker path — second, independent fault.** LM386 output (pin 5 → ~220µF
+  coupling cap → speaker; R+C Zobel to ground) runs through the **heaviest-
+  corroded part of the board, traces look corroded/open.** Separate from the
+  headphones (which bypass the LM386) — could be a dead speaker with working
+  phones. Repair: trace each segment, clean to bright copper, bridge opens,
+  verify the 220µF cap.
+- **Four measurement phantoms banked** (each cost real time):
+  1. **AC coupling** made the steady +5V DAC rail read 0V (scope strips DC).
+  2. **DMM averaging** made a 5V 50%-duty square wave read 2.5V (meter = mean)
+     — looked like a sagging rail; it was a clock.
+  3. **Cap charging** made rails read a momentary 0Ω "short" (ohmmeter inrush
+     into decoupling caps then climbs) — a real short is *stable at the lead
+     floor*; a cap *climbs*.
+  4. **PSU connected-but-OFF** ties all rails together through its transformer /
+     diodes / bleeders → every rail-to-rail check reads shorted. **Disconnect
+     the PSU before any inter-rail resistance test.**
+  - Meta-lesson: for "is a rail OK / is there a short," use **powered DC
+    voltage**, not resistance — caps and the PSU both lie on the ohmmeter.
+- **Other lessons:** identify which quad-op-amp section does what by buzzing the
+  DAC outputs to the −input pins, not by assuming; manually bridging
+  output→(−input) to force feedback and listening for the **click** is a fast
+  "is the chip + output path alive?" test; positive supply vias corrode first
+  (anodic dissolution under bias) — hunt them first.
+- **Remaining work:** (1) replace op-amp #1 (TL074C SOIC-14), refit, retest both
+  headphone channels; (2) repair the corroded speaker-output traces + verify the
+  220µF cap; (3) full clean → **water-rinse** → dry → conformal-coat the audio
+  zone to arrest the ongoing corrosion; (4) a "RESOLVED" entry once it's singing.

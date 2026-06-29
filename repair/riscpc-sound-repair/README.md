@@ -15,7 +15,25 @@ confirmed the test tone is **dead at SK12 tip**.
 VIDC20 ──I²S──► TDA1545A (Philips dual 16-bit DAC, 8-pin)
         ──► 2× TL074C (quad op-amp) ──► output ──► SK12 (headphone) / LM386 (IC36) ──► speaker
 ```
-- Audio op-amps run **dual ±12V** (the TRM design was single +12V/0V).
+
+### TDA1545A pinout (DIP8 — datasheet: [`docs/TDA1545A.pdf`](../../docs/TDA1545A.pdf))
+| Pin | Name | Type | Notes |
+|----|------|------|-------|
+| 1 | BCK | digital in | bit clock, up to 18.4 MHz |
+| 2 | WS | digital in | word/LR select (sample rate) |
+| 3 | DATA | digital in | serial audio data |
+| 4 | GND | supply | 0 V |
+| 5 | VDD | supply | **+5 V** (3–5.5 V); output current ∝ VDD, so a sagged rail kills level |
+| 6 | IOL | analog out | Left current out → TL074 I/V |
+| 7 | IREF | ref | bias current |
+| 8 | IOR | analog out | Right current out → TL074 I/V |
+
+**Trace boundary:** pins 1–3 are fast digital (probe with µs/div like the bus);
+pins 6/8 onward are analog audio (ms/div, AC, ~50 mV). The DAC is the digital→analog
+handoff — confirm DATA (pin 3) wiggles with a tone before chasing the op-amps.
+- Audio op-amps run **dual ±12V** (the TRM design was single +12V/0V) — well
+  inside the TL07xx's ±2.25–±20V range. Datasheet: [`docs/TL074.pdf`](../../docs/TL074.pdf)
+  (TI SLOS080, covers TL074/A/B/H/M).
 - ±12V is filtered by chokes **L13 (+12V)** and **L14 (−12V)**, each 2µH2, with a
   reservoir electrolytic.
 - IC36 (speaker amp) runs on **+5V** (regulated from +12V).
