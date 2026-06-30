@@ -9,3 +9,8 @@
 **/fp-info-cache
 **/*.lck
 **/_autosave-*
+# Large derived LA exports (regenerate from .dsl via DSView + ds-view/stitch_full.py)
+# Two exceed GitHub's 100 MB per-file limit; all three are reproducible.
+ds-view/sa110-bad-full.csv
+ds-view/sa110-bad-lowslice.csv
+ds-view/sa110-bad-highslice.csv

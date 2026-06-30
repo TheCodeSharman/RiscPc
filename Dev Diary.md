@@ -609,3 +609,118 @@ the full blow-by-blow is ever needed.)
   headphone channels; (2) repair the corroded speaker-output traces + verify the
   220µF cap; (3) full clean → **water-rinse** → dry → conformal-coat the audio
   zone to arrest the ongoing corrosion; (4) a "RESOLVED" entry once it's singing.
+
+### Jun 30 — StrongARM (SA110) card: intermittent cold-boot fault (in progress)
+- **Symptom:** the SA110 card (the runner since Feb, after the ARM710 card's dead
+  oscillator) now **won't boot from cold**; ~5–6 resets (self-heating) → boots
+  reliably; **warm = works.** Classic **thermal-marginal startup**, not a dead
+  part — "dead then a reset boots it" is a bad-connection/margin signature.
+- **Eliminations (each a measurement, not a guess):**
+  - **Clock — ruled out.** Oscillator present & stable at **3.68 MHz** even on the
+    cold no-boots. Datasheet confirms 3.68 MHz **is** the SA-110's *core PLL
+    reference* (CPU core ~200 MHz is internal via the PLL — don't expect the bus
+    speed at the oscillator). `docs/sa110.pdf`.
+  - **Core power — ruled out.** The card has its **own regulators** (the ARM710
+    runs straight off the supply; the SA-110 is dual-rail). Found the two discrete
+    pass transistors: **Q1 = VDD core ≈ 2.4 V**, **Q2 = VDDX I/O = 3.3 V**
+    (datasheet: VDD 1.65/2.0 V × 8 pins, VDDX 3.3 V × 9 pins). Core rail is
+    **solid cold, no sag on failed boots** (only a normal load-transient ripple
+    during the boot beep). So +5 V *into* the card was the wrong thing to scope.
+  - **Motherboard — ruled out.** **ARM710 card boots reliably** (even with the LA
+    attached) → motherboard, RAM, ROM, PSU, the D1/D7 bodges & VIDC bridges all
+    fine. Both cards present an identical **16 MHz** external bus (SA-110's speed
+    is internal), so they stress the bus the same — clean isolation to **the card**.
+  - **Connector/socket — ruled out.** Cleaned openbus socket + connector (IPA,
+    contact cleaner, DeoxIT). **Wiggling the card changes nothing** → not a
+    mechanical/loose contact.
+- **Key behaviours:** **load-sensitive** — the POST dummy adapter *and* even the
+  LA probe capacitance each stop it booting (observer effect; the adapter isn't a
+  fault, it's a **diagnostic-mode selector** — machine runs POST instead of
+  booting). **POST is skipped on the SA110** even with the adapter (no A23
+  activity) → **no POST-decode route.** CPU *does* run (nMREQ active; lots of
+  low-address activity = normal early boot, ROM mapped to 0) but derails before
+  completing.
+- **Phantom banked:** an "A18 stuck low" reading was a **mislabelled probe (it was
+  on A16)** — false alarm, same class as the old "D3 stuck — unseated probe." Swap
+  the probe to a known-good line before trusting any "stuck" line on this rig.
+- **Working diagnosis:** a **high-resistance solder joint on a signal net on the
+  SA110 card** (glue logic between SA-110 and bus, or an SA-110 bus pin). The
+  **RC story** unifies every symptom: series R + line/probe capacitance → slow
+  edges → blown setup/hold. **Cold** raises R; **added capacitance** (adapter/
+  probes) raises C; both blow the margin; warm+unloaded just scrapes it.
+  Thermal-sensitive but **mechanically-insensitive ⇒ a resistive (oxidised/
+  cold-flowed) joint, NOT a crack.** Not power, not clock, not the connector.
+- **Plan:** (1) **freeze-spray** = reproduce-on-demand (whole card → fail) **and**
+  localise (one component at a time → the one that drops it owns the joint); (2)
+  **reflow** that joint — or pragmatically reflow the lot (glue logic, SA-110
+  perimeter, regulators) since clock/power/motherboard/connector are all cleared;
+  (3) **cold-soak verify** (must fail cold *before* a fix to trust the fix after).
+  Use **thermal** provocation, not mechanical (wiggle does nothing).
+- **Useful refs:** SA-110 = 144-pin TQFP; A18 = pin 101 (verify vs pinout fig);
+  nWAIT = pin 127; POST protocol = A23 + D0 (`acorn_post_wire` decoder), pulse-
+  timed (~3 µs bit / 164 µs byte) so decode needs **timing capture ≥~10 MHz**,
+  not MCLK-synchronous state mode.
+
+### Jun 30 — RESOLVED: SA110 cold-boot fault was **surface leakage under the board**
+- **Root cause (confirmed in practice):** the motherboard had been sitting on a
+  piece of paper that got **damp from IPA / contact-cleaner cleaning cycles**.
+  Swapping it for **dry** paper → **10+ consecutive dead-cold power-ons, 100%**
+  (previously "often won't" cold). The earlier "high-resistance joint on the
+  SA110 card" working diagnosis was **wrong** — there was no joint (microscope
+  showed no corrosion/cold joints on the card). A damp/contaminated paper pressed
+  against the **solder side** forms µA high-impedance **leakage** between
+  vias/pads; that drags a *sensitive control/handshake line* off threshold. It
+  explains everything at once: thermal warm-up (self-heat dries the film),
+  intermittency, the RC-timing margin, the load-sensitivity, **and** the absence
+  of any visible defect.
+- **How the LA work nailed the *class* of fault** (so we stopped chasing card
+  joints): reconstructed the full address bus from two 16-probe capture
+  **slices** — `sa110-bad-lowslice` = A2–A16, `sa110-bad-highslice` =
+  A2–A5(overlap)+A17–A26+A28. Natural bit positions ⇒ a **plain OR** after
+  sequence-aligning the two *separate* runs on the A2–A5 overlap (they're
+  cycle-deterministic: 3.56 M transitions each, 14 resyncs, 10 low-conf rows).
+  Tool: `ds-view/stitch_full.py` → `sa110-bad-full.csv`.
+- **The freeze, decoded:** the bus goes **dead-static at physical `0x10024344`**
+  (A28 set = DRAM) and never transitions again. Disassembling the ROM code
+  running there (RISC OS 3.70) = **`DAbHan`, the Data Abort Handler** (confirmed
+  vs Kernel source `s/Kernel`, `s/Middle`): it loads the faulting instruction
+  from `[lr-8]`, splits LDM/STM vs LDR/STR, and **walks the L1 page table**.
+  `0x10024344` is an **L1 page-table entry** — proven because the trace also hits
+  `0x100240B0` = the L1 entry that maps the page-table's *own* region (the
+  self-referential entry), which only lines up if the table's physical base is
+  `0x10024000`; so `0x10024344` = entry `0xD1` = the entry for logical
+  `0x0D100000`. Sequence: boot progresses (full RAM sweep `0x10000000`→`0x14380000`
+  completes — bulk DRAM fine), then DAbHan runs **repeatedly ~19 ms** (a recurring
+  data abort it can't clear = abort storm), then one page-table access **stalls
+  the bus solid**. A stalled *cycle* (not bad data) = the memory system never
+  returns ready ⇒ a **control/handshake** fault — exactly the leakage fingerprint,
+  not a dead line or corruption.
+- **POST / dummy-adapter myth-busting** (from `external/Kernel/TestSrc`): the
+  dummy adapter is "a **diode from A21 to \*ROMCS**" (disables ROM when A21 high)
+  — a *dumb test link* that sets `R_TESTED`. At the end of POST,
+  `ANDS r0,#(R_EXTERN:OR:R_TESTED) / BNE Reset` = **"repeat test forever"**, so a
+  fitted adapter **can never boot, by design** → useless as a pass/fail boot test.
+  The A23/D0 external protocol only runs for `R_EXTERN` (a real *display*
+  adapter), not a dumb link — so "no A23 activity" isn't "POST skipped." On
+  **StrongARM** specifically POST predates the SA110: it reads the **CP15 ID**
+  (`ts_ARM_type`: `MRC p15,0,r0,c0,c0`, guarded by an undef trap to spot an ARM2),
+  classifies it only as "not ARM2", and the CPU-specific phases (ARM3 cache test)
+  + speed-calibrated timing loops were written for ARM2/3/610/710 — so on a
+  ~5–10× faster SA110 they no-op / run too fast to show / diverge while the outer
+  repeat-forever loop still spins. "No POST output but still looping" = expected.
+- **Permanent fix (do this, dry paper is only a workaround):** the hygroscopic /
+  conductive residue (IPA contact-cleaner film + flux from the cleaning cycles) is
+  still on the solder side and will recur with humidity. **Scrub the underside**
+  with fresh IPA (esp. around **IOMD, the DRAM sockets, the CPU-card connector** —
+  the abort/handshake suspects), **fully dry / gentle bake**, and store on
+  **standoffs / a dry insulator, not paper.**
+- **Lesson:** "cold-soak intermittent + no visible defect + *stalled* (not
+  corrupt) bus" should put **surface leakage / contamination** on the suspect list
+  right next to solder joints. The LA captures were what said *high-impedance
+  control-line*, not *dead line* — which is what kept us off a wild goose chase
+  reflowing good joints on the card.
+- **Artifacts:** `ds-view/stitch_full.py` (reusable two-slice stitcher),
+  `ds-view/SA110-STITCH-HANDOVER.md` (mid-investigation handover). The bulky
+  derived CSVs (`sa110-bad-{full,lowslice,highslice}.csv`, 95–131 MB, two over
+  GitHub's 100 MB limit) are **gitignored** — regenerate from the `.dsl` captures
+  via DSView Parallel export + `stitch_full.py`.
