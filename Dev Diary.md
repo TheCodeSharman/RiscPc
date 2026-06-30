@@ -724,3 +724,19 @@ the full blow-by-blow is ever needed.)
   derived CSVs (`sa110-bad-{full,lowslice,highslice}.csv`, 95–131 MB, two over
   GitHub's 100 MB limit) are **gitignored** — regenerate from the `.dsl` captures
   via DSView Parallel export + `stitch_full.py`.
+
+### Jul 1 — 3D-printed replacement case standoff (motherboard secured factory-style)
+- **Problem:** a missing/broken Risc PC case standoff meant the motherboard wasn't
+  properly secured.
+- **Part:** printed a replacement standoff — **10 mm Ø × 5 mm high**, plain
+  cylinder with a **4.0 mm hole for an M3 heat-set brass insert** (no printed
+  thread — the insert is far stronger and more reliable). Chamfered the hole
+  mouth so the insert starts square; melted it in at ~200–230 °C kept dead
+  vertical so it sits flush.
+- **Material/slicer:** 3DFillies **PLA+** off the **stock PrusaSlicer "Generic
+  PLA"** profile (no dedicated PLA+ profile exists, and brand profiles make little
+  practical difference for PLA), nozzle nudged to **215–220 °C** for stronger
+  layer bonding (load-bearing part), bed **60 °C**. Printed hole-axis vertical,
+  4 perimeters / high infill so there's solid material for the insert to grip.
+- **Result:** motherboard now bolts down **just like the factory** — mechanical
+  restoration complete alongside the electrical fixes.
