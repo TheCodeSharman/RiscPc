@@ -470,6 +470,80 @@ the full blow-by-blow is ever needed.)
     converters (Section B = left, −in pin 6 ← DAC IOL; Section A = right, −in
     pin 2 ← DAC IOR) + output drivers (Section C → left ear, Section D → right
     ear), current-boosted by output transistors **Q1 (left) / Q4 (right)**.
+    (**Jun 30 follow-up — Q1/Q4 CONFIRMED NPN BJTs by diode test** (briefly
+    suspected MOSFETs; ruled out). Both **SOT-23**. Diode-mode,
+    in-circuit (op-amp #1 already removed): bottom-left pin = **base** — red(+)
+    reads **0.667 V to bottom-right and 0.664 V to top, open in reverse** =
+    common-anode NPN. Top↔bottom-right conducted both ways (0.372/0.249 V) =
+    in-circuit shunt across C–E (the 340Ω bias + jack path), not a device
+    junction. Standard SOT-23/SC-59 NPN pinout: **bottom-left = base (1),
+    bottom-right = emitter (2), top = collector (3)**. Part **identified by
+    raking-light photo** (markings invisible under direct light — embossed text
+    only pops under grazing illumination): both marked **`2Cp`** + date code
+    `49` = **BC849C** (NXP/Philips), a **low-noise high-gain NPN** (hFE group C,
+    420–800; VCEO 30 V, IC 100 mA, Ptot 250 mW) — exactly right for a low-noise
+    audio emitter-follower. Spare: BC850C (45 V, same LN family) = exact-grade
+    swap; BC847C/MMBT3904 works electrically but isn't low-noise grade.
+    Headphone path traced back from SK12 = **jack → 3R3 → 33R →
+    680Ω∥680Ω (340Ω) → emitter**, i.e. a **single-ended class-A emitter-
+    follower**: op-amp drives the base, emitter follows via 33R→3R3 to the jack,
+    340Ω pulls the emitter toward the rail (~35 mA standing) so one NPN sources
+    *and* sinks. The original "BJT output transistors" call was right.)
+  - **Inter-stage coupling + driver topology fully traced (both channels), op-amp
+    #1 OUT.** The drivers (Sec C = left, Sec D = right) are **inverting gain
+    stages**, *not* followers: each I/V output AC-couples into the driver's
+    −input. Per channel (mirror-symmetric):
+    - **Left:** DAC IOL → pin 6 → I/V (Sec B) → pin 7 → **47µF/16V coupling cap
+      (+ve→pin 7)** → **47kΩ input-R** → pin 9 (Sec C −in) → Sec C → pin 8 → Q1
+      → 33R → 3R3 → SK12.
+    - **Right:** DAC IOR → pin 2 → I/V (Sec A) → pin 1 → **47µF (+ve→pin 1)** →
+      **47kΩ** → pin 13 (Sec D −in) → Sec D → pin 14 → Q4 → 33R → 3R3 → SK12.
+    - **CORRECTION — the driver is a unity-gain (−1) current booster with the BJT
+      INSIDE the op-amp loop** (composite amp), *not* a plain gain stage. The
+      op-amp output (pin 8/14) drives **only the transistor base**; **feedback is
+      taken from the EMITTER → 47kΩ → −in**. So emitter→47k→pin 9 / pin 13 both
+      buzz, but **pin 8↔9 / pin 14↔13 read OPEN** (no direct out-to-−in link —
+      this initially looked like a fault on the *working* channel too, which is
+      what revealed the real topology). Input 47kΩ + feedback 47kΩ ⇒ **gain −1**,
+      a line driver. Driver **+inputs (pin 10/12) measured at 0V** (ground ref) ⇒
+      output idles near 0V ⇒ **headphones DC-coupled** (explains the missing jack
+      series cap; the working right driver idles ~1.3V = amplified input-offset).
+    - Coupling caps = aged electrolytics (PVC sleeve fraying but **no
+      leakage/discolouration at the base ⇒ NOT the corrosion source**); right one
+      reads **40µF in-circuit on the LCR meter = healthy** (47µF, ±20% tol). +ve
+      faces the I/V output (~3.3V VREF) = correct polarity.
+    - I/V **feedback caps confirmed both channels** (Cf ∥ the 2.1kΩ Rf: pin 7→6
+      left, pin 1→2 right); one supply-rail **decoupling cap** also IDed. So all
+      I/V-stage caps now accounted for.
+    - **Net:** every passive in both headphone paths verified intact with the
+      chip removed ⇒ the dead right channel is the **op-amp alone (Sec A)**,
+      nothing downstream. The op-amp #2→#1 swap test is de-risked on both ends.
+  - **SWAP TEST — op-amp #2 → op-amp #1 footprint: RIGHT CHANNEL RESTORED. 🎉**
+    With the known-good op-amp #2 in the #1 spot, the **right (originally-dead)
+    channel plays** — VDU 7 / Ctrl-G bell visible on the scope and audible. This
+    **confirms the op-amp #1 Section A diagnosis end-to-end**: a healthy section
+    in that footprint brings the dead channel back, nothing else downstream was
+    wrong. **LEFT channel railed** (Q1 base = −9V) — traced *not* to the board but
+    to **op-amp #2's Section C being DEAD**, one of the two sections it had
+    grounded/unused in its speaker role (never verified). Proof: −in (pin 9) =
+    **−1.2V** vs +in (pin 10) = **0V** ⇒ +1.2V differential ⇒ a healthy section
+    MUST drive its output to the *positive* rail, yet pin 8 is pinned to the
+    *negative* rail ⇒ section not functioning. **CONFIRMED silicon:** pin 9
+    lead→pad = **0.1Ω** solid (cold-joint cause ruled out); input 47kΩ + feedback
+    47kΩ (emitter→−in) intact; +in = 0V. Every external cause eliminated ⇒ the
+    open loop is **internal to Section C**, board left-channel is healthy. **PLAN: replace BOTH op-amps with known-good
+    TL074C** — fit one in op-amp #1 for stereo headphones; op-amp #2 is not
+    trustworthy (bad Section C) — **fit a NEW TL074C in BOTH spots and discard
+    op-amp #2** rather than risk a known-defective chip in the corroding board.
+    (op-amp #2's footprint +12V via-to-pin-4 bridge wire is already in place, so
+    the speaker spot just needs the new chip dropped in.) Fault confirmed AND fix confirmed (right channel
+    sings) — only the new chips stand between here and stereo.
+  - **Corroded −input/via contacts — RESOLVED by cleaning.** The earlier
+    "intermittent corroded −input contacts" were the **thin-film failure mode**:
+    a near-invisible electrolyte/oxide film (no green crust) that's resistive but
+    looks like clean copper. Mechanically cleaning the vias restored solid
+    connections (they were never deeply eaten). Caveat: such films can *reform*
+    in a still-corroding zone → reinforces the conformal-coat step.
   - **op-amp #2 = mono SPEAKER amp** — 2-stage, tapped off op-amp #1's Q1
     (left) → LM386 → speaker; its other 2 sections have grounded inputs (unused,
     tied off against oscillation). So **op-amp #1 is upstream of *both* outputs.**
