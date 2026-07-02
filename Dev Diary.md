@@ -740,3 +740,67 @@ the full blow-by-blow is ever needed.)
   4 perimeters / high infill so there's solid material for the insert to grip.
 - **Result:** motherboard now bolts down **just like the factory** — mechanical
   restoration complete alongside the electrical fixes.
+
+### Jul 2 — bring-up planning: drive recovery + SD system disc + networking
+Board's working, so the focus shifts from *repair* to *bringing the system up*.
+Mostly diagnosis + planning this evening (parts on order).
+
+- **Failing HDD — it's the adapter, not the drive.** Tried imaging the failing
+  RiscPC IDE drive over a **USB3 combo IDE/SATA adapter** (Initio `13fd:1040`):
+  endless USB reset loop, no block device. `uas` off (`modprobe -r uas` +
+  `usb-storage.quirks`) didn't help. A second RiscPC drive (425 MB) *attached*
+  but the bridge **misreported 2³² sectors / 2 TB** with read errors on sector 0.
+  - **Isolation:** a SATA drive **and** an IDE optical (ATAPI) both work on the
+    adapter; **both vintage IDE hard drives fail** ⇒ the combo adapter's
+    **PATA↔SATA translation can't handle old PATA HDDs**. (Premature "drive's
+    dead" call retracted — it **reads fine in the RiscPC's own native IDE**.)
+  - **Plan:** native IDE + `ddrescue`. Ordered a **PCIe PATA card (JMicron
+    JMB363** — native ATA host, no translation). Recovery box = the desktop
+    (revived — it just wasn't switched on at the front 🙄); no internal disc ⇒
+    boot the **NixOS installer USB** live, `nix-shell -p ddrescue`, image to a
+    spare USB stick. **Backup → private S3** via `rclone`, *not* the (public)
+    repo — image contents unknown/personal. Runbook: **mule-test → two-pass
+    ddrescue + mapfile → rclone S3.**
+  - Alternatives on file: **DiscKnight** (RiscPC-native retry-copy), **ATAboy**
+    (open USB bridge for old CHS drives), ARM Linux on the RiscPC (its birthplace,
+    but a project in itself).
+- **SD system disc + ADFS.** Staying on **authentic RISC OS 3.7** (source-readable;
+  RO4/6 closed; RO5 32-bit & RiscPC-awkward; 3.7 is native for the SA/RPC game
+  builds). Format FileCore **≤2 GB** (LFAU efficiency); ~40 GB onboard-IDE ceiling.
+  Test mule = **$10 16 GB Emtec**.
+  - **ADFS on CF/SD:** two faults — the >2 GB buffer bug (dodged by ≤2 GB) and the
+    CF/SD **background-transfer/timeout** corruption. Root cause: ADFS assumes
+    **spinning-disc timing** (a latent bug flash exposes). Fix = **evansm7/
+    adfs_patcher** (single-sector + longer timeout); `*Configure ADFSBuffers 0`
+    in CMOS covers the pre-patch cold-boot window.
+  - Onboard IDE is **PIO-only** — "background transfer" = interrupt-driven PIO,
+    *not* DMA. **raFS** = long filenames on 3.7. **Partition Manager** (JASPP) to
+    format.
+- **Networking (EtherX 2.00).** Dual 26/32-bit; "**Requires Internet 5.00+ for
+  DCI4**." "Internet 5" here = the **softloadable Internet module v5.xx** (NOT the
+  RO5-only RISC OS Developments stack — earlier conflation corrected). The card's
+  skeleton `!Boot` holds only `…!InetSetup.AutoSense.EtherX` (driver registration)
+  → needs a full modern `!Boot`: the **Universal `!Boot`** (RISC OS 3.10–3.70,
+  covers StrongARM 3.7). **No DHCP on 3.7 → static IP.** Card LED slow-green-blinks
+  pre-driver (likely just uninitialised; confirm it goes solid once driven).
+  - **Confirmed:** the stock 3.7 install-disc `!Boot` has **no `!InetSetup`** (which
+    is why the skeleton had nowhere to slot in). The **Universal `!Boot` supplies
+    it** at `!Boot.Resources.Configure.!InetSetup` (GUI config) plus the **DCI4
+    stack in `!System`** — `Internet`, `MBufManager`, `Resolver`. Open item now
+    narrowed to: **is the bundled `Internet` module ≥ 5.00?** If not, a one-module
+    swap in `!System`, not a re-do.
+- **Getting the `!Boot` across (no net/SD/floppy/CD yet).** `UniBoot.zip` is
+  **2.48 MB** (covers 3.10–3.70) = **~2 floppies** — size is a non-issue.
+  **Greaseweazle** inbound (writes native ADFS floppies). The site's *pre-split*
+  floppy build (`UniBoot1/2.zip`) is labelled for the older A3010/A3020/A4000/A5000
+  — maybe the same content, unverified → **safer to split the full `UniBoot.zip`
+  myself** (known-correct for the RiscPC) than gamble on a possibly-trimmed build.
+  Fallback: **build the SD in RPCEmu (3.7)** with the whole boot + EtherX AutoSense,
+  install in the RiscPC (two-for-one, but geometry risk + SD-in-RiscPC untested).
+  CD-R would need a **late-90s** CD-ROM (3.7 ATAPI hit-and-miss; avoid
+  DVD/2000s/burners).
+- **Next (after work tomorrow):** (1) unzip `UniBoot.zip`, **confirm the `Internet`
+  module is ≥ 5.00** (swap it into `!System` if not); (2) prep the Universal
+  `!Boot` + EtherX AutoSense in a **3.7 RPCEmu** instance, ready to split-to-floppy
+  or write-to-SD whichever transfer lands first; (3) when the JMB363 card arrives,
+  run the ddrescue recovery — **425 MB mule first.**
