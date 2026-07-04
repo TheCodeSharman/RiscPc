@@ -804,3 +804,99 @@ Mostly diagnosis + planning this evening (parts on order).
   `!Boot` + EtherX AutoSense in a **3.7 RPCEmu** instance, ready to split-to-floppy
   or write-to-SD whichever transfer lands first; (3) when the JMB363 card arrives,
   run the ddrescue recovery — **425 MB mule first.**
+
+### Jul 4 — audio: intermittent right-channel dropout was the TOSLINK, *not* the board
+- Symptom: right/whole-stream audio *sometimes* got through over the optical
+  digital-out → TOSLINK adapter → soundbar path. **Not the op-amp repair
+  regressing.**
+- **Isolation:** plugged headphones into **SK12** (bypasses S/PDIF, adapter and
+  soundbar → drives the analogue op-amp #1 / Q1 / Q4 headphone path directly).
+  Both channels play clean ⇒ the repaired board + analogue front end are good;
+  the fault is entirely downstream on the digital-out side.
+- **Root cause: mechanical, on the fibre.** Traced to over-bending / partly
+  unseating the optical cable when pushing the cabinet back toward the wall.
+  Reseating (swap to TV input, then back to the adapter) cleared it; works fine
+  now. The **"sometimes"** is the tell — received light sitting right at the
+  receiver's decode threshold, flexing just over/under it. A hard break would be
+  dead-silent every time; a marginal *analogue* fault would distort, not fully
+  recover. TOSLINK mutes below threshold rather than degrading gracefully, so a
+  crushed/over-bent fibre reads as a clean channel/stream dropout.
+- **Layout fix:** leave a slack loop behind the plinth so pushing to the wall
+  can't crush the fibre; mind the ~25 mm min bend radius on TOSLINK.
+- **Takeaway for future-me:** intermittent digital-audio dropouts → suspect the
+  optical link (bend/seating) first; headphones off SK12 are the instant
+  board-vs-downstream bisector.
+
+### Jul 4–5 — RPCEmu 3.71: build, emulator fixes, and a Filecore SD system disc
+Goal: build a **Filecore-formatted SD** system disc for the RiscPC (via an
+IDE→SD adapter) by formatting it inside **RPCEmu**. Ended with a booting,
+byte-verified 2 GB SD carrying a Universal `!Boot` + an ADFS torture test.
+
+- **RPCEmu fork built from source** (`TheCodeSharman/rpcemu`, `integration`;
+  interpreter only — dynarec unstable). **Two-directory layout:** emulator at
+  `~/Projects/rpcemu`; the RISC OS install at
+  `~/Projects/rpcemu/installs/riscos-371/` (gitignored), launched by its own
+  `run` script (`cd`s in + starts via devenv; RPCEmu keys off cwd, `datadir=./`).
+  Rebuildable from a clean clone with **`make setup-install`**.
+- **Reproducible devenv (Qt5)** committed on the fork's `upstream` branch (rides
+  every branch, stays out of upstream-submission diffs). Four emulator fixes,
+  each a rebased `feature/*` (clean `git diff upstream feature/X`) folded into
+  `integration`:
+  - **gcc15 / C23 build break.** GCC 15 defaults to `-std=gnu23`; `hostfs.c`'s
+    hand-rolled `typedef int bool` is then a hard error. Chose **not** to patch
+    source — the top-level Makefile wrapper pins `-std=gnu17` (the pre-C23
+    default upstream built with), so the source stays byte-identical to upstream.
+  - **No emulator audio.** `QAudioOutput` found no backend: a bare devshell's Qt
+    plugin search only covers qtbase, but the audio plugins live in
+    qtmultimedia's own store path. Fix = `QT_PLUGIN_PATH` → qtmultimedia
+    (+ qtwayland). Host ALSA→PipeWire bridge then provides output.
+  - **Wayland pointer stuck.** Full-screen mousehack re-centred by *warping* the
+    host pointer; Wayland forbids warping, so the emulated pointer stuck at an
+    edge. Enabled `feature/fullscreen-mouse-map` (maps the pointer instead).
+  - **IDE reported a fixed 32 GB.** `ide_identify()` hardcoded 65535 cyl, so
+    Partition Manager saw every disc as 32 GB (→ huge LFAU, won't fit the SD).
+    Patched `ide.c` to derive cylinders from the image size
+    (`feature/ide-real-geometry`): 2000 MB → 4063 cyl → **1.93 GB**, honest and
+    just under the 2 GB Filecore buffer-bug line.
+- **RISC OS install = marutan 3.71 Easy-Start bundle** (ROM371 + a full HostFS
+  `!Boot` + CMOS + NAT networking). Two runtime bits the bundle assumed you'd
+  unzipped over an existing RPCEmu install — both now created by
+  `setup-install.sh`:
+  - **HostFS drive absent** → needs `poduleroms/` with `hostfs,ffa` +
+    `hostfsfiler,ffa` (RPCEmu loads the HostFS filing system + its icon-bar filer
+    from there as an extension podule ROM). Without it, no HostFS drive at all.
+  - **Networking dead** → needs `netroms/EtherRPCEm,ffa` (the emulated NIC driver
+    `network.c` loads at startup). DNS/TCP then work; **ping doesn't** — slirp
+    NAT can't relay ICMP without the host's `ping_group_range`, so a hanging
+    `*Ping` is normal, not a fault (DNS resolving a name already proves the link).
+- **Where I (Claude) went wrong:** kept asserting "it clearly booted from
+  HostFS." Wrong — RISC OS is **ROM-based**, so reaching the desktop says
+  *nothing* about HostFS. The missing drive was the absent `poduleroms/`, flagged
+  in the very first rpclog line and talked past. Caught and corrected by MS.
+- **Format:** PackMan → JASPP source (`www.jaspp.org.uk/packages/release`) →
+  **Partition Manager**. PackMan's HTTPS update failed on a **CAfile** cert error
+  (missing/mis-pathed CA bundle; installing CACertificates + reset didn't help);
+  switching the source to **http** dodged TLS entirely. Full-disc **≤2 GB
+  Filecore** (1.93 GB, sane LFAU thanks to the geometry fix).
+- **Filecore 77-file/dir limit bites the loaded bundle.** Copying the bundle's
+  `!Boot` to Filecore fails: `!GhostScr` (Ghostscript, 232-file dir) and `!Store`
+  (PackMan cache, 321) exceed the **77-entry** limit of 3.71's new-directory
+  format (big directories only arrived with RO4). So the kitchen-sink bundle
+  *cannot* live on a 3.71 Filecore disc — reinforcing the clean-disc plan.
+  Downloaded a fresh **Universal `!Boot`** (riscos.com, covers 3.10–3.70): lean,
+  every dir ≤77, copies clean. Extract **inside** RISC OS (SparkPlug/UnZip) to
+  keep filetypes. Set **`*Opt 4,2`** (run `$.!Boot`) — stored on the disc, so it
+  rides the `dd` to the SD (the `*Configure Boot`/drive half is machine-side CMOS).
+- **Written to SD:** `dd hd4.hdf → /dev/mmcblk0` (14.6 GB SD), full 2 GB,
+  **verified byte-for-byte** with `cmp`. Getting files onto the Filecore image =
+  copy in the emulator (HostFS→ADFS::4) then re-`dd`; `du` on the sparse hdf +
+  `grep -a` for a leafname confirm what landed before writing.
+- **ADFS torture test** — `tools/risc-pc-diag/ADFStort.bas`, now on the SD as
+  `ADFS::4.$.ADFStort`: writes a multi-MB file whose every word holds its own
+  offset, reads it back in large blocks, verifies. Detects the CF/SD
+  background-transfer corruption; PASS = safe, FAIL prints the corruption offset
+  → `*Configure ADFSBuffers 0` / evansm7 adfs_patcher.
+- **Next / open:** real-hardware moment of truth — boot the RiscPC from the SD,
+  then run `ADFStort` **from the SD** (so its test file lands there). If the disc
+  isn't even seen → suspect **geometry** (emulator 16h/63s vs the adapter's CHS).
+  Also: confirm the Universal `!Boot`'s **Internet module ≥ 5.00** for EtherX DCI4.

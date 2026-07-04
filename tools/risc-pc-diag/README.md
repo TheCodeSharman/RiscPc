@@ -58,3 +58,18 @@ The green cast (Red **and** Blue suppressed) predicts a stuck-low bit in **both*
 the Red and Blue walks → expect ≥2 bad lines, consistent with the multiple bus
 bodges. Send the wrong-bit list to map it to exact D-lines and cross-check why
 the timing registers survive those bits.
+
+## Disc / media diagnostics
+
+### `ADFStort.bas` — CF/SD ADFS corruption torture test
+RISC OS 3.x ADFS/IDEFS assumes spinning-disc timing; on fast **CF/SD** media its
+background (interrupt-driven PIO) transfers can silently corrupt data. This
+writes a multi-MB file whose every 32-bit word holds its own file offset, reads
+it back in large blocks and checks each word — any mismatch is corruption
+(self-locating), across several passes since the fault is intermittent.
+
+**Run it on the disc under test** — make that disc the current directory (its
+test file is written there). `PASS` = transfers are safe; `FAIL` prints the first
+corruption offset → then `*Configure ADFSBuffers 0` and/or fit the **evansm7
+adfs_patcher** and re-run. Load a text `.bas` with `*BASIC` then `*EXEC <file>`,
+or run a tokenised copy directly.
