@@ -900,3 +900,38 @@ byte-verified 2 GB SD carrying a Universal `!Boot` + an ADFS torture test.
   then run `ADFStort` **from the SD** (so its test file lands there). If the disc
   isn't even seen → suspect **geometry** (emulator 16h/63s vs the adapter's CHS).
   Also: confirm the Universal `!Boot`'s **Internet module ≥ 5.00** for EtherX DCI4.
+
+### Jul 5 — keyboard: sticky keys were fluid *between* the membrane layers; one torn dome pusher
+Finally tore down the misbehaving keyboard (Acorn RISC PC keyboard, **NMB
+Technologies**, Acorn part **0391,400/01** — on the underside label).
+- **Not individual switches.** It's a **membrane** design with discrete **green
+  silicone rubber domes** seated in the plastic chassis — one dome per key, not a
+  single moulded web, and not mechanical switches as I'd assumed.
+- **Root cause of the sticky/dead keys:** earlier attempts to clean it had let
+  fluid wick **between the two plastic membrane layers**, where it couldn't dry
+  or be wiped. **Fix:** full disassembly, **IPA wash** of everything, meticulous
+  dry. **All keys now work flawlessly.**
+- **Self-inflicted damage:** got too aggressive with one dome and **tore the
+  little central pusher** (the moulded pip that presses the membrane through the
+  carrier). Robbed the dome from the **AltGr** key (never used) and removed that
+  keycap to keep the important keys working.
+- **Repair of the torn dome (in progress):** kept the torn fragment. **Superglue
+  failed** — cyanoacrylate can't bond silicone (low surface energy) and cures
+  rigid, so it shears off a part that flexes on every keystroke. Correct
+  chemistry is a **silicone adhesive**: bonds silicone-to-silicone and stays
+  flexible. Had a tube of **100% silicone, neutral-cure** sealant on hand — same
+  chemistry as the "proper" product (Smooth-On Sil-Poxy), and **neutral cure**
+  means no acetic acid off-gassing near the printed contacts. (Sil-Poxy is the
+  gold standard but was **$36 + $16 postage** — absurd for one pip; the local
+  tube is functionally equivalent for an unstressed bond this small.)
+- **Technique:** IPA-clean both faces, **micro-dot** transferred with a needle
+  tip (silicone paste is stringy at the nozzle), placed with fine tweezers under
+  the **microscope**, kept off the pip's business tip, dome sitting in its
+  chassis pocket to hold geometry. Left to cure **overnight, undisturbed** —
+  neutral cure is slow to grab, so no early stress-testing.
+- **Takeaways for future-me:** (1) never wet-clean these keyboards in a way that
+  can drive fluid *between* the membrane layers — dismantle and clean the layers
+  separately. (2) Discrete domes mean a torn one is a **single-dome swap**, so a
+  cheap donor keyboard = a lifetime of spares (only one on eBay AU at the time,
+  **$125 + $49.50 postage** — not worth it for one key). (3) Silicone bonds to
+  silicone; nothing else holds. **Next:** gentle press-test after full cure.
