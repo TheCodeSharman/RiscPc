@@ -935,3 +935,127 @@ Technologies**, Acorn part **0391,400/01** — on the underside label).
   cheap donor keyboard = a lifetime of spares (only one on eBay AU at the time,
   **$125 + $49.50 postage** — not worth it for one key). (3) Silicone bonds to
   silicone; nothing else holds. **Next:** gentle press-test after full cure.
+
+### Jul 5 (later) — intermittent `*`-key freeze: same fluid-between-layers fault, on the keypad `*`
+Reassembled with the AltGr key back in and the keyboard worked — then **froze,
+flooding `*` (numeric-keypad side) on auto-repeat**, keyboard totally
+unresponsive, and it kept flooding **even with the keyboard unplugged**. A
+**cold boot cleared it every time**; it then recurred intermittently.
+- **What the symptoms decode to:**
+  - `*` repeating is **RISC OS host-side auto-repeat**, not the keyboard
+    transmitting — the keyboard sends one make + one break, never a stream. So
+    a `*` flood = a **make received without its break** → OS latches the key as
+    held → repeats forever. Unplugging can't stop it (the break would have to
+    come *from* the keyboard); only a cold boot (which re-runs the HRST reset
+    handshake) clears the latched key-state. This also proves it's **not the
+    motherboard/IOMD KART** — a damaged KART wouldn't come back clean on reboot.
+  - **Caps Lock LED dead during the freeze** = the key→OS→keyboard **round-trip
+    is hung** (same LED round-trip test as the Feb reset-loop diagnosis, above).
+    So beyond a stuck key-state, the whole link desyncs and locks up — one event:
+    a jammed `*` matrix contact confuses the controller's scan and hangs the
+    protocol.
+- **Root cause = a between-layers bridge at the keypad `*`, cleared by wiping.**
+  **No visible fluid** — just wiped the inner faces at `*` with a finger and the
+  fault cleared. So it wasn't a wet droplet but an **invisible conductive film /
+  residue** (dried spill residue, skin oil, dust) bridging the matrix contact —
+  *or* the act of separating and reseating the two layers itself broke a
+  marginal mechanical contact. Either way, **surface film / seating, not a
+  switch fault.**
+- **Why "sometimes fine" isn't mysterious:** a marginal between-layers bridge
+  conducts only sometimes; reassembly clamp pressure / residual damp / temp
+  nudge it over or under threshold. "Torn down several times, same freeze, this
+  time fine" is the *signature* of a marginal short, not random luck — a hard
+  fault would be dead every time.
+- **Takeaway (reinforces Jul 5 #1):** surface-wiping isn't enough once fluid is
+  *between* the layers — you have to **separate the two membrane sheets and wipe
+  the inner faces** at the offending key. Watch the keypad `*` for recurrence.
+
+### Jul 5 (later) — first boot off the SD system disc; `ZapUser:` boot error explained
+The SD system disc we built **booted the real RISC PC into RISC OS** — first
+boot from the recovered/rebuilt card on the actual machine. One cosmetic error
+during startup: **`Filing system or path ZapUser: not present`**.
+- **Cause.** I'd dropped `!Zap` into `$.Apps` **without its companion `!ZapUser`**
+  (never installed it). `!ZapUser` is the only thing that defines the
+  `ZapUser$Path` (`ZapUser:`) path variable; Zap ships it separately, and it
+  hadn't made it onto the machine.
+- **Why it fires at boot, before opening any folder.** The Universal `!Boot`'s
+  **PreDesktop** runs `AddApp Boot:^.Apps.!*` (i.e. `$.Apps.!*`) in its *ResApps*
+  section. `AddApp` populates the icon-bar **Apps** directory and, to do so,
+  **runs each app's `!Boot`** at startup — so the whole Apps folder is "seen" by
+  the Filer before the desktop appears. My mental model ("`!Boot` only runs when
+  I open the folder") was wrong: `Filer_Boot` / `Repeat Filer_Boot <dir>` /
+  `AddApp` all force it during boot.
+- **The actual fault line.** `!Zap.!Boot` tries to boot `!ZapUser` to define
+  `ZapUser$Path`; when that fails it falls straight through to
+  `IfThere ZapUser:Config.Country …`, dereferencing an **undefined** `ZapUser:`
+  → the error. Note `!Zap.!Run` guards this with
+  `If "<ZapUser$Path>" = "" Then Error 0 Please locate !ZapUser`, but **`!Boot`
+  has no such safety net** — a latent bug in Zap's `!Boot` that only bites when
+  `!Zap` is installed without `!ZapUser`.
+- **Fix.** Removed `!Zap` from `$.Apps` — nothing left to boot it, error gone.
+  *Proper fix if Zap is wanted later:* install **both** `!Zap` and `!ZapUser`
+  (either both in `!Boot.Choices`, or `!ZapUser` inside the `!Zap` dir).
+- **Takeaway:** a `!Boot` file must be trivial and side-effect-free — it runs at
+  unpredictable times (Filer scan, `AddApp`, `Filer_Boot`). Any app dropped into
+  `$.Apps` gets its `!Boot` executed at every startup, so a broken `!Boot`
+  surfaces as a boot error, not a run-time one.
+
+### Jul 5 (later) — dual IDE: SD card + old HDD mounted together to migrate the custom mode file
+Put the **IDE→SD adapter** and the **original IDE hard drive** on the bus at the
+same time so I can copy files (my **custom screen-mode file**) straight from the
+old disc to the new SD system disc — no intermediate host transfer.
+- **Jumpering: the SD adapter has to be master.** With the **real HDD jumpered
+  as master it didn't work**; jumpering the **HDD as slave** (leaving the SD
+  adapter as master) → **both drives enumerate and work simultaneously.** Likely
+  the SD/CF-to-IDE adapter is **master-only / doesn't implement slave (or DASP
+  master-present) handshaking** — common for these cheap adapters — so it must
+  own the master position and the real drive rides as slave.
+- **`*Configure IDEDiscs 2`.** RISC OS only probes the configured number of IDE
+  discs (default 1), so the second drive was invisible until I bumped the count
+  to **2** (and reset). Also **disabled boot** (booting off the disc) so I get a
+  clean desktop to do the copy rather than running either drive's `!Boot`.
+- **Filecore won't show two discs of the same name.** Both discs were named the
+  default `HardDisc4`, and the desktop **can't open two Filer viewers for the
+  same disc name — it just closes/removes the duplicate window.** (Filecore keys
+  the desktop on disc *name*, not drive number.) **Fix: renamed the new disc to
+  `HardDisc5`.** Now both open independently and I can **drag-and-drop between
+  them.** ✅
+- **Why this matters:** gives a direct in-machine migration path for anything on
+  the old drive (mode file first, then anything else worth keeping) onto the SD
+  system disc, without needing the old drive to be bootable.
+
+### Jul 5 (later) — ADFSTort passes on the SD system disc
+Ran **ADFSTort** (the Filecore disc torture/soak test — sustained
+read/write/verify hammering to shake out marginal media or filing-system
+corruption) against the SD system disc → **passed clean.** This validates the
+**IDE→SD adapter + Filecore** path under real load, not just casual browsing:
+the disc holds up to heavy write/verify traffic, so the SD is fit for
+daily-driver use. (Earlier ADFSTort run was in the RPCEmu 3.71 build context;
+this is the **on-hardware** confirmation.)
+
+**Why this is a big deal — no "Disc Error 20", so I can run STOCK RISC OS 3.71.**
+"Disc Error 20" is the well-known CF/SD-on-RISC-PC failure, and it's a **timing
+bug in ADFS**:
+- ADFS was written against the **first IDE standard**, which specified a **~500 ns
+  DRQ (data-request) timeout**. Later ATA revisions dropped that tight window.
+  **Modern CF/SD cards are slower to assert DRQ** (worst on multi-sector
+  transfers), so they overrun ADFS's ancient timeout → **Disc Error 20** and
+  **corrupted directory structures.**
+- The community fix is **patched ADFS 2.68** (loaded early in `!Boot`, or via
+  latest ROOL `!System`); it **restricts transfers to one block at a time** and
+  **lengthens the timeout**. **RISC OS 5 already includes it**; **3.71's stock
+  ADFS does not.**
+- **We never hit it** — almost certainly because this is an **industrial SD→IDE
+  module with its own IDE controller + buffer**, not a cheap passive adapter. A
+  passive CF adapter exposes the **raw card's** DRQ timing to the host (→ error
+  20); the industrial module presents a **clean, consistently-fast IDE state
+  machine** and decouples it from the slow flash behind it, so ADFS's tight
+  timing is always satisfied. Designed as a true HDD *replacement*, so it behaves
+  like the fast fixed drive ADFS expects.
+- **ADFSTort passing corroborates this:** the timeout fault bites hardest under
+  sustained multi-block traffic — exactly what the torture test throws — and it
+  stayed clean.
+- **Outcome:** **no ADFS patch / no `!System` update needed — the machine runs
+  stock RISC OS 3.71.** ✅ *Fallback for future-me:* if I ever swap to a passive
+  adapter or a different card and see error 20, the fix is the ADFS 2.68 patcher
+  / latest ROOL `!System` (Stardot threads t=10545, t=14016, t=16000, t=20208).
