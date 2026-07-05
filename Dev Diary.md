@@ -969,6 +969,22 @@ unresponsive, and it kept flooding **even with the keyboard unplugged**. A
 - **Takeaway (reinforces Jul 5 #1):** surface-wiping isn't enough once fluid is
   *between* the layers — you have to **separate the two membrane sheets and wipe
   the inner faces** at the offending key. Watch the keypad `*` for recurrence.
+- **Update — downgraded, not gone:** now getting **random `*` presses but no
+  freeze / keyboard stays responsive**. That's a make *and* break registering
+  (so the link never hangs) = the hard bridge has become an **intermittent
+  flicker** — residual film still in the gap, just less of it. The finger-wipe
+  helped but didn't fully remove it.
+- **Cleaning chemistry — what NOT to use:** both DeoxIT and the conductive-ink
+  pen are **wrong for this fault**. DeoxIT is for oxidised *metal* contacts with
+  intermittent *opens* and leaves a protective oily film — useless on printed
+  **carbon** pads and its residue can bridge/attract dust (fault is an unwanted
+  *short*, not an open). Conductive ink *adds* conductivity — it fixes a *worn*
+  pad that won't make; here it would only entrench the bridge. **Right tool =
+  pure 99% IPA**: separate the two membrane layers, clean both inner carbon
+  faces + the dome pip, dry fully. **Plan:** IPA re-clean of the `*` inner faces;
+  ohm the pad at rest (should be open) while flexing to locate the bridge; check
+  dome/pusher geometry isn't preloading the contact. Conductive pen kept in
+  reserve *only* if a pad later reads high-resistance / weak-make.
 
 ### Jul 5 (later) — first boot off the SD system disc; `ZapUser:` boot error explained
 The SD system disc we built **booted the real RISC PC into RISC OS** — first
