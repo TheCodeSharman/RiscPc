@@ -985,6 +985,26 @@ unresponsive, and it kept flooding **even with the keyboard unplugged**. A
   ohm the pad at rest (should be open) while flexing to locate the bridge; check
   dome/pusher geometry isn't preloading the contact. Conductive pen kept in
   reserve *only* if a pad later reads high-resistance / weak-make.
+- **ROOT CAUSE FOUND — a hidden 4th membrane sheet with a sealed fluid pocket.**
+  Following the multi-key clue (`*` *and* Page Up firing → a **shared matrix
+  line**, not a single pad) traced the fault to the **laminated junction at the
+  parallel connector**, where all lines run adjacent. Lifting that area to let
+  air in temporarily revived the keyboard — the tell. On teardown the real
+  finding: the stack is **not** the assumed 3 layers (top contact / spacer /
+  bottom contact) — there was a **4th sheet stuck onto the bottom contact
+  layer** that I hadn't realised was meant to separate. **Fluid was trapped in a
+  sealed pocket *under* that extra layer**, one layer deeper than every clean I'd
+  done — right where the traces converge, bridging shared lines. That's the
+  whole saga in one: `*`+PageUp phantom keys, freezes, "cleared by reboot/air"
+  were all the latch clearing or the bridge momentarily breaking — never the
+  water. **Fix:** separated the 4th layer, cleaned/dried the trapped pocket,
+  reassembled. **Working so far** — and unlike the earlier reboots this removed
+  the *cause*, not the symptom.
+- **Takeaways:** (1) **know the real layer count before cleaning** — an assumed
+  3-layer stack hid a sealed 4th, so every clean sat on top of the problem.
+  (2) Multi-key misfire = shared-line short = look at the **connector junction**,
+  not the pads. (3) The connector lamination is the worst possible fluid trap:
+  hardest to dry, all lines adjacent.
 
 ### Jul 5 (later) — first boot off the SD system disc; `ZapUser:` boot error explained
 The SD system disc we built **booted the real RISC PC into RISC OS** — first
@@ -1075,3 +1095,39 @@ bug in ADFS**:
   stock RISC OS 3.71.** ✅ *Fallback for future-me:* if I ever swap to a passive
   adapter or a different card and see error 20, the fix is the ADFS 2.68 patcher
   / latest ROOL `!System` (Stardot threads t=10545, t=14016, t=16000, t=20208).
+
+### Jul 5 (later) — networking up: EtherX online, static IP; root cause was a broken RJ45 tab
+Got the RISC PC onto the LAN. **`*ping` at all was the first clue:** it errored
+`SWI &41200 no known` — `&41200` is `Socket_Creat`, the base of the BSD-socket
+SWI chunk provided by the **Internet module**. "No known SWI" = the TCP/IP stack
+simply wasn't loaded/configured yet, *not* a card fault.
+
+- **Config: static IP.** Stock RISC OS 3.7x has **no DHCP** (static or BOOTP
+  only; DHCP arrived with RISC OS 4 / is standard in RISC OS 5). BOOTP would
+  need a server keyed to the card's MAC — more plumbing than it saves for one
+  box — so static it is. LAN is `192.168.88.0/24`, gateway/DNS `192.168.88.254`;
+  gave the RISC PC `192.168.88.10`, mask `255.255.255.0`, via Configure →
+  Network → Internet. **Gotcha:** changes don't apply until you press **Save**
+  *and* reboot (the Internet module reads its config at boot). Forgot the Save
+  button first time round.
+- **After reboot the SWI error was gone** (stack now loading) but
+  `*ping 192.168.88.254` → **"host is down"**. Key distinction: that's an **ARP
+  failure** (request sent, no layer-2 reply) — *not* a timeout — so it's
+  physical, not firewall/routing. A firewall can't block ARP for the router's
+  own address, and can't zero a packet counter.
+- **`*EXInfo` was the smoking gun:** link **100baseT full duplex**, TX climbing,
+  **RX = 0.** A one-way link — TX pair fine, RX pair dead. Ruled out the router
+  entirely (own-IP `*ping 192.168.88.10` worked → stack + interface fine).
+- **Root cause: a broken retention tab on the RJ45** of the patch cable between
+  the switch and the powerline (Ethernet-over-power) adapter. The plug had
+  crept out just far enough to lose the RX pair — **link LED still lit, TX ok,
+  RX zero.** Re-seating it carefully → **`*ping 192.168.88.254` replies**, and
+  the full ladder passes: `1.1.1.1` (routing) **and** `www.riscosopen.org`
+  (DNS) both resolve. **Fully online.** 🎉
+- **Cable replaced** — swapped the flaky length (Cat5e; EtherX is 100M max) so
+  the broken-tab plug can't creep out and drop the RX pair again.
+- **Lesson for future-me:** **link-up + TX-fine + RX-0 = suspect the physical RX
+  path (cable/plug/duplex), never the config.** `*EXInfo`'s per-direction packet
+  counts split "is it the wire or the software?" in one glance — check RX before
+  touching any network settings. And "host is down" ≠ timeout: it means ARP got
+  no reply, i.e. layer-2/physical, so don't go chasing the firewall.
