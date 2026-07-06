@@ -1224,3 +1224,139 @@ transfer. Two threads got chased to the end — and both landed.
   the firmware revert never touched. (3) `RGBHV limit no sync` = gbs-control never
   got simultaneous HS+VS-active (`STATUS_16 & 0x0a`) on the *scaling* path; for a
   >480-line source that usually means it should be **bypassing**, not scaling.
+
+### Jul 7 — Acorn Access/Freeway over WiFi works: Toolbox 1.71 onto the real RISC PC
+The payoff day for the Freeway saga: RPCEmu (RISC OS 3.71 install) and the real
+RISC PC now share discs over **Acorn Access/Freeway across WiFi**, and **Toolbox
+1.71** is merged onto the real machine (its `!Browse` wanted ≥1.43; ROM had 1.36,
+SD boot soft-loaded 1.41). A deep stack got peeled — emulator C, NixOS module, L3
+networking, RISC OS AUN internals, FileCore/HostFS — and it all landed.
+
+- **RPCEmu: a real, additive unprivileged-networking mode.** Turned the earlier
+  "overload IPTunnelling with a `tunnelinterface=` key" hack into a first-class
+  **`NetworkType_IPTunnellingTap`** — its own "IP Tunnelling (pre-created TAP)"
+  radio + "Tunnel Interface" field in the Qt network dialog, threaded through the
+  config signal/`network_config_changed`/settings load-save (`iptunnellingtap`
+  token). It attaches to a **pre-created, user-owned persistent tap** and skips the
+  privileged `SIOCSIFADDR`/`IFF_UP`, so RPCEmu runs **fully unprivileged** — no
+  root, no setuid drop-privileges dance. Started down a "remove the old root tap
+  path" road, then Michael rightly pulled it back to **purely additive**: plain
+  `IPTunnelling` (and its root path) is untouched, Ethernet Bridging still legit
+  needs root. Built clean, live-verified: guest attaches to `rpctap0` in ~1s.
+- **The duplicate-IP "wedge" — NOT what it looked like.** `*ping 192.168.88.12`
+  threw `Internet: … Duplicate IP address 1.112.1.79! from be:f7:9e:ec:01:4f`
+  (the tap MAC). First instinct (and the old handover's) was that the host was
+  proxy-answering the guest's own `.12` DAD. **Disproved it host-side without even
+  driving RISC OS:** wrote a Python TAP-injector (`/dev/net/tun` + `TUNSETIFF`),
+  fired the exact DAD probes in — host stays **silent** for `.12` (same-device
+  route suppression holds) but proxy-answers `.10`/`.254`. So `.12` was fine.
+- **Root cause: a *second* identity.** `1.112.1.79` in the host neigh table (at the
+  guest MAC) was the tell — it's real, not garbled. RISC OS/Acorn Access brings up
+  an **AUN ("Econet over IP")** interface on an off-subnet `1.x` address, net.station
+  **auto-derived from the emulated NIC MAC's low bytes** (`…01:4f` → net 1 / station
+  79). That off-subnet address routes off-tap via the default gateway, so the blunt
+  `proxy_arp=1` on the tap **answered its DAD** → the guest's whole Internet module
+  wedged with "duplicate IP", dragging `.12` down with it. Boot capture nailed it:
+  the guest DADs `1.112.1.79` *and* `.12`, and once the host stopped answering the
+  `1.x` probe, `.12` came up and the **real RISC PC (.10) immediately unicast
+  Freeway to it**.
+- **Fix: scope the tap's proxy-ARP to the LAN, generically.** First cut used
+  `ip neigh … proxy` for `.10`/`.254` — Michael (correctly) objected to baking a
+  peer's address into config. Replaced with **`arptables -A OUTPUT -o rpctap0
+  --opcode Reply ! -s 192.168.88.0/24 -j DROP`**: keep blunt `proxy_arp=1`, but drop
+  any proxy REPLY for an *off-subnet* answered address. Names no machine — just the
+  subnet (new `lanSubnet` module option). Uplink `proxy_arp` stays 1 so the real
+  machine can still resolve `.12`. Folded into `nix/rpcemu-freeway.nix`, pushed
+  through the fork's reintegrate → `integration` (93c9e6e) → nix-config re-lock →
+  `nixos-rebuild`; verified the rule reapplies declaratively and survives the
+  service restart (persistent tap keeps RPCEmu attached).
+- **Copying `!System` the RISC OS way.** Wholesale-dragging the 6.9 MB `!System`
+  over Access was fragile ("Server lost contact") and wrong-model. Toolbox 1.71
+  lives in `!System.310.Modules.Toolbox` (in `310` because the suite needs RO
+  3.10+, so it loads on 3.7). The right tool is Configure's **Merge !System** —
+  version-aware, keeps the newest module across the numbered dirs, so no `310`-vs-
+  `370` precedence trap. Scanned the HostFS tree first and cleared the red herrings:
+  no names over FileCore's **10-char** limit, no `.`-in-leafname HostFS traps, no
+  collisions. `*Help Toolbox` → **1.71**, `!Browse` happy. No RetroScaler needed. 🎉
+- **Lessons for future-me:** (1) **A tap can be probed without the guest** — open
+  `/dev/net/tun`/`TUNSETIFF` and inject ARP to test host proxy-ARP behaviour in
+  isolation; it disproved the obvious-but-wrong `.12` theory instantly. (2) A `1.x`
+  address in an Acorn context is **AUN/Econet**, not TCP/IP — Access quietly runs a
+  second net-identity derived from the MAC; the wedge was that sibling, not the
+  address you configured. (3) **Blunt `proxy_arp` on a tap is over-broad** — it
+  answers for the whole off-tap world; scope it to the LAN subnet with an arptables
+  `--opcode Reply ! -s <cidr>` drop rather than enumerating peers. (4) Update a
+  RISC OS module with **Configure → Merge !System**, never a wholesale copy —
+  version-aware and it dodges FileCore/HostFS name limits and numbered-dir
+  precedence. (5) A live `ip`/`arptables`/`tc` fix **proves** a theory but isn't a
+  fix until it's in the module and rebuilt — persistence is the deliverable.
+- **Still open:** bulk Access transfers can drop host→guest (tap TX) packets if
+  RPCEmu stalls draining the tap → "lost contact"; bumped tap `txqueuelen`/qdisc
+  live but did **not** fold that into the module — do so if big copies flake again.
+
+### Jul 7 — PackMan on the real RISC PC: the 26-bit + long-filename double ceiling
+With Toolbox 1.71 across, the plan was "install more software the easy way" via
+**PackMan**. Instead the day became a tour of every wall RISC OS **3.71** puts up
+against 2020s software — and the eventual win was a long-filename filing system.
+
+- **PackMan itself won't run — the 26-bit wall.** Current PackMan (0.9.8) aborts on
+  3.71 with `No writeable memory at this address`. Crucially it **also crashed on
+  RPCEmu before any copy**, so it's *not* transfer corruption — it's a 32-bit /
+  RO5-era build on a 26-bit OS. The **0.9.7 beta** from the QuickStart is the last
+  build that targets the old OS; that runs. (Aside: my "corrupted binary" theory
+  was a red herring twice today — the real recurring villain was **version / OS
+  incompatibility**, not corruption.)
+- **The realisation that shrinks the whole problem:** you only ever need to get the
+  **small PackMan app** across Access — once it runs it **builds `!Packages` itself**
+  and fetches the catalogue + packages over the **real machine's own internet**
+  (TCP, reliable), *not* Access. So bulk file-shuffling over the flaky AUN link is
+  unnecessary. Double-clicking `!Packages` runs its `!Boot`, which sets
+  `Packages$Dir` — that's how the root "registers" wherever it lives.
+- **Then the FileCore 10-char wall.** Installing JASPP games (**SWIV**, **Nevryon**)
+  → `Failed to start the configuration` / `failed to commit component update`.
+  JASPP say it plainly: *"RISC OS 3.7 does not yet have the new filecore which
+  supports long filenames,"* and their packages carry preservation-style names
+  (e.g. `Lemmings (1991) (Kr…`). PackMan unpacks *into* `!Packages`, so those long
+  names can't be written on a 10-char disc → commit rolls back. `NetSurf` also
+  simply **doesn't appear** — it's arm32/RO5-only, so PackMan hides it on a 26-bit
+  box (same wall, list-side).
+- **JASPP's fix: a long-filename filing system** — LongFiles, RaFS, X-Files, or
+  TBAFS (or a network FS). Chased **LongFiles** first: it **worked on RAMFS but
+  HUNG on ADFS**. That isolation was the key — the module's fine, the disc's fine
+  (the whole system boots off the **IDE→SD adapter**), so it's a **LongFiles ↔
+  large SD-backed FileCore** interaction: a '90s shim that writes a hidden index
+  into every directory, meeting modern-ish storage geometry on RO3.7. (Fitting,
+  given this repo's own RPCEmu `ide-real-geometry` patch exists because RiscPC IDE
+  geometry is a minefield.)
+- **RaFS was the answer — and mechanically so.** RaFS is an **image** filing system:
+  all long-name data lives inside one container file, so it does its directory
+  bookkeeping *inside the image* and never does LongFiles' per-directory hidden-file
+  writes to the real disc. It's immune to the exact thing hanging LongFiles. (Also:
+  I'd run RaFS on this machine years ago — proven-on-your-hardware beats a forum
+  poster's success on a different box.) Found the download via the **Wayback
+  Machine** (live riscos.info / JASPP forum both 403 automated fetches).
+- **The fix that finally stuck:** the **package root `!Packages` must physically
+  live on the long-filename volume** — that's where packages unpack. Drag `!Packages`
+  onto the RaFS volume, delete the old copy, **double-click** it (re-sets
+  `Packages$Dir`) → SWIV/Nevryon commit cleanly. Done.
+- **OS-upgrade deliberation (parked, not done).** Today made the case: RO 3.7's twin
+  ceilings — **26-bit software** and **10-char FileCore** — collide with everything
+  modern. Options weighed: **RO4/Adjust** (native long names, stays 26-bit, keeps
+  old apps, but commercial); **RO5** (32-bit, modern ecosystem, ROOL sells RiscPC
+  ROM sets — the appealing DIY-ROM/ROM-switcher project); **network FS** (long names
+  on Linux, TCP-reliable) to stay on 3.7. **Correction to self:** ARM610/710 are
+  **ARMv3 → 32-bit-capable**; only ARM2/ARM3 (ARMv2) are 26-bit-only. So *any*
+  RiscPC can take RO5 — it's the OS that's 26-bit on this box, not the CPU.
+- **Lessons for future-me:** (1) To get modern software onto a real RISC PC, get
+  **PackMan across once** (small app) and let it fetch everything over the machine's
+  **own internet (TCP)** — never bulk-copy packages over Access. (2) The **package
+  root** must sit on a **long-filename filing system** — packages unpack into it; a
+  10-char FileCore disc fails the commit. (3) Long-filename shims' compatibility
+  **varies by filing system**: LongFiles hung on the SD-backed ADFS but was fine on
+  RAMFS; **RaFS (image-based) sidesteps it**. Isolate by testing the *same op on a
+  different FS*. (4) The day's real recurring failure was **"too new for this OS"**
+  (26-bit vs 32-bit, RO-version), not corruption — reach for the version/arch
+  explanation first. (5) ARM6/7 = ARMv3 = 32-bit-capable; only ARM2/3 are 26-bit.
+  (6) When a site 403s automated fetches, the **Wayback Machine** (calendar → blue
+  capture → timestamp, or the `/web/<year>/<url>` jump-link) often still serves the
+  page *and the archived download*.
