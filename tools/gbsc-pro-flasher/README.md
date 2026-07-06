@@ -43,19 +43,29 @@ sudo-askpass wrapper).
 
 ## Flashing the AV module (this tool)
 
-1. Connect the AV module's programming USB/UART to this machine and put it in
-   bootloader mode (power-on/reset — the bootloader prints its `HCMGBoot.` banner for
-   a short window). In bootloader mode it enumerates as USB **2E88:4603** →
-   `/dev/ttyACM*`.
-2. Confirm it's seen:
-   ```bash
-   ./gbsc_pro_flash.py --list
-   ```
-3. Flash (auto-detects the port by VID:PID):
+Getting into bootloader mode is the finicky part (cf. RetroScaler/gbsc-pro
+issue #6). Verified working procedure on real hardware:
+
+1. **Port:** the AV module is the **USB-C** socket (the micro-USB is the ESP, which
+   shows up as a CH340/CH341 → `ttyUSB*` — *not* what you want here). Use a known
+   **data** USB-C cable, not charge-only.
+2. **Enter bootloader:** hold the **update button**, plug the GBSC Pro's power in,
+   keep holding ~3 s, release. It should flash **red/green** and enumerate as
+   **`2e88:4603` (XHSC CDC) → `/dev/ttyACM0`**. Confirm with `./gbsc_pro_flash.py --list`.
+   Note: the bootloader does *not* emit a banner passively — `--probe` will read
+   nothing even when it's ready; the `2e88:4603` enumeration is the real proof.
+3. **Flash** (auto-detects by VID:PID, or pin `--port /dev/ttyACM0`):
    ```bash
    ./gbsc_pro_flash.py firmware/GBSC_PRO_AV_MODULE_v1.3.bin
    ```
-   or pin the port: `--port /dev/ttyACM0`.
+   Until your user is in the `dialout` group, the port is root-only — run under sudo
+   with the dev-shell interpreter:
+   ```bash
+   nix develop -c sh -c 'sudo -A "$(command -v python3)" \
+     gbsc_pro_flash.py --port /dev/ttyACM0 firmware/GBSC_PRO_AV_MODULE_v1.3.bin'
+   ```
+4. After "Update success", **power-cycle the GBSC Pro normally** to boot the new
+   firmware (the red/green flashing stops and the picture returns).
 
 Verify the tool without any hardware attached:
 
