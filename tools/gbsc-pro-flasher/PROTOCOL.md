@@ -108,7 +108,31 @@ YMODEM, block 0 carries no `<size>` field. The HC32 bootloader does not need it.
 | 0x18 | CAN (cancel; sent 8× to abort) |
 | 0x43 | 'C' — receiver ready / CRC mode |
 
-## 5. Notes / gotchas
+## 5. Reading firmware back / current version (verified against device source)
+
+Cross-checked against the published device source in `RetroScaler/gbsc-pro`
+(`GBSC-Pro-Source code/usart_uart_dma -（IapApp）`, an HC32**F460**):
+
+- **The flash is effectively write-only via this path.** The vendor exe *contains* a
+  `YModemReceiver` (receive/save) class, but it is **dead code** — never instantiated
+  and `StartReceiving()` is never called; only the download (`U`→`1`) path is wired up.
+- **The bootloader is closed-source.** The `HCMGBoot.` banner and the `U`/`1`/
+  `Enter download` menu strings appear **nowhere** in the published source — only the
+  IAP *application* (the video-processing app that runs after boot) is open. So whether
+  the bootloader also implements a YMODEM *Upload* command (as the HC32/ST
+  `iap_ymodem_boot` lineage often does) **cannot be confirmed from source**. Treat as
+  no-readback unless the live bootloader menu proves otherwise.
+- **No firmware version is exposed anywhere in software.** There is no version constant
+  in the IAP app, no version handshake between the ESP and the HC32, and the gbs-control
+  web UI reports none. The only possible software-visible version is whatever the closed
+  bootloader prints in its banner — see `--probe` (read-only; sends nothing).
+
+Practical consequence: we cannot back up the installed image or read its version number.
+The mitigation is to keep the previous official AV bin (`firmware/GBSC_PRO_AV_MODULE_v1.2.3.bin`)
+as a rollback target, since a bootloader-mediated flash always leaves the bootloader
+intact and re-flashable.
+
+## 6. Notes / gotchas
 
 - The exe embeds an AES key string `"lyan1989@xyz"` with `Encrypt/Decrypt` helpers,
   but these are **not** applied to the firmware stream — the YMODEM payload is the

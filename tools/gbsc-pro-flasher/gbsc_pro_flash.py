@@ -221,6 +221,57 @@ def send_firmware(ser, fw: bytes, filename: str, progress=True) -> bool:
     return True
 
 
+def probe(port: str) -> int:
+    """Read-only: print whatever the bootloader emits, sending nothing.
+
+    The HC32 bootloader prints its banner (and any menu/version text) only when
+    in bootloader mode. This never writes to the device, so it cannot erase or
+    corrupt anything — it's the safe way to see what's currently there.
+    """
+    import re
+    import serial
+
+    ser = serial.Serial()
+    ser.port = port
+    ser.baudrate = BAUD
+    ser.bytesize = serial.EIGHTBITS
+    ser.parity = serial.PARITY_NONE
+    ser.stopbits = serial.STOPBITS_ONE
+    ser.timeout = 0.2
+    ser.dtr = True
+    ser.rts = True
+    ser.open()
+    try:
+        print(f"[*] Listening on {port} @ {BAUD} for ~3s (sending nothing)...")
+        buf = bytearray()
+        t0 = time.time()
+        while time.time() - t0 < 3.0:
+            n = ser.in_waiting
+            if n:
+                buf += ser.read(n)
+            else:
+                time.sleep(0.05)
+        if not buf:
+            print("[!] No output received. The AV module is almost certainly NOT in "
+                  "bootloader mode (the HC32 only emits its banner from the bootloader). "
+                  "Power-cycle/reset it with USB connected, then re-run --probe promptly.")
+            return 1
+        text = buf.decode("latin1", errors="replace")
+        print("=== bootloader output (verbatim) ===")
+        print(text)
+        print("=== hex ===")
+        print(buf.hex(" "))
+        hits = sorted(set(re.findall(r"[Vv]?\d+\.\d+[\w.-]*", text)))
+        if hits:
+            print("[i] possible version token(s):", ", ".join(hits))
+        else:
+            print("[i] no version-like string in the banner — this bootloader may not "
+                  "report one (the current firmware version is then unknowable in software).")
+        return 0
+    finally:
+        ser.close()
+
+
 def flash(port: str, path: str) -> int:
     import os
     import serial
@@ -303,6 +354,9 @@ def main() -> int:
     ap.add_argument("firmware", nargs="?", help="AV-module .bin (e.g. GBSC_PRO_AV_MODULE_v1.3.bin)")
     ap.add_argument("--port", help="serial device (default: auto-detect by USB VID:PID 2E88:4603)")
     ap.add_argument("--list", action="store_true", help="list serial ports and exit")
+    ap.add_argument("--probe", action="store_true",
+                    help="read-only: print the bootloader banner (sends nothing); "
+                         "the only way to glimpse the installed version")
     ap.add_argument("--selftest", action="store_true", help="verify CRC/framing without hardware")
     args = ap.parse_args()
 
@@ -311,8 +365,17 @@ def main() -> int:
     if args.list:
         list_ports_cmd()
         return 0
+
+    if args.probe:
+        port = args.port or find_port()
+        if not port:
+            print("[!] GBSC Pro bootloader not found (USB 2E88:4603). "
+                  "Connect the AV module in bootloader mode, or pass --port.")
+            return 1
+        return probe(port)
+
     if not args.firmware:
-        ap.error("firmware .bin path is required (or use --list / --selftest)")
+        ap.error("firmware .bin path is required (or use --list / --probe / --selftest)")
 
     port = args.port or find_port()
     if not port:
