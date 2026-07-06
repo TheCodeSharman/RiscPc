@@ -115,13 +115,35 @@ def _read_until_any(ser, needles, timeout):
 
 
 def _enter_download_mode(ser):
-    """Drive the HC32 bootloader banner into YMODEM download mode."""
-    banner = _read_until_any(ser, [b"HCMGBoot.", b"Enter  1"], timeout=5.0)
-    if b"HCMGBoot." in banner:
-        ser.write(b"U")
-        ser.write(b"1")
-        _read_until_any(ser, [b"Enter download"], timeout=3.0)
-    # else the "Enter  1" prompt is already up; nothing more to send.
+    """Drive the HC32 bootloader into YMODEM download mode.
+
+    The bootloader emits its `HCMGBoot.` banner once on entry; by the time we
+    open the port it is usually already gone and the bootloader waits silently
+    for input. So we read whatever banner is still buffered but do NOT require
+    it — presence on USB 2E88:4603 already means bootloader mode — and actively
+    drive the menu (`U` then `1`), requiring the `Enter download` prompt in
+    reply. Only menu characters are sent here; no firmware is written until the
+    prompt is seen, so a failed handshake is harmless.
+    """
+    banner = bytearray()
+    deadline = time.monotonic() + 1.5
+    while time.monotonic() < deadline:
+        if ser.in_waiting:
+            banner += ser.read(ser.in_waiting)
+            if b"Enter  1" in banner or b"HCMGBoot." in banner:
+                break
+        else:
+            time.sleep(0.05)
+    if b"Enter  1" in banner:
+        return
+    if ser.in_waiting:
+        ser.read(ser.in_waiting)
+    ser.write(b"U")
+    time.sleep(0.2)
+    if ser.in_waiting:
+        ser.read(ser.in_waiting)
+    ser.write(b"1")
+    _read_until_any(ser, [b"Enter download"], timeout=3.0)
 
 
 def _channel(ser):
