@@ -5,9 +5,16 @@ S-video variant of gbs-control that sits on the RISC PC's video→HDMI path.
 
 RetroScaler only ship Windows tools (`GBSC_PRO_Programmer.exe`,
 `NodeMCU-PyFlasher.exe`) in their firmware zip. This directory reverse-engineers the
-AV-module programmer's serial protocol and reimplements it in Python so the GBSC Pro
-can be updated from this box without Windows. See [`PROTOCOL.md`](PROTOCOL.md) for the
-full wire spec and how it was derived (ILSpy decompile of the vendor exe).
+AV-module programmer's serial protocol so the GBSC Pro can be updated from this box
+without Windows. See [`PROTOCOL.md`](PROTOCOL.md) for the full wire spec and how it
+was derived (ILSpy decompile of the vendor exe).
+
+`gbsc_pro_flash.py` is a thin driver: the YMODEM transfer itself is done by the
+[`ymodem`](https://github.com/alexwoo1900/ymodem) library (its "CP/M YAM" style
+happens to produce the bootloader's non-standard **filename-only block 0**), and this
+script adds only what the library can't: the `HCMGBoot.` → `U` → `1` →
+`Enter download` bootloader handshake. `ymodem` isn't in nixpkgs, so the repo flake
+pins it inline (`buildPythonPackage` + `fetchFromGitHub`) and puts it in the dev shell.
 
 ## The GBSC Pro has two firmwares
 
@@ -22,11 +29,14 @@ v1.3 are staged in [`firmware/`](firmware/).
 
 ## Requirements
 
-`pyserial`. In this repo just use the dev shell, or:
+`pyserial` + `ymodem` (which pulls in `ordered-set`). In this repo just enter the
+flake dev shell — it provides all of them:
 
 ```bash
-nix-shell -p 'python3.withPackages(ps: [ps.pyserial])'
+nix develop        # then: ./gbsc_pro_flash.py ...
 ```
+
+For non-Nix / pip users: `pip install -r requirements.txt`.
 
 Your user needs access to the serial device (`dialout` group, or run under the
 sudo-askpass wrapper).
@@ -50,7 +60,9 @@ sudo-askpass wrapper).
 Verify the tool without any hardware attached:
 
 ```bash
-./gbsc_pro_flash.py --selftest      # checks CRC-16/XMODEM + packet framing
+./gbsc_pro_flash.py --selftest      # CRC, filename-only block 0, SOH/128 framing
+python3 test_loopback.py            # full handshake + transfer vs an emulated bootloader
+./gbsc_pro_flash.py --probe         # read-only: dump the bootloader banner (when connected)
 ```
 
 **Safety:** the transfer is plain YMODEM to a resident bootloader — a failed/

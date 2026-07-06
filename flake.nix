@@ -15,8 +15,24 @@
     {
       devShells = forAllSystems (pkgs:
         let
-          # Bench-test scripts (repair/riscpc-rtc-repair/) drive a serial bridge.
-          pythonEnv = pkgs.python3.withPackages (ps: [ ps.pyserial ]);
+          # ymodem isn't in nixpkgs; pin upstream inline. Used by
+          # tools/gbsc-pro-flasher to flash the GBSC Pro AV module over YMODEM.
+          ymodem = pkgs.python3Packages.buildPythonPackage {
+            pname = "ymodem";
+            version = "1.5";
+            pyproject = true;
+            src = pkgs.fetchFromGitHub {
+              owner = "alexwoo1900";
+              repo = "ymodem";
+              rev = "1d9611bb5d1b4c01149b228aeee9893588d424ef";
+              hash = "sha256-UeGF/qbEIwnHpXfouCXwAv19pNOqXJlmqNfsdK7Iz90=";
+            };
+            build-system = [ pkgs.python3Packages.setuptools ];
+            dependencies = with pkgs.python3Packages; [ ordered-set pyserial ];
+          };
+          # Bench-test scripts (repair/riscpc-rtc-repair/) drive a serial bridge;
+          # gbsc-pro-flasher needs ymodem.
+          pythonEnv = pkgs.python3.withPackages (ps: [ ps.pyserial ymodem ]);
         in
         {
           default = pkgs.mkShell {
