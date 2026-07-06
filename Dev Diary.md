@@ -1131,3 +1131,96 @@ simply wasn't loaded/configured yet, *not* a card fault.
   counts split "is it the wire or the software?" in one glance — check RX before
   touching any network settings. And "host is down" ≠ timeout: it means ARP got
   no reply, i.e. layer-2/physical, so don't go chasing the firewall.
+
+### Jul 6 — Freeway/Access: the blocker was WiFi client isolation, not RISC OS
+Goal: share files between **RPCEmu** (which carries newer `!System` modules —
+Toolbox 1.71 vs the SD boot's 1.36/1.41) and the real RISC PC over the LAN, using
+native **Acorn Access / Freeway** (ShareFS over AUN — Econet-in-UDP, port 32768).
+Access discovers peers by **IPv4 broadcast**, and that turned out to be the whole
+problem — but *not* on the RISC OS side.
+
+- **`*ping` failing at all = no socket layer.** `ping: SWI &41200 no known` =
+  `Socket_Creat`, base of the BSD-socket SWI chunk provided by the **Internet
+  module** — the TCP/IP stack just wasn't loaded/configured. Configure → Network,
+  static IP, reboot → stack up.
+- **Toolbox aside:** !Browse wants Toolbox 1.43; ROM has 1.36 (**dormant**, not
+  "unplugged"); the SD boot only soft-loads 1.41; RPCEmu has 1.71 — hence wanting
+  to copy its `!System` across, hence wanting Freeway. (Also confirmed: **no
+  native RISC OS 3.71 browser does the modern HTTPS web** — even current NetSurf
+  needs RISC OS 4.02+; realistic path is a TLS-terminating proxy à la FrogFind/WRP.)
+- **The rabbit hole — Freeway never worked over WiFi.** RPCEmu runs on the
+  (WiFi-connected) NixOS bench box; the real RISC PC is on the wired LAN. Long
+  chase through RPCEmu network modes (NAT / bridged / IP-tunnelling) and the
+  802.11 "a station can't bridge a foreign MAC" rule — all red herrings. The real
+  fault was upstream of everything: **the home router was silently dropping IPv4
+  broadcast to WiFi clients.**
+- **The fingerprint that cracked it:** *multicast* (mDNS, Chromecast) reached the
+  WiFi box fine; *broadcast* (ARP, DHCP, Freeway) did not. Multicast-yes /
+  broadcast-no = **AP client isolation**. Proven by injecting `ping -b` from the
+  wired side and capturing on WiFi: **0 of N arrived** on the affected SSID; after
+  the fix, **all** arrived.
+- **Router-side bug, not config:** every config source said isolation was *off*,
+  yet the AP's generated hostapd config had it *on*. Traced (by instrumenting the
+  config generator) to the router defaulting an unset `multicast_to_unicast` to
+  ON, which auto-forces AP isolation. One-line fix + re-apply script,
+  **documented on the router itself** (`/root/local-fixes/`) — deliberately kept
+  out of this repo since it's home-network infra, not RISC PC repair.
+- **Lesson for future-me:** if a **broadcast-discovery** protocol (Access/Freeway,
+  and much LAN gear) can't find peers over WiFi but **multicast/casting works
+  fine**, suspect **AP client isolation** — not the RISC OS stack, not RPCEmu, not
+  the card. Test directly: inject `ping -b <bcast>` from the wire, `tcpdump` on the
+  WiFi client; if broadcast doesn't arrive, it's the AP.
+
+### Jul 6 — RetroScaler GBSC Pro: flasher vindicated by SWD, and the real no-sync bug
+Picking up the GBSC Pro saga (our native Linux flasher for the scaler's HC32F460
+"AV module"): flashing v1.3 had left the RISC PC's VGA→HDMI path dead with
+`RGBHV limit no sync`, and reverting firmware hadn't fixed it. The nagging doubt
+was whether our flasher *actually programs* the chip or just ACKs the YMODEM
+transfer. Two threads got chased to the end — and both landed.
+
+- **The bootloader can't read back — so verify out-of-band.** The plan was a
+  round-trip via a bootloader UPLOAD command. Dumping + disassembling the
+  bootloader (Thumb-2, from the flash image) killed that: the entire command set
+  is `U` = print device info (chip-UID blob), `1` = "Enter download mode" → YMODEM
+  receive + EFM flash program, `2` = **jump to application**. No upload, full stop.
+  That also explained the earlier "wedge": sending `2` earlier didn't corrupt
+  anything — it *booted the app*, which grabbed the USB CDC and lit the LED solid
+  red. Nothing was ever erased.
+- **SWD was the answer.** The AV PCB exposes a 4-pin **J19** header (1=3V3,
+  2=SWDIO, 3=SWDCLK, 4=GND — found in the KiCad schematic, MCU U21). Soldered a
+  header, clipped on an **ST-Link V2**, drove it with **pyocd** (`commander -t
+  cortex_m`). Flash is **not** readout-protected (CPUID `0x410FC241` = Cortex-M4).
+  Dumped all 512 KB: bootloader `0x0–0x6fff`, **app base `0x10000`**, config blobs
+  at `0x70000`/`0x7c000`. **The v1.2.3 app at `0x10000` is byte-for-byte identical
+  to our `GBSC_PRO_AV_MODULE_v1.2.3.bin` (all 38 272 bytes).** Case closed — the
+  flasher's "Update success" is *real programming*, not a bare ACK. (Both dumps
+  archived locally alongside the ESP backup.)
+- **So the no-sync is a genuine regression, not a bad flash.** Chased and dropped
+  two wrong theories: (a) *monitor-ID pins changing the sync* — no, the RISC PC
+  latches `MonitorType` at boot, so hot-plugging VGA never changes its output;
+  (b) *wrong input sync-type* — the board's J14/J18 sync-format jumpers aren't even
+  populated. The right question was Michael's: **it worked all week, then died —
+  what persistent state changed that a firmware revert didn't undo?**
+- **Root cause: one gbs-control flag, flipped by the factory reset.** During the
+  flashing mess a `/uc?1` "reset to defaults" was issued. Reading the source:
+  `loadDefaultUserOptions()` sets **`preferScalingRgbhv = 1`**. gbs-control only
+  marks a source "valid for scaling" when it's **≤535 total lines** (i.e. 640×480-
+  class); the RISC PC's 1024×768 (~806 lines) is *supposed* to pass through. But
+  the automatic high-res→**bypass** drop (`videoStandardInput 14→15`) only fires
+  when `preferScalingRgbhv == 0`. The reset set it to **1**, so 1024×768 was too
+  big to scale *and* no longer auto-bypassed → stuck in the scaling path → never
+  locks → `RGBHV limit no sync`. Yesterday it worked because the flag was 0.
+- **Fix: `http://gbscontrol.local/uc?x`** — the `x` user-command toggles
+  `preferScalingRgbhv` back to 0, restoring the high-res-passthrough behaviour
+  (nudge with `/sc?k` = `bypassModeSwitch_RGBHV` if it doesn't drop immediately).
+  Deleting the saved preset slots doesn't matter here: RGBHV **bypass** uses the
+  firmware's built-in `rgbhv.h` preset, not a slot.
+- **Lessons for future-me:** (1) when a bootloader is "write-only," an **ST-Link
+  on SWD** dumps the flash directly and settles "did the write take?" byte-for-byte
+  — no vendor cooperation needed (also the recovery path if a bootloader is ever
+  lost). (2) A symptom that appears right after flashing isn't necessarily *from*
+  the firmware — a `/uc?1` reset quietly changing **`preferScalingRgbhv`** was the
+  real culprit; "worked, then a reset, then broken" points at persistent config
+  the firmware revert never touched. (3) `RGBHV limit no sync` = gbs-control never
+  got simultaneous HS+VS-active (`STATUS_16 & 0x0a`) on the *scaling* path; for a
+  >480-line source that usually means it should be **bypassing**, not scaling.
