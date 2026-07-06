@@ -20,6 +20,7 @@ Requires: pyserial (in the repo dev shell: python3 + pyserial are provided).
 """
 
 import argparse
+import binascii
 import sys
 import time
 
@@ -42,12 +43,12 @@ BLOCK = 128
 
 
 def crc16_ccitt(data: bytes, crc: int = 0x0000) -> int:
-    """CRC-16/CCITT (XMODEM): poly 0x1021, init 0x0000, no reflection, no xorout."""
-    for b in data:
-        crc ^= b << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
-    return crc & 0xFFFF
+    """CRC-16/CCITT (XMODEM): poly 0x1021, init 0x0000, no reflection, no xorout.
+
+    This is exactly Python's stdlib binascii.crc_hqx (same polynomial and
+    conventions), so we defer to it rather than hand-roll the bit loop.
+    """
+    return binascii.crc_hqx(data, crc)
 
 
 def build_packet(seq: int, data: bytes) -> bytes:
