@@ -1360,3 +1360,144 @@ against 2020s software — and the eventual win was a long-filename filing syste
   (6) When a site 403s automated fetches, the **Wayback Machine** (calendar → blue
   capture → timestamp, or the `/web/<year>/<url>` jump-link) often still serves the
   page *and the archived download*.
+
+### Jul 7 (later) — SD boot flakiness: not corruption, a power-on init race (cheap card vs one-shot adapter)
+
+Plugged the **ARM710** card back in and the machine booted to `This handle has
+already been closed` / `!Boot not found`, then the SD system disc reading
+**unformatted**. Spent the session proving it's **not** what it looked like — and
+the ARM710 was a **red herring** (swapping the SA110 back gave identical symptoms;
+the fault is **CPU-independent**).
+
+> **✅ RESOLVED same session — the fix cost $0.** Cloned the verified image onto a
+> **genuine SanDisk 16 GB** (a spare Pi card from the junk box) → **10 / 10 cold
+> boots in a row** vs the mule's ~1-in-7. At a 15% base rate, 10-in-a-row is ~1-in-10⁸
+> — definitive, not luck. **Root cause: the `$10` Emtec mule's slow/variable
+> power-on wake losing the adapter's power-on init race.** A real name-brand card
+> wakes fast enough to win it every time. No industrial card / bench test / purchase
+> needed — all the Mouser/RS/AliExpress/pSLC deliberation below was moot. (The
+> bench-supply PSU test and industrial-card upgrade remain the fallbacks *if* it ever
+> regresses, but a genuine card was the whole answer.)
+
+- **Not corruption — the data is safe.** Imaged the SD on the NixOS box: full
+  2000 MiB at a steady **84 MB/s, zero I/O errors**, so the media and the card's
+  *stored data* are perfect. Saved as `rpcemu/sd-rescue/sd-rescue.img` (verified
+  backup). `cmp` vs the `hd4.hdf` golden master diverges only at ~887 MiB (legit
+  installs); the **FileCore disc record + map at the start are byte-identical to a
+  known-good disc.** Booted the image under RPCEmu (throwaway install
+  `rpcemu/installs/sd-rescue/`, RPC710, net off) → **mounts and browses cleanly**
+  (the `!Boot`-not-found was just the rescue CMOS + the disc being named
+  `HardDisc5`). So the on-disc filing system is **fine**; the real-machine
+  "unformatted" is a **read-path/hardware** problem, not damaged data.
+- **Intermittent — ~1-in-7 cold boots — and that's the whole key.** Every "fix"
+  (reseat, DeoxIT on the SD pads, finger-pressure on the holder) "worked" exactly
+  **once** then failed. At a ~15% base rate that's **regression-to-the-mean, not
+  causation** — n=1 tests are worthless here. Real signal only came from things
+  that moved the *rate* (a genuine 7-in-a-row).
+- **Two distinct faults, one root fragility:**
+  - **Issue A — cold-boot init race.** Fails only on a *cold power-on*; a warm
+    reset (card already powered) boots **100%**. `*Configure ADFSBuffers` was
+    already **0**, so the multi-sector DRQ-timeout ("error 20" / evansm7 territory)
+    is **not** it — single-sector reads are already forced and it still fails.
+  - **Issue B — warm-reset wedge (self-inflicted).** Warm-resetting *mid-
+    transaction* wedges the cheap card's controller; a warm reset doesn't power-
+    cycle it, so it stays wedged (activity LED stuck on, hangs every reset) until a
+    **full power-off**. Avoid by waiting for the activity light to go idle before
+    any reset.
+- **The race is at the *adapter's* power-on init, not ADFS's probe.** The test that
+  nailed it: `*Configure Floppies 1` makes boot **wait ~20 s** (for a non-existent
+  floppy) *before* the first IDE access — and it **still** reports unformatted.
+  20 s ≫ any SD wake time, so "ADFS probes too early" is dead. What fits: at
+  **power-on** the SD→IDE adapter does a **one-shot init of the card and latches the
+  result with no retry**. If the cheap card isn't ready in that instant, the adapter
+  caches "blank/no card" and serves *that* forever — which is why the 20 s delay,
+  and **warm resets, can't recover it** (once unformatted → warm resets fail 100%),
+  and only a **cold power cycle** re-rolls the dice.
+- **Corroborating fingerprints:** the failing read shows **one blink then "disc is
+  blank"** — the card ACKs a single read but returns **zeros because its FTL/mapping
+  tables aren't loaded yet** (caught mid-wake). A PC never sees this: it does a
+  proper *retrying* SD init and waits for the card; the cheap adapter does neither.
+- **Prime suspect: the `$10` Emtec test-mule card.** Slow and *variable* to become
+  ready at power-on (big FTL to load even at 2 GB-used, budget controller, dirty
+  power-loss state — worsened by the warm-reset wedging). **PC-image-clean does
+  *not* exonerate a card** — it proves the data + a PC host only, nothing about
+  behaviour behind a cheap adapter with a one-shot init.
+- **Plan (no-regret order):** (1) order a **genuine SanDisk *Industrial* card,
+  smallest capacity** — industrial grade is spec'd for fast *deterministic*
+  power-on ready, exactly the variable; small = less FTL to load. Clone the verified
+  image on, **test cold-boots-only** (count the streak). Want the better card
+  anyway. (2) If it *still* fails cold, **bench-supply the adapter's 5 V** and
+  power-cycle it on clean power: reliable on bench / ~15% on the RISC PC PSU ⇒
+  **aging PSU rail bring-up** (fix = bulk cap / recap); still ~15% on clean bench
+  power ⇒ **adapter firmware** (needs an adapter that retries / holds BSY).
+- **Lessons for future-me:** (1) At a low success rate, **measure rates, never
+  trust a single boot** — the reseat/DeoxIT/pressure "fixes" were all coincidence.
+  (2) **A warm reset is state-preserving** (never powers the card): good stays good,
+  bad stays bad — it can't rescue a failed boot *and* it masks Issue A entirely, so
+  validate fixes with **cold boots only**. (3) **PC-image-clean ≠ card is fine**
+  behind a cheap adapter. (4) To tell "host probes too early" from "adapter inits
+  too early," **delay the host access** (`Floppies 1`) — if the fault survives the
+  delay, it's *below* the OS. (5) Rescue assets kept: `rpcemu/sd-rescue/sd-rescue.img`
+  (verified 2 GB backup) + `rpcemu/installs/sd-rescue/` (RPCEmu boot-test of the
+  image).
+
+### Jul 8 — random data aborts: RAM/bus cleared, disc-corruption the prime suspect; a diagnostics suite
+
+After the SD boot fix, hit **intermittent random data aborts** — different apps
+(PackMan, others) and even the Task Manager **Shutdown** task, no pattern. Spent
+the session ruling causes in/out and building the tools to do it.
+
+- **Not the RAM/bus (the big negative).** Wrote a **March-U (13N)** RAM test that
+  runs with the **cache OFF** — a March test is only valid on non-cacheable memory
+  (a cache returns just-written values and *masks* the SAF/TF/CF faults it hunts).
+  A clean **cache-off March-U over 8 MB, 2 passes** = PASS: no stuck-at, transition,
+  coupling or address-decode faults on the CPU↔DRAM path. Hard RAM/bus cell faults
+  are off the table.
+- **Cache-off, done right.** You *can't* touch the cache from BASIC (CP15 + IRQ
+  control are privileged; BASIC is USER mode), and `OS_MMUControl` bit-poking is
+  CPU-specific and doesn't clean/invalidate. The clean answer (from the PRM): the
+  **`*Cache Off` command (RO 3.5+)** disables cache AND write buffering, and being
+  the OS's own command does the CPU-correct clean/invalidate internally — **safe on
+  both ARM710 and StrongARM**, no assembler. That's what the tools use.
+- **VRAM correction — and it matters.** The old diag README said "no VRAM"; wrong —
+  I'd **soldered on 2 MB VRAM** (AliExpress chips, 100% stable). And the arithmetic
+  proves VRAM is **pooled as general RAM**: shrinking the screen mode freed ~780 K
+  into a pool that pushed **free above the 8 MB DRAM total** — impossible unless
+  VRAM is allocatable. So **VRAM is NOT ruled out** as a fault source (a marginal
+  hand-soldered chip holding app data would be a live abort suspect), and the big
+  March `DIM` reaches it. This contradicts the usual "VRAM is screen-only" lore —
+  on this box it's pooled. (The RPCEmu *VRAM-honesty* patch was right to expose up
+  to 8 MB; the TRM confirms the address lines exist.)
+- **The diagnostics suite** (`tools/risc-pc-diag/`, all with flushed-per-line
+  logging — `OS_Args 255` = EnsureFile — so a hang/reset still leaves a valid log):
+  - **`RAMtest`** — March-U over the biggest `DIM`, `*Cache Off`, per-element log.
+    The readable reference.
+  - **`RAMtestA`** — same March-U with the inner loop in **hand-written ARM code**
+    (much faster; plain LDR/STR, no privileged ops since the cache is off via the
+    command). Cross-check it against `RAMtest` as the oracle before trusting it.
+  - **`MarchU`** — March-U on **non-cacheable screen/VRAM**, no global cache-off
+    (safe anywhere) — exercises the video path and the soldered VRAM.
+  - **`ADFStort`** — now logged too (+ 256 KB blocks to stress multi-sector DRQ).
+- **Leading hypothesis: disc/cable corruption in loaded code.** A byte flipped
+  during a marginal disc read/write, landing in **loaded code or a pointer**,
+  produces exactly a random, patternless data abort — and the **clean RAM test
+  fits** (the bad bytes came from disc, not a cell). Supported by: an hour of
+  **Nevryon/SWIV with no aborts** (ARM710, managing memory), the SD fixed, and the
+  **marginal IDE cable connector** found earlier (its 2nd socket throws IDE errors).
+  Fixes: **replace the ribbon**; **re-install** any app whose on-disc file a bad
+  write corrupted during the flaky period; a clean reboot clears transient
+  RAM-resident corruption.
+- **Next:** overnight **`ADFStort` 50 MB × 50 passes, 256 KB blocks** on the SanDisk
+  (good socket) to catch intermittent disc corruption — the log is the morning
+  verdict. Then swap the cable. Open: whether any residual aborts are
+  software/memory-pressure (the "freeing memory sometimes helped" clue — though that
+  was n=1 and coincidence-prone).
+- **Lessons for future-me:** (1) **A March RAM test needs the cache OFF** or it
+  silently passes (cache masks the very faults) — use **`*Cache Off`** (RO3.5+), the
+  OS's CPU-correct command, not `OS_MMUControl` poking or hand assembler. (2) **This
+  box pools VRAM as general RAM** (free can exceed DRAM) — don't rule VRAM out, and a
+  `DIM` can land in the soldered chips. (3) **A random data abort with clean RAM →
+  look at what got *loaded*** — disc/cable corruption of code, not the silicon.
+  (4) Keep a **slow readable reference** (`RAMtest`) beside the **fast ARM version**
+  (`RAMtestA`) and cross-check — the reference is the oracle. (5) Log diagnostics
+  **flushed-per-line** so a crash/reset still yields the story.
