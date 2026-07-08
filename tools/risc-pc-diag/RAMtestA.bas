@@ -21,30 +21,30 @@
   210 REM RPCEmu (no real cache), so validate a known-good run before trusting it.
   220 :
   230 logfile$ = "RAMlogA"
-  240 mb       = 7.8
+  240 mb       = 26   : REM 32MB machine: task-slot cap is 28640K (RO3.x 28MB app-space limit); 26 leaves headroom. No room? lower.
   250 passes%  = 2
   260 :
   270 REM ---- assemble the March-U routine ----
+  272   REM entry R0 = param block: +0 base +4 top +8 z +12 o +16 count(out) +20 addr +24 exp +28 got
+  274   REM regs R1=base R2=top R3=z R4=o R5=ptr R6=got R7/R8/R9=fault addr/exp/got R12=count
+  276   REM (comments live as REM: this BASIC's [ ] assembler rejects ; comment lines)
   280 DIM code% 1023
   290 FOR pass% = 0 TO 2 STEP 2
   300   P% = code%
   310   [ OPT pass%
-  320   ; entry: R0 = param block.  Save regs, load base/top/z/o.
   330   .march
   340   STMFD R13!, {R1-R12, R14}
-  350   LDR R1, [R0, #0]        ; base
-  360   LDR R2, [R0, #4]        ; top
-  370   LDR R3, [R0, #8]        ; z
-  380   LDR R4, [R0, #12]       ; o
+  350   LDR R1, [R0, #0]
+  360   LDR R2, [R0, #4]
+  370   LDR R3, [R0, #8]
+  380   LDR R4, [R0, #12]
   390   MOV R5, #0
-  400   STR R5, [R0, #16]       ; count = 0
-  410   ; ---- M0: (w z) ascending ----
+  400   STR R5, [R0, #16]
   420   MOV R5, R1
   430   .m0
   440   STR R3, [R5], #4
   450   CMP R5, R2
   460   BLE m0
-  470   ; ---- M1 up: (r z, w o, r o, w z) ----
   480   MOV R5, R1
   490   .m1
   500   LDR R6, [R5]
@@ -68,7 +68,6 @@
   680   ADD R5, R5, #4
   690   CMP R5, R2
   700   BLE m1
-  710   ; ---- M2 up: (r z, w o) ----
   720   MOV R5, R1
   730   .m2
   740   LDR R6, [R5]
@@ -83,7 +82,6 @@
   830   ADD R5, R5, #4
   840   CMP R5, R2
   850   BLE m2
-  860   ; ---- M3 down: (r o, w z, r z, w o) ----
   870   MOV R5, R2
   880   .m3
   890   LDR R6, [R5]
@@ -107,7 +105,6 @@
  1070   SUBS R5, R5, #4
  1080   CMP R5, R1
  1090   BGE m3
- 1100   ; ---- M4 down: (r o, w z) ----
  1110   MOV R5, R2
  1120   .m4
  1130   LDR R6, [R5]
@@ -122,8 +119,7 @@
  1220   SUBS R5, R5, #4
  1230   CMP R5, R1
  1240   BGE m4
- 1250   LDMFD R13!, {R1-R12, PC}     ; return (26-bit: restores flags)
- 1260   ; ---- fault recorder: R7=addr R8=exp R9=got, pb in R0 ----
+ 1250   LDMFD R13!, {R1-R12, PC}
  1270   .faultrec
  1280   LDR R12, [R0, #16]
  1290   CMP R12, #0

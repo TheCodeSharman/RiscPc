@@ -1501,3 +1501,64 @@ the session ruling causes in/out and building the tools to do it.
   (4) Keep a **slow readable reference** (`RAMtest`) beside the **fast ARM version**
   (`RAMtestA`) and cross-check — the reference is the oracle. (5) Log diagnostics
   **flushed-per-line** so a crash/reset still yields the story.
+
+### Jul 9 — overnight ADFStort clean, +16 MB EDO fitted (34816 K), cache-off March-U PASS
+
+Morning verdict on the Jul 8 plan, then a memory upgrade and a proper RAM soak.
+
+- **ADFStort ran overnight → 0 errors.** The 256 KB-block disc torture on the
+  SanDisk (good IDE socket) came back completely clean — disc + Filecore + the DRAM
+  feeding those transfers all solid over a full night of seeks and multi-sector DRQ.
+- **New RAM: a pair of 16 MB EDO SIMMs.** Arrived NOS (sealed antistatic bags, no
+  sign of pulls). Fitted **both from the start** — Task Manager reports **34816 K =
+  32768 K DRAM (2×16 MB) + 2048 K VRAM**, i.e. both sticks sized full and both
+  sockets good in one boot. On the RISC PC the IOMD treats EDO as fast-page (no
+  speed gain), so EDO here is purely a compatibility question — and these pass.
+- **The 28640 K wimpslot ceiling — it's an OS limit, not a RAM shortage.** Couldn't
+  drag **Next** past **28640 K** on a 32 MB machine. That number is exact: RO 3.x
+  fixes **application space at &0000_0000–&1C00_0000 = 28 MB**, and the bottom
+  **&8000 (32 K)** is system-reserved → **28672 K − 32 K = 28640 K**. So **no single
+  task can test all 32 MB** — the raised limit only came with RO 4/Select/RO 5. RAM
+  above ~28 MB stays in the free pool for dynamic areas, not a slot.
+- **`RAMtestA` `;`-comment bug — fixed.** First real-hardware run of the fast
+  (ARM-code) variant threw **"No such mnemonic" at line 320** — the first pure
+  `;`-comment line. This box's **BBC BASIC inline assembler does not accept `;`
+  comments**: on `OPT 2` it parses the `;` as a mnemonic. Fix: **strip every `;`
+  from inside `[ ]`** (delete the standalone comment lines, trim the trailing ones)
+  and keep the documentation as **`REM` lines *before* `[ OPT`** (you can't `REM`
+  inside the block either — the assembler rejects that too). Verified it assembles
+  under RPCEmu before copying across. `mb` also bumped 7.8 → **26** for the bigger
+  machine (fits under the 28640 K ceiling with BASIC's own headroom).
+- **Cache-off March-U over 26 MB × 2 passes on the ARM710 → PASS, clean.** No
+  stuck-at / transition / coupling / address-decode faults on both `0/FF` and
+  `AA/55` backgrounds, every read reaching real DRAM over the buffered bus. **Fresh
+  known-good NOS EDO is now provably clean across the tested span** — the RAM
+  variable in the data-abort hunt is swapped out for known-good silicon. (Slow even
+  in hand ARM: **cache-off means instruction fetches are uncached too**, so the loop
+  runs at bus speed — that's the price of March validity, not a defect.)
+- **Coverage caveat (honest):** March covered ~26 MB of 32 MB (the wimpslot
+  ceiling) — **not** the OS's resident pages nor the top few MB. "The bulk is
+  provably clean," not literally every word.
+- **Paths to full coverage (noted, not yet done), effort order:** (1) a
+  **non-cacheable `OS_DynamicArea`** to claim past the slot and march that too —
+  stays in RISC OS, cheapest; (2) **load-then-take-over**: an absolute ObjAsm
+  program RISC OS launches that relocates itself + stack to a corner, kills IRQ/FIQ,
+  **MMU off**, marches all physical DRAM bar its own footprint, reports and reboots
+  — ~total coverage, no ROM burn; (3) a **TestSrc-style custom test ROM** — the
+  "proper" POST way, most work. Toolchain for (2)/(3) is **ObjAsm in the DDE**,
+  which is exactly the dialect `TestSrc`/the Kernel are written in.
+- **March-U optimisation note (for the fast variant):** only **M0 (the init fill)**
+  is safe to `STM` — it's order-independent *and* wins page-mode S-cycles; the
+  **M1–M4 `r,w,r,w` elements must stay single `LDR`/`STR`** or batching reorders
+  reads/writes and **destroys the coupling-fault coverage** March exists for.
+  **Unrolling** is the free win — under cache-off the `CMP`/`B` loop-control is
+  re-fetched every word, so unrolling M0–M4 amortises that without altering the
+  access sequence.
+- **Lessons for future-me:** (1) **RO 3.x caps a task slot at 28640 K** (28 MB app
+  space − &8000) — a single BASIC/Wimp task **cannot** test all of >28 MB; full
+  coverage needs a dynamic area or bare-metal. (2) **This box's BASIC assembler
+  rejects `;` (and `REM`) inside `[ ]`** — document asm blocks with `REM` lines
+  *before* the bracket. (3) **Cache-off is why even hand ARM crawls** (uncached
+  I-fetch) — expected, not a bug; it's the cost of a valid March. (4) **Optimise a
+  March carefully**: `STM` only the fill, never the interleave, unroll for speed.
+  (5) **ObjAsm (DDE) = the TestSrc toolchain** when the bare-metal itch wins.
