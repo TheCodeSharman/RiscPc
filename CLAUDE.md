@@ -56,7 +56,7 @@ paths above. (DSView itself is built from the `TheCodeSharman/DSView` fork via
 
 ## ROM Images
 
-Known-good RISC OS ROM dumps live in `ROMS/4. Local Dump/`:
+Known-good RISC OS ROM dumps live in `roms/4. Local Dump/`:
 
 - `RiscOS_3.60.rom`, `RiscOS_3.70.rom` — clean 4MB merged images (ready to
   use directly with RPCEmu).
