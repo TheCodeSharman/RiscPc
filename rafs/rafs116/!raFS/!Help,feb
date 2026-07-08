@@ -1,0 +1,8 @@
+| raFS (C) 1997-1999 Richard Atterer
+| V1.16 (05-05-1999)
+
+Set raFS$Dir <Obey$Dir>
+
+RMEnsure UtilityModule 3.50 Set Alias$Do %%*0
+/<raFS$Dir>.SetVars 10 6=31 7=14=30=34=35 raFS$Help <raFS$Dir>.Docs.help%/html
+Do Filer_Run <raFS$Help>

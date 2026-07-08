@@ -1,0 +1,3 @@
+Unset Log$FileHandle
+IfThere <raFS$LogDir>.Log Then Filer_Run <raFS$LogDir>.Log
+ADFS:Close

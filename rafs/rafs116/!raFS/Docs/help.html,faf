@@ -1,0 +1,516 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>Manual for the raFS filing system</TITLE>
+<META NAME="Author" CONTENT="Richard Atterer">
+<META NAME="Keywords" CONTENT="Atterer, Augsburg, Acorn, raFS, filing, system, long, filename, filenames, directory, directories, file, files">
+<META NAME="Description" CONTENT="Manual for the raFS filing system written by Richard Atterer">
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000FF" VLINK="#8800BB" ALINK="#FF0000">
+
+<H1 ALIGN="center"><A HREF="http://www.informatik.tu-muenchen.de/~atterer/"><IMG ALT="raFS" SRC="rafs.gif" WIDTH=206 HEIGHT=88 BORDER=0></A></H1>
+
+<P>raFS is a filing system which allows for files with long filenames and for any number of objects in directories. It stores the files you save to it on a "host filing system", e.g. ADFS, as individual files.
+<P ALIGN="center">raFS is Free Software, written by Richard Atterer.
+
+<P><HR>
+
+<P><H4><A NAME="top">Part I - User Manual</A></H4>
+
+<UL>
+<LI><A HREF="#release">Release note</A> - please read it!
+<LI><A HREF="#intro">Introduction</A>
+<LI><A HREF="#usage">Usage</A> - raFS' system of storing data
+<UL>
+  <LI><A HREF="#discs">Working with discs</A> - write-protecting, renaming, dismounting
+  <LI><A HREF="#create">Creating new discs</A>
+  <LI><A HREF="#choices">The Choices window</A>
+</UL>
+<LI><A HREF="#verify">Verifying corrupted discs</A>
+<LI><A HREF="#contact">Contacting the author</A>
+<LI><A HREF="#history">Version history</A>
+<LI><A HREF="gpl.html">GNU General Public License</A>
+</UL>
+
+<P><H4>Part II - Technical Details</H4>
+
+<UL>
+<LI><A HREF="tech.html#integrity">Corrupted discs</A> and how they are dealt with
+<LI><A HREF="tech.html#behave">Behaviour in special situations</A>
+<LI><A HREF="tech.html#limits">Limits of raFS</A>
+<LI><A HREF="tech.html#goddamnbugs">Known problems</A>
+<LI><A HREF="tech.html#cli">Command line interface</A>: <KBD><A HREF="tech.html#cli_filer">Desktop_raFSFiler</A>, <A HREF="tech.html#cli_filermenu">raFSFiler_Menu</A>, <A HREF="tech.html#cli_fs">raFS</A>, <A HREF="tech.html#cli_create">raFS_Create</A>, <A HREF="tech.html#cli_flush">raFS_Flush</A>, <A HREF="tech.html#cli_discs">raFS_Discs</A>, <A HREF="tech.html#cli_mount">Mount</A>, <A HREF="tech.html#cli_dismount">Dismount</A>, <A HREF="tech.html#cli_verify">Verify</A>, <A HREF="tech.html#cli_name">NameDisc</A>, <A HREF="tech.html#cli_unsafe">raFS_Unsafe</A>, <A HREF="tech.html#cli_safe">raFS_Safe</A>, <A HREF="tech.html#cli_opt">raFS_Opt</A>, <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A></KBD>
+<LI><A HREF="tech.html#call">Calling raFS from assembler</A>: <KBD><A HREF="tech.html#call_info">raFS_Info</A>, <A HREF="tech.html#call_nrofdiscs">raFS_NrOfDiscs</A>, <A HREF="tech.html#call_enumeratediscs">raFS_EnumerateDiscs</A>, <A HREF="tech.html#call_finddisc">raFS_FindDisc</A>, <A HREF="tech.html#call_discinfo">raFS_DiscInfo</A>, <A HREF="tech.html#call_memcopy">raFS_MemCopy</A>, <A HREF="tech.html#call_readvar">raFS_ReadVar</A>, <A HREF="tech.html#call_setvar">raFS_SetVar</A></KBD>
+<LI><A HREF="tech.html#format">File formats</A>
+</UL>
+
+<P><HR>
+
+
+
+<P><H2><A NAME="release">Release note for version 1.16 (05-05-1999)</A></H2>
+
+<P>raFS is now very stable. Nevertheless, this does not mean you shouldn't be careful when entrusting your valuable data to this program. <EM>I encourage you to back up important data that you write to raFS.</EM>
+
+<P>Important things to remember when using raFS:
+<UL>
+<LI>Always shut down the computer, don't just reset it.
+<LI>Always remount a disc after the path of the storage directory has changed, by double-clicking on the directory.
+<LI>Always verify a disc if accessing a file fails and raFS tells you to verify. <EM>Never</EM> try to delete a file which raFS claims is corrupt!
+<LI>Never change any of the files inside a storage directory.
+<LI>Never burn a <EM>mounted</EM> disc (with a <I>Lock</I> file in its storage directory) onto CD ROM! ;-)
+</UL>
+
+<P>In case raFS overwrites the only copy of your Favourite File, don't say I didn't warn you...
+
+
+<P><HR WIDTH="41%">
+
+
+
+
+<P><H2><A NAME="intro">Introduction</A></H2>
+
+The limits imposed by the standard Acorn filing systems (all those that use FileCore), which prohibit filenames longer than 10 characters and more than 77 objects in a directory have always annoyed people. Because of this, there have been several products which attempt to bypass FileCore. Many of them are image filing systems, i.e. filing systems that access single files on disc as if they were whole discs containing files and directories:
+
+<UL>
+
+<LI><I><A HREF="http://www.findon.demon.co.uk/arcfs/">ArcFS</A></I> and <I><A HREF="http://www.pilling.demon.co.uk">SparkFS</A></I> allow long filenames as a by-product of their main functionality, compaction of the files. They are reliable, but are relatively slow, and they are not for free.
+
+<LI><I><A HREF="http://login.eunet.no/~guttorvi/strong.html">StrongHelp</A></I> was written so that many single help files could be effectively stored in one large file. Actually it is not intended for containing other things, but this is possible. However, it occasionally corrupts image files.
+
+<LI>Just like StrongHelp, <I><A HREF="http://www.wonderworks.co.uk/">X-Files</A></I> stores the files uncompacted. It is slow, contains a few bugs and spends large amounts of time compacting its image files once they grow to a size of several Megabytes.
+
+<LI><I><A HREF="http://www.tribbeck.com/longfiles/">LongFiles</A></I> is not an image filing system, instead it intercepts the calls that programs make to RiscOS for file operations. As of version 2, it is quite stable, but nevertheless, it remains a hack. The maximum number of objects in each directory is 76.
+
+<LI><I><A HREF="http://www.wss.co.uk/">WIN95FS</A></I> is a bit expensive if you just need long filenames, but not support for WINDOW~1.
+
+<LI><I>TBAFS</I>, which is also commercial, offers compaction and PC support.
+
+</UL>
+
+<P>raFS is neither an image filing system nor a hack: It has been written as "normal" filing system. The files that you save to raFS aren't stored in one large file, but as individual files in a directory structure that the program sets up on another filing system. This means that you can take full advantage of the "host" filing system's abilities to manage files, which is much more effective. Additionally, there are much better chances of retrieving your data in case something goes wrong.
+
+<P>raFS has the following features:
+
+<UL>
+
+<LI>100% written in assembler
+
+<LI>Because it is not an image filing system, there are no problems when used together with InfoZip, sFTP etc., and the size is not limited to 4GB (or even 2GB if on a FileCore-based filing system).
+
+<LI>Buffers directory data so that accesses are very fast.
+
+<LI>Supports multiple "discs" (up to 50).
+
+<LI>Easy creation and mounting of discs with the desktop part (raFSFiler).
+
+<LI>Will either use the sprite area, the RMA (RiscOS before V3.5) or a dynamic area (RiscOS 3.5 and above) for its buffering. If the sprite area is used, this is done in a way that is compatible with other programs using it, e.g. Memphis.
+
+<LI>Will work with <I>CDFS</I> and <I>Access+.</I>
+
+<LI>Foreign language support.
+
+<LI>Full support for files being opened multiple times (including loading/saving).
+
+<LI>It gives correct error numbers!
+
+</UL>
+
+<P>This documentation has been split up into two parts. The first part is aimed at people who want to use raFS on the desktop, whereas the second part describes the filing system's interfaces in greater detail. It is not necessary to read it as most of the information is only relevant for advanced users and programmers.
+
+<P>I hope you find this a useful program!
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="usage">Usage</A></H2>
+
+raFS is loaded into memory by double-clicking on <I>!raFS</I> or on a disc application directory (like the example <I>!raFSDisc</I>) in a directory viewer. It will install an icon on the icon bar. You may want to copy the !raFS application into your <KBD>!Boot.Choices.Boot.PreDesk</KBD> directory to have it loaded every time the computer is switched on.
+
+<P>Before you start, the way raFS manages its discs should be clear to you. Actually, the word "disc" may be misleading - raFS does <EM>not</EM> introduce a new disc format of its own. I will talk of "discs" nevertheless because they are handled in the same way as e.g. ADFS handles floppy discs: They can be created, renamed, mounted and dismounted, and their name will appear in directory displays in the form "raFS::<I>DiscName</I>.$.&nbsp;..." Unlike with image filing systems, raFS' discs are not stored in one large file, but as single files inside a directory.
+
+<P>raFS can store the data saved to discs in two types of directory: One is an application directory whose name begins with "!" and which is displayed with a special icon. The second is a normal directory, which cannot be distinguished from other directories until you double-click on it. If you do this and raFS is loaded, raFS mounts (i.e. makes known to the system) the disc contained within that directory and opens the root directory of the raFS disc instead of the directory you clicked on.
+
+<P>If the program is not loaded when you double-click on a normal directory containing a raFS disc, or if it is loaded but you hold down the Shift key while clicking, you will see the actual directory contents: A file called <I>!Atterer</I> (yes, I know I'm humble to call it like that), one called <I>!Mount</I> and a directory <I>A0</I> with further subdirectories and similarly named files.
+
+<P><STRONG>Don't change or delete any of these files unless you know what you are doing!</STRONG>
+
+<P>It should be noted that raFS distinguishes its own directories from other ones by looking for the <I>!Mount</I> file and just executing it with <KBD>Obey</KBD> when the directory is about to be opened. The default file also installs raFS on the icon bar if it isn't already loaded, so just double-click on <I>!Mount</I> if you wanted to open an raFS directory, but raFS wasn't loaded. (The reason why <KBD>Obey</KBD> and not just <KBD>Run</KBD> is used is that the file's filetype may not be correct - for instance, if you burn an raFS disc onto CD ROM using a PC.)
+
+<P>When you mount a disc, a file named <I>Lock</I> is created inside the storage directory, and it is removed again when the disc is dismounted. This is used to test whether the storage directory can be written to, and the file contents help to recognize the disc when you rename the storage directory. If a disc has not been mounted before, but a <I>Lock</I> file is already present, raFS either refuses to mount the disc (e.g. if it is shared over a network and has been mounted on a different machine) or gives a warning, telling you to verify it, but nevertheless mounting it (because your computer crashed or was reset since the disc was first mounted).
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P>
+
+
+
+<H3><A NAME="discs">Working with discs</A></H3>
+
+<TABLE><TR>
+
+<TD>The icon bar menu offers many commonly needed operations on mounted discs. If no discs are mounted at all, the entries below the dotted line are greyed out.
+
+<UL>
+
+<LI><B>Read-only</B> lets you write-protect discs so that any subsequent attempts to alter the data on them will be faulted. If a disc is write-protected, its name is ticked in the submenu. This option does not work for discs stored on DOSFS due to incorrect behaviour of that filing system.
+
+<LI>With <B>Name&nbsp;disc</B>, you can change the name of a disc. (You guessed it!)
+
+<LI><B>Dismount</B> removes the selected disc from the list of discs known to RiscOS - any subsequent accesses to the disc will fail with <SAMP>Disc not present</SAMP>. You can also dismount all discs by selecting the "Dismount" menu entry without moving to the submenu.
+
+<LI>Selecting a disc name in the <B>Verify</B> submenu starts a verify operation for that disc - <A HREF="#verify">see below</A> for details.
+
+<LI><B>Open&nbsp;root</B> opens the root directory for the selected disc, or for all mounted discs if the entry in the main icon bar menu is selected.
+
+</UL>
+
+<P><EM>Important:</EM> Should you ever want to move a storage directory or rename the (hard)disc it resides on, re-mount the disc afterwards (e.g. by double-clicking on it) so that raFS knows about the new name.
+
+</TD>
+
+<TD><IMG ALT="[The icon bar menu]" SRC="ibar.gif" WIDTH=103 HEIGHT=253></TD>
+
+</TR></TABLE>
+
+<P>The <B>Flush</B> menu entry is not normally needed. When you select it, all changed but as yet unsaved directories are saved within the discs' storage directories. You should manually flush raFS' buffers if the program was unable to save changes automatically due to an error. (For example, you should flush if you clicked on Cancel when you were asked to insert a floppy disc with an raFS disc stored on it.)
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P>
+
+
+
+<H3><A NAME="create">Creating new discs</A></H3>
+
+<TABLE><TR>
+
+<TD VALIGN="top">New discs can easily be created from the window that is opened when the pointer is moved right over the <B>New&nbsp;disc</B> menu entry. You can choose whether to use an application or a normal directory with the "App" option (or by preceding the storage directory's leafname with "!"). Having also entered a name for the new disc, drag the icon to a directory viewer to create the disc.
+
+</TD>
+
+<TD><IMG ALT="[The 'Create new disc' window]" WIDTH=202 HEIGHT=172 SRC="crea.gif"></TD>
+
+</TR></TABLE>
+
+<P>raFS has the useful ability to let you use a whole hard or floppy disc for one of its own discs. When you click e.g. on the floppy drive icon to display the root directory, the program looks for the <I>!Mount</I> file just like it does for double-clicks on directory symbols. To create a disc like this, enter the name of the hard or floppy disc's root directory (e.g. <KBD>ADFS::HD.$</KBD>) in the first writable, choose a name for the new disc and finally click on <B>Create</B>.
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P>
+
+
+
+<H3><A NAME="choices">The Choices window</A></H3>
+
+Clicking with Adjust on the raFS icon bar icon while the Shift key is pressed or selecting the <B>Choices...</B> menu entry opens a window with various settings that influence the program's behaviour. You can also save your preferences from here.
+
+<P><B>Storage dirs mounted on startup:</B> In the writable fields of this section you can enter the names of up to three discs by dragging the storage directories to the fields. raFS will then mount these discs automatically every time it is run.
+
+<P><B>Commands for clicks on icon bar:</B> The commands executed when the icon bar icon is clicked on can be changed here independently for Select/Adjust and any combination of the Shift/Ctrl keys. See <A HREF="tech.html#cli">here</A> for details on the commands used by the default settings. By default, clicks cause the following actions:
+
+<UL COMPACT>
+<LI>Select opens the root directory of one of the mounted discs. If only one disc is mounted, its root directory opens immediately, otherwise a menu is displayed.
+<LI>Adjust opens the <B>New disc</B> window.
+<LI>Shift-Select opens a menu of all mounted discs and dismounts one of them according to which entry you choose.
+<LI>Shift-Adjust opens the <B>Choices</B> window.
+<LI>Ctrl-Select and Ctrl-Adjust issue <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> and <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> respectively, which switch write through buffering on and off.
+<LI>Shift-Ctrl-Select causes a flush.
+<LI>Shift-Ctrl-Adjust executes <KBD>raFS_Safe -smash</KBD> to switch write through buffering off immediately.
+</UL>
+
+<P><B>Directory cache:</B> This part of the window controls raFS' directory cache, which is used by the filing system to speed up accesses to its discs. When you make changes to a directory, e.g. by deleting a file, the changed directory information is not saved to the host filing system immediately, but only after a certain delay or after a given number of modifications, whichever of the two happens first.
+
+<P>Note: The fact that directories are usually only saved after a delay means that if you change the directory contents and then reset your computer immediately afterwards (or it crashes), the directory information as stored on the host filing system will not yet have been brought up to date. If you open the directory again later, deleted files will still appear to exist and new files won't appear in the directory display! This must be prevented from happening, so if you run software that crashes a lot, especially while accessing the filing system, you should disable the delay as follows:
+
+<P>For both the field where the delay in centiseconds is entered and the field containing the number of modifications, the values 0 and 1 have a special meaning: 0 tells raFS to completely disable saving of directories automatically after a delay or after any number of modifications, respectively. (If both values are 0, changed directories are only saved to make room if the maximum directory cache size has been reached, and when discs are dismounted.) A value of 1 in either of the two fields forces immediate write-through of any changes to the host filing system. (If you know a little about <TT>*</TT>commands, you can deal more elegantly with frequently crashing applications by adding <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> and <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> commands to their !Run files.)
+
+<P><B>Miscellaneous:</B> A number of options for raFSFiler.
+
+<UL COMPACT>
+<LI>Look for "!Mount": If switched on, raFSFiler looks for files called <I>!Mount</I> in any directories that open, and executes them.
+<LI>Adjust-close of "raFS:$" opens parent: If switched on, closing the root directory of a raFS disc with Adjust opens the parent of that disc's storage directory.
+<LI>Menu entry <B>Quit</B> in icon bar menu: If you dislike that raFSFiler, unlike ADFSFiler, has a <B>Quit</B> entry in its icon bar, you can switch off this option.
+<LI><B>Quit</B> RMKills: Controls whether the two raFS modules are removed from memory when you select the <B>Quit</B> menu entry. Note that doing this for the raFS module means that all discs will be dismounted.
+</UL>
+
+<P>At the bottom of the window there are four buttons: <B>Default</B> fills in the "factory default" values for all the fields bar the first three. <B>Save</B> causes the values to be used and also stores them on disc. The <B>Cancel</B> button prevents any changes made to the fields from coming into effect - you can also click on it with Adjust to have the current values filled in once more. Finally, <B>Set</B> makes raFS use the supplied values, but only for the current session. If you click on the last three buttons with Select, the Choices window is closed; if you use Adjust, it remains open.
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="verify">Verifying corrupted discs</A></H2>
+
+Sometimes, raFS discs can become corrupted. The most common cause for this is that the computer crashed after data had been saved, but before the changed directory data could be written back to the host filing system. Typically, some files can no longer be accessed after this has happened, some that had just been saved don't appear in the directory, or files that had been deleted still appear to be present.
+
+<P><STRONG>Do not attempt to delete those files of a corrupted disc that give errors - by doing this, you might delete the data of other files!</STRONG>
+
+<P>The verify operation offers a means to detect and repair corrupted discs. To start verifying, select the disc name from the <B>Verify</B> submenu of the icon bar menu (or use the <A HREF="tech.html#cli_verify"><TT>Verify</TT></A> command). Instead of clicking on the disc name you can also just select the <B>Verify</B> entry, which automatically picks those discs for verifying that caused errors earlier on. The names of the directories being scanned will be printed, along with other messages, some of which need further explaining:
+
+<UL>
+<LI><SAMP>Correcting: First unfilled directory is '<I>A0.B0</I>'</SAMP>: This can even happen for correct discs and is nothing to worry about.
+<LI><SAMP>Different file lengths! 'Fix' to assume data in '<I>A0.B0.C0</I>' belongs to '<I>$.File</I>'. 'Skip' if data belongs to a different file</SAMP>: You are given a choice here, as raFS is not sure whether the directory entry points to the correct data (and there may be another directory entry which <EM>is</EM> correct!). If you are unsure what to answer, choose Skip.
+<LI><SAMP>Will set the file length to zero / will turn the directory into an empty directory</SAMP>: This does <EM>not</EM> mean that the file or directory will be deleted - instead, the data has already been lost and raFS just removes the <EM>reference</EM> to it.
+<LI><SAMP>Sorry, the names of the remaining <I>X</I> files are lost! Will insert the files in 'Lost+Found'</SAMP>: The number of files actually inserted could be less than what the message says, as unreferenced files with a file length of zero are not inserted, instead they are deleted.
+</UL>
+
+Any unreferenced directories and files that are found are copied into the <I>Lost+Found</I> directory raFS creates in the disc's root directory.
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="contact">Contacting the author</A></H2>
+
+If you want to send me a bug report, have some suggestions about what future versions of raFS should support, or just generally want to tell me how absolutely wonderful it is, you can contact me either by email (preferred) or by "ordinary" mail.
+
+<P>My email address is <A HREF="mailto:atterer@informatik.tu-muenchen.de">atterer@informatik.tu-muenchen.de</A> (<A HREF="pubkey.asc">PGP key</A>). To get the latest version of raFS, have a look at my homepage at <A HREF="http://www.informatik.tu-muenchen.de/~atterer/">http://www.informatik.tu-muenchen.de/~atterer/</A>.
+
+<P>In case you want to pay me a visit and beat me up because raFS corrupted all your data, this is the snail mail address:
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Richard Atterer
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Beethovenstra&szlig;e 30
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;86391 Stadtbergen
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<I>Germany</I>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR
+WIDTH="41%">
+
+
+
+<P><H2><A NAME="history">Version history</A></H2>
+
+Many thanks to the following people for suggestions and bug reports: Stefan&nbsp;Bellon, Emil&nbsp;Brunavs, Peter&nbsp;Burwood, Nick&nbsp;Clark, Dave&nbsp;Daniels, Justin&nbsp;Fletcher, Mike&nbsp;Gregory, Tony&nbsp;Houghton, Rick&nbsp;Hudson, Hans&nbsp;de&nbsp;Jong, James&nbsp;Larcombe, Vincent&nbsp;Lefevre, Marko&nbsp;Lukat, Robin&nbsp;Moffatt, Jakob&nbsp;Stoklund&nbsp;Olesen, David&nbsp;Pilling, Tim&nbsp;Rowledge, Darren&nbsp;Salt, Reiner&nbsp;Schulz, Dick&nbsp;Tanis, David&nbsp;Thomas, Reuben&nbsp;Thomas, Martin&nbsp;Tillman.<P>
+
+<B>V1.15 (14-11-1998)</B>
+
+<UL COMPACT>
+
+<LI>Less stringent behaviour if <I>Lock</I> files remain in discs' directories after a crash or reset: Only a warning is given. If a Wimp error box opens, it closes automatically after a <A HREF="tech.html#cli_optmt">specified delay</A>,
+
+<LI>Selecting the <B>Verify</B> entry of the icon bar menu or using <A HREF="tech.html#cli_verify"><KBD>Verify&nbsp;*</KBD></A> now "does the right thing", verifying those discs that need verifying,
+
+<LI>Bugfix in the verify code: Open files are now taken into account,
+
+<LI>If <I>!raFS</I> is placed in <KBD>!Boot.Choices.Boot.PreDesk</KBD>, the mounting of the discs to be mounted on startup is no longer delayed until the Welcome screen has been displayed,
+
+<LI>New command <A HREF="tech.html#cli_filermenu"><KBD>raFSFiler_Menu</KBD></A> creates user-definable menus of disc names; the default choices were changed to use it,
+
+<LI>The <KBD>rafsln</KBD> utility allows reading raFS discs on any Unix system - a binary for ARMLinux is supplied with the source code,
+
+<LI>Some improvements to make raFS work on write-protected DOS-formatted floppy discs - the discs must be mounted using the <KBD>-ro</KBD> switch,
+
+<LI>raFSFiler now looks for <I>!Mount</I> in the root of image files,
+
+<LI>Vincent Lefevre kindly translated the templates and messages into French,
+
+<LI>Corrected mistake in <KBD>Mount</KBD> which didn't make the command accept all combinations of the command line switches.
+
+</UL>
+
+
+<B>V1.14 (15-10-1998)</B>
+
+<UL COMPACT>
+
+<LI><A HREF="#verify">Verify</A> detects errors in discs and repairs them,
+
+<LI>A <I>Lock</I> file is saved to the storage directory when a disc is mounted, which allows for detection of read-only media and renamed storage directories,
+
+<LI>Opening directories for input (used by some programs to test their presence) now works regardless of the access details,
+
+<LI>Files opened for output only can also be read from,
+
+<LI>The RiscOS&nbsp;3.1 version supports using the RMA instead of the sprite area to avoid clashes with other programs,
+
+<LI>The <I>!Atterer, !Mount</I> and <I>!Dismount</I> files can also be called <I>_Atterer, _Mount</I> and <I>_Dismount</I> for compatibility with ISO CD&nbsp;ROMs,
+
+<LI>raFSFiler now uses the ANT URL message as well as the URI protocol to launch URLs,
+
+<LI>Typing a very long name in the 'Create new disc' window no longer corrupts the contents of the disc name icon,
+
+<LI>Some minor bugs fixed.
+
+</UL>
+
+
+<B>V1.13 (10-05-1998)</B>
+
+<UL COMPACT>
+
+<LI>I was very tempted to finally add an easter egg to raFS, but refrained from doing it, as it's probably not the kind of feature people want to see in a <EM>filing system</EM> :-)
+
+<LI>Two bugs were fixed in an intermediate version 1.12a: One sometimes caused an undefined instruction exception in raFSFiler, the other prevented <KBD>raFS_Opt</KBD> from working in most cases, as the <KBD>-LoadMessages</KBD> switch had accidentally been made mandatory,
+
+<LI>raFSFiler was extended to allow for up to three discs to be mounted during start-up and to execute different commands for clicks on the icon bar with Shift or Ctrl pressed. Furthermore, new options enable you to switch off the Wimp filter on the Filer and to influence the behaviour of the <B>Quit</B> menu entry.
+
+<LI>In the <B>New disc</B> window, creating a disc with the same name for the disc name and storage directory is much easier. (Also added support for Ctrl-C to copy the name from the upper into the lower icon.)
+
+<LI>Adjust clicks on the close icon of an raFS disc cause the parent of the disc's storage directory to be opened. Apologies to James Larcombe, who implemented this in a separate module only to find I had already added it to raFSFiler myself!
+
+<LI>Added <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A>,
+
+<LI>Some basic checking of storage directory names - warns you if you attempt to mount an raFS disc which is stored on raFS,
+
+<LI><A HREF="tech.html#cli_optor"><KBD>raFS_Opt&nbsp;-OpenRename</KBD></A> controls whether open files can be renamed. By default, this is now possible,
+
+<LI>Added a <KBD>-verbose</KBD> switch to <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> and <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A>
+
+<LI>The <A HREF="tech.html#integrity">raFS$NoChecks</A> variable has been extended to allow for image file types to be excluded from the stricter integrity checks,
+
+<LI>You can specify a default <I>!Dismount</I> file in the Messages to make <KBD>raFS_Create</KBD> automatically write into new storage directories. However, by default no <I>!Dismount</I> file is created,
+
+<LI>Fixed a memory leak in raFSFiler, when the module was quit and subsequently restarted with <KBD>Desktop_raFSFiler</KBD>,
+
+<LI>Name of the dynamic area is internationalised,
+
+<LI>Bugfix: If a file without write access was opened using <KBD>OPENOUT</KBD>, an error was returned correctly for attempts to write, but the file extent was reset to zero nevertheless. The behaviour is now exactly the same as for FileCore: The file extent is <EM>reported</EM> as zero, but in reality remains unaltered.
+
+</UL>
+
+
+<B>V1.12 (22-02-1998)</B>
+
+<P>Released on an <I>Acorn User</I> cover disc.
+
+<UL COMPACT>
+
+<LI>There's now a mechanism which avoids having to supply multiple copies of the raFS(Spr) modules for different countries; you can override the hard-coded English defaults in a Messages file given to raFS with <A HREF="tech.html#cli_optlm"><KBD>raFS_Opt&nbsp;-LoadMessages</KBD></A>
+
+<LI>Dutch translation of the program texts kindly donated by Dick Tanis - thanks!
+
+<LI>The extent of image files could <EM>still</EM> be set to zero - this is now definitely fixed. However, the new behaviour causes the creating of new SparkFS archives on top of old ones to fail,
+
+<LI>Directories can no longer be moved into themselves - this caused the directory's contents to become inaccessible,
+
+<LI>"Workaround" for the rename submenu title being truncated to "Enter new na" - changed the text to "New name" :-) The truncation is caused by a bug in MessageTrans&nbsp;0.31 and earlier - it has been fixed in V0.32,
+
+<LI>Corrected mistakes in V1.11 which lead to <SAMP>Does not belong to this directory entry</SAMP> or <SAMP>Not open for update</SAMP> errors,
+
+<LI>No longer complains about <SAMP>Disc already mounted</SAMP> if the case of some characters in the storage directory path differs from what was used initially to mount the disc.
+
+</UL>
+
+
+<B>V1.11 (14-02-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>Workaround for dangerous bug:</STRONG> The extent of image files was sometimes set to zero when the file was accessed,
+
+<LI>Major bug fixed: If a file was overwritten by saving on top of it, the directory data wasn't marked as changed, which could result in <SAMP>Does not belong to this directory entry</SAMP> errors,
+
+<LI>Fixed another bug which also caused <SAMP>Does not belong to this directory entry</SAMP> if a file was opened with <KBD>OPENOUT</KBD> and then not stamped after it had been closed,
+
+<LI>Sequential pointer is now set to the correct value for attempts of reading data off the end of the file,
+
+<LI>(Hopefully) fixed problem with raFSFiler submenu title being displayed as "Enter new na",
+
+<LI>Can now also use <KBD>-newdisc</KBD> switch with <A HREF="tech.html#cli_filer"><KBD>Desktop_raFSFiler</KBD></A> to open the "Create new disc" dialogue box,
+
+<LI>In the "Create new disc" dialogue box, dragging the icon to a directory display immediately creates the disc,
+
+<LI>Added <A HREF="tech.html#cli_free"><KBD>Free</KBD></A>,
+
+<LI>Corrected behaviour of <KBD>Mount</KBD> - now doesn't set the CSD to the new disc's root, but only FileSwitch$raFS$CSD,
+
+<LI>If there is no CSD (e.g. after <KBD>NoDir</KBD>), <KBD>Dir</KBD> and <KBD>Cat</KBD> now access the disc's root instead of giving <SAMP>Disc not present</SAMP>,
+
+<LI>(RiscPC version only) Bug fixed: Errors while saving directory data could cause <SAMP>Directory data not valid</SAMP> errors later on,
+
+<LI>Maximum size of dynamic area is no longer the total RAM size, but only 1&nbsp;MB,
+
+<LI>Fixed problem with raFSFiler complaining about <SAMP>Message file already open</SAMP>,
+
+<LI>Directory data is now stamped as Data (&amp;FFD) on the host FS under all circumstances.
+
+</UL>
+
+
+<B>V1.10 (10-01-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>There is now an raFSFiler!</STRONG>
+
+<LI>raFS has been registered with Acorn and has been assigned the filing system number 142,
+
+<LI>Major update of documentation, German translation of the first part,
+
+<LI>The FS module can be called directly from assembler,
+
+<LI><EM>Finally</EM> added support for flushing directories after a delay (<A HREF="tech.html#cli_optdd"><KBD>-DirsaveDelay</KBD></A> switch of <A HREF="tech.html#cli_opt"><KBD>raFS_Opt</KBD></A>) or after a given number of changes to the directory data (<A HREF="tech.html#cli_optdm"><KBD>-DirsaveMods</KBD></A> switch),
+
+<LI>Added <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> and <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> for temporarily forcing write-through for directory buffer,
+
+<LI>Support for <A HREF="tech.html#cli_mount"><I>!Mount</I></A> and <A HREF="tech.html#cli_dismount"><I>!Dismount</I></A> files added, together with <KBD>-X</KBD> switch for the <KBD>Mount</KBD> command,
+
+<LI><KBD>Mount</KBD> and <KBD>Dismount</KBD> set raFS$(D)Disc to the (dis)mounted disc's name,
+
+<LI><A HREF="tech.html#cli_create"><KBD>raFS_Create</KBD></A> now writes a <I>!Mount</I> file to storage directories it sets up. The new <KBD>-app</KBD> switch causes it to also add <I>!Sprites</I> and <I>!Run</I> files for application directories,
+
+<LI>Added disc <A HREF="tech.html#integrity">integrity checks</A> to open, load, save, delete and create operations, and support for the raFS$NoChecks variable,
+
+<LI>Fixed a "feature" which meant that when you renamed a file to be in a different directory, raFS always attempted to load it into memory, but then threw it away again immediately - oops! :-)
+
+<LI><A HREF="tech.html#cli_name"><KBD>NameDisc</KBD></A> didn't check at all whether a disc with the desired new name was already mounted - it now gives an error if this is the case. Additionally, the changed <I>!Atterer</I> file is now saved immediately after the command, and the new disc name can be longer than 10 characters (didn't work because OS_FSControl&nbsp;50 was used - now alters the name directly),
+
+<LI><A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A> no longer fails to notice that a disc of the same name is already mounted if the case of one or more characters of the names differs,
+
+<LI>Fixed a quite serious bug occurring during a <KBD>Close</KBD> on one of raFS' host filing systems, when raFS had files open on that filing system,
+
+<LI>When Service_Shutdown is received, now doesn't dismount all discs any longer (which prevented Wimp applications that closed down after it from saving anything to raFS discs), but instead does the equivalent of an <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> (only if <KBD>raFS_Unsafe</KBD> hasn't already been issued),
+
+<LI>Minor bug fixed: Under unlikely circumstances, an error during saving a file could result an unreferenced file to be left behind,
+
+<LI>When the module is <KBD>RMRun</KBD>, raFS is selected as the current filing system,
+
+<LI>Maximum number of discs increased to 50, default directory buffer size is now 30k.
+
+</UL>
+
+
+<B>V1.02 beta (30-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Added <A HREF="tech.html#cli_discs"><KBD>raFS_Discs</KBD>,</A>
+
+<LI>When a file is opened for output only, not for update, its extent is now set to zero. Because the calls made to raFS are exactly the same in those two cases, this is achieved by the routine on FindV taking note of what the last reason code passed to OS_Find was,
+
+<LI>Changed <KBD>Mount, Dismount</KBD> and <KBD>NameDisc</KBD> into filing system commands,
+
+<LI>Added the <KBD>-path</KBD> switch to <A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A>,
+
+<LI><KBD>Mount</KBD> no longer gives an error when trying to mount the same disc twice; it and <KBD>Dismount</KBD> (un)set the CSD/URD correctly,
+
+<LI>Fixed a bug which prevented you from re-opening directories once they had been flushed to disc, if any of the directory entries' names contained one of the characters <TT>#%&amp;*@\^</TT>
+
+<LI><KBD>Back</KBD> works now,
+
+<LI><A HREF="tech.html#format">File formats</A> are explained in this document.
+
+</UL>
+
+
+<B>V1.01 beta (09-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Fixed a bug in <KBD>raFS_Flush</KBD> and <KBD>Dismount</KBD>,
+
+<LI>Separate RiscPC-only version of module using a dynamic area.
+
+</UL>
+
+
+<B>V1.00 beta (30-10-1997)</B>
+
+<UL COMPACT>
+
+<LI>First release: Long filenames, any number of objects per dir, directory cacheing; no file cacheing or auto-flushing of directory cache.
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I>
+
+</BODY></HTML>

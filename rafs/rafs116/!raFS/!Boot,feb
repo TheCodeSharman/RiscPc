@@ -1,0 +1,13 @@
+| raFS (C) 1997-1999 Richard Atterer
+| V1.16 (05-05-1999)
+
+Set raFS$Dir <Obey$Dir>
+IconSprites <raFS$Dir>.!Sprites
+
+| Use the RMA instead of the sprite area on RiscOS 3.1
+| Value is initial amount of memory claimed, in kBytes
+| Make sure you change this in !Boot and !Run
+|SetEval raFS$UseRMA 16
+
+Set raFS$RM <raFS$Dir>.raFS
+RMEnsure UtilityModule 3.50 Set raFS$RM <raFS$Dir>.raFSSpr

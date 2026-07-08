@@ -1,0 +1,365 @@
+/*
+  __   _
+  |_) /|  Copyright Richard Atterer
+  | \/¯|  <atterer@informatik.tu-muenchen.de>
+  ¯ ´` ¯
+  Create symbolic links to the files inside a raFS disc.
+  Syntax: *rafsln [switches] <DirContaining!Atterer> [ <DestinationDir> ]
+  A directory with the disc name will be created in the destination
+  directory (whose name defaults to . if not specified).
+
+  V1.01  13-11-98
+  V1.02  28-11-98  creates directories with executable bits set
+*/
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define maxextlen 23
+
+#ifdef DEBUG
+  #define D(cmd) cmd
+  #define ND(cmd)
+  #define log(args) printf args;
+#else
+  #define D(cmd)
+  #define ND(cmd) cmd
+  #define log(args)
+#endif
+
+typedef unsigned char  u8;
+typedef unsigned int   u32;
+typedef unsigned short u16;
+
+typedef enum boolean { FALSE, TRUE } boolean;
+
+/* the following is for little endian */
+typedef u32 rafs_id;
+#define level1rafsdir(id) (id & 0xff)
+#define level2rafsdir(id) ((id >> 8) & 0xff)
+#define level3rafsdir(id) ((id >> 16) & 0xff)
+
+#define DIRSEP "/"
+#define DIRSEP_CHAR '/'
+#define FILESEP "."
+#define FILESEP_CHAR '.'
+
+typedef struct rafs_dir_s {
+  u32 entries;
+  u32 unused_m;
+  u32 parent_id;
+  u32 unused_pp;
+  u32 offset[1];
+} rafs_dir;
+
+typedef struct rafs_direntry_s {
+  u32 load, exec;
+  u32 length;
+  u32 attr;
+  u32 rafs_flags;
+  u32 unused_bf;
+  u32 id;
+  char name[1];
+} rafs_direntry;
+
+void syntaxerror(void);
+void rafs_readmapping();
+void rafs_deletemapping();
+int link_rafs_disc(const char* source, const char* destination);
+int link_rafs_dir(char* src, int srclen, char* dst, int dstlen, rafs_id id);
+void append_rafs_id(char* buf, rafs_id id);
+int filename_conv(char* buf, const rafs_direntry* riscos);
+
+static char* ext[4096];
+static const char mappingsfile[] = "/.rafsln_mapping"; /* in home dir */
+
+static boolean symlinks = FALSE; /* create symbolic, not hard links */
+/* add extensions to RiscOS files without any '/' in their names */
+static boolean extensions = FALSE;
+/* add hex filetype after comma, e.g. 'filename,fff'. If both extensions
+   and this are true, hex filetypes are only added for files for which
+   there is no type->extension mapping */
+static boolean commatype = FALSE;
+
+
+int main(int argc, char* argv[])
+{
+  char* source = 0;
+  char* destination = 0;
+
+  /* scan command line arguments */
+  while (--argc) {
+    if (strcmp(*++argv, "-s") == 0 && symlinks == FALSE)
+      symlinks = TRUE;
+    else if (strcmp(*argv, "-e") == 0 && extensions == FALSE)
+      extensions = TRUE;
+    else if (strcmp(*argv, "-c") == 0 && commatype == FALSE)
+      commatype = TRUE;
+    else if (source == 0)
+      source = *argv;
+    else if (destination == 0)
+      destination = *argv;
+    else
+      syntaxerror();
+  }
+  if (source == 0) syntaxerror();
+  if (destination == 0) destination = ".";
+
+  if (extensions) rafs_readmapping();
+  if (link_rafs_disc(source, destination)) {
+    if (extensions) rafs_deletemapping();
+    perror("rafsln");
+    exit(1);
+  }
+  if (extensions) rafs_deletemapping();
+  return 0;
+}
+
+void syntaxerror(void)
+{
+  fprintf(stderr, "Syntax: rafsln [-s] [-e] [-c] <DirContaining!Atterer> "
+	  "[<DestinationDir>]\n"
+	  "Creates a directory with the name of the raFS disc, filled with "
+	  "links.\n"
+	  "  -s  Make symbolic links instead of hard links\n"
+	  "  -e  Add extensions to names not containing any dots\n"
+	  "  -c  Add filetype after comma; 'filename,fff'\n");
+  exit(1);
+}
+
+/* read contents of RiscOS -> extension mappings
+   the mappings are stored in ext[] */
+void rafs_readmapping()
+{
+  int read, type;
+  char extstr[maxextlen];
+  char filename[1024];
+  FILE* map;
+  char* home;
+
+  home = getenv("HOME");
+  if (home == 0)
+    filename[0] = '\0';
+  else
+    strcpy(filename, home);
+  strcpy(filename + strlen(filename), mappingsfile);
+
+  map = fopen(filename, "r");
+  if (map == 0) {
+    fprintf(stderr, "rafsln: Couldn't open '%s'\n", filename);
+    exit(1);
+  }
+  while ((read = fscanf(map, " %x %s \n", &type, extstr)) == 2) {
+    int extlen = strlen(extstr);
+    ext[type] = (char*)malloc(extlen + 1);
+    memcpy(ext[type], extstr, extlen + 1);
+    log(("rafs_readmapping: %x is %s\n", type, ext[type]));
+  }
+  fclose(map);
+  return;
+}
+
+/* free memory claimed by extension mappings */
+void rafs_deletemapping()
+{
+  int i;
+  for (i = 0; i < 4096; i++)
+    if (ext[i]) free(ext[i]);
+  return;
+}
+
+/* Create links to the files inside a raFS dir structure.
+   Returns 0 for success, else -1 and errno set */
+int link_rafs_disc(const char* source, const char* destination)
+{
+  int err;
+  int srclen = strlen(source);
+  int dstlen = strlen(destination);
+  char* src;
+  char* dst;
+  FILE* att;
+
+  /* claim memory */
+  src = (char*)malloc(srclen + 10);  /* appending "/!atterer0" */
+  if (src == 0) return -1;
+  strcpy(src, source);
+  dst = (char*)malloc(dstlen + 64 + 256);
+  if (dst == 0) {
+    free(src);
+    return -1;
+  }
+  strcpy(dst, destination);
+
+  /* append '/' unless already present */
+  if (src[srclen - 1] != DIRSEP_CHAR)
+    src[srclen++] = DIRSEP_CHAR;
+  if (dst[dstlen - 1] != DIRSEP_CHAR)
+    dst[dstlen++] = DIRSEP_CHAR;
+
+  /* open !Atterer, get disc name */
+  strcpy(src + srclen, "!Atterer");
+  log(("link_rafs_disc: open %s\n", src));
+  att = fopen(src, "r");
+  if (att == 0 || fread(dst + dstlen, sizeof(u8), 64, att) != 64) {
+    free (src); free(dst);
+    return -1;
+  }
+  fclose(att);
+
+  /* create dir with disc name */
+  log(("link_rafs_disc: create %s\n", dst));
+  if (mkdir(dst,
+	    S_IRUSR | S_IWUSR | S_IXUSR
+	  | S_IRGRP | S_IWGRP | S_IXGRP
+	  | S_IROTH | S_IWOTH | S_IXOTH)) {
+    free (src); free(dst);
+    return -1;
+  }
+  dstlen = strlen(dst);
+  dst[dstlen++] = DIRSEP_CHAR;
+
+  /* recurse through raFS directory structure */
+  err = link_rafs_dir(src, srclen, dst, dstlen, (rafs_id)0);
+  free(src); free(dst);
+  if (err) return -1; else return 0;
+}
+
+/* Will append e.g. "A0/A0/A0" after srclen bytes.
+   Will append e.g. "DirName/WheeLongFileName" after dstlen bytes
+   id is the ID of a directory */
+int link_rafs_dir(char* src, int srclen, char* dst, int dstlen, rafs_id id)
+{
+  rafs_dir* dir;
+  struct stat statbuf;
+  unsigned i;
+  FILE* dirhandle;
+  int err = 0;
+
+  append_rafs_id(src + srclen, id);
+
+  if (stat(src, &statbuf)) return -1;
+  dir = (rafs_dir*)malloc(statbuf.st_size);
+  if (dir == 0) return -1;
+
+  if ((dirhandle = fopen(src, "r")) == 0) {
+    free(dir);
+    return -1;
+  }
+  fread(dir, 1, statbuf.st_size, dirhandle); /* load dir data */
+  if (ferror(dirhandle)) {
+    free(dir);
+    return -1;
+  }
+  fclose(dirhandle);
+  log(("link_rafs_dir: dir %s, %d entries\n", src, dir->entries));
+
+  /* will continue after errors during the recursion */
+  for (i = 0; i < dir->entries; i++) {
+    rafs_direntry* entry =
+      (rafs_direntry*)(&dir->offset + dir->offset[i] / sizeof(u32));
+    filename_conv(dst + dstlen, entry);
+    if ((entry->rafs_flags & 0xc0) == 0xc0) {
+      int newlen = dstlen + strlen(dst + dstlen);
+      /* directory */
+      if (mkdir(dst, S_IRUSR | S_IWUSR | S_IXUSR
+		| S_IRGRP | S_IWGRP | S_IXGRP
+		| S_IROTH | S_IWOTH | S_IXOTH)) err = -1;
+      dst[newlen++] = DIRSEP_CHAR;
+      dst[newlen] = '\0';
+      if (link_rafs_dir(src, srclen, dst, newlen, entry->id) != 0)
+	err = -1;
+    } else {
+      /* file - create link */
+      int(*linkfct)(const char* oldpath, const char* newpath);
+      append_rafs_id(src + srclen, entry->id);
+      log(("link_rafs_dir: %s -> %s\n", dst, src));
+      if (symlinks) linkfct = &symlink; else linkfct = &link;
+      if (linkfct(src, dst)) err = -1;
+    }
+  }
+  free(dir);
+  return err;
+}
+
+void append_rafs_id(char* buf, rafs_id id)
+{
+  static const char* names =
+    "A0" DIRSEP "\0A1" DIRSEP "\0A2" DIRSEP "\0"
+    "B0" DIRSEP "\0B1" DIRSEP "\0B2" DIRSEP "\0"
+    "C0" DIRSEP "\0C1" DIRSEP "\0C2" DIRSEP "\0"
+    "D0" DIRSEP "\0D1" DIRSEP "\0D2" DIRSEP "\0"
+    "E0" DIRSEP "\0E1" DIRSEP "\0E2" DIRSEP "\0"
+    "F0" DIRSEP "\0F1" DIRSEP "\0F2" DIRSEP "\0"
+    "G0" DIRSEP "\0G1" DIRSEP "\0G2" DIRSEP "\0"
+    "H0" DIRSEP "\0H1" DIRSEP "\0H2" DIRSEP "\0"
+    "I0" DIRSEP "\0I1" DIRSEP "\0I2" DIRSEP "\0"
+    "J0" DIRSEP "\0J1" DIRSEP "\0J2" DIRSEP "\0"
+    "K0" DIRSEP "\0K1" DIRSEP "\0K2" DIRSEP "\0"
+    "L0" DIRSEP "\0L1" DIRSEP "\0L2" DIRSEP "\0"
+    "M0" DIRSEP "\0M1" DIRSEP "\0M2" DIRSEP "\0"
+    "N0" DIRSEP "\0N1" DIRSEP "\0N2" DIRSEP "\0"
+    "O0" DIRSEP "\0O1" DIRSEP "\0O2" DIRSEP "\0"
+    "P0" DIRSEP "\0P1" DIRSEP "\0P2" DIRSEP "\0"
+    "Q0" DIRSEP "\0Q1" DIRSEP "\0Q2" DIRSEP "\0"
+    "R0" DIRSEP "\0R1" DIRSEP "\0R2" DIRSEP "\0"
+    "S0" DIRSEP "\0S1" DIRSEP "\0S2" DIRSEP "\0"
+    "T0" DIRSEP "\0T1" DIRSEP "\0T2" DIRSEP "\0"
+    "U0" DIRSEP "\0U1" DIRSEP "\0U2" DIRSEP "\0"
+    "V0" DIRSEP "\0V1" DIRSEP "\0V2" DIRSEP "\0"
+    "W0" DIRSEP "\0W1" DIRSEP "\0W2" DIRSEP "\0"
+    "X0" DIRSEP "\0X1" DIRSEP "\0X2" DIRSEP "\0"
+    "Y0" DIRSEP "\0Y1" DIRSEP "\0Y2" DIRSEP "\0"
+    "Z0" DIRSEP "\0Z1" DIRSEP "\0";
+  const char* cur;
+
+  cur = names + level1rafsdir(id) * 4;
+  *buf++ = *cur++; *buf++ = *cur++; *buf++ = *cur++;
+  cur = names + level2rafsdir(id) * 4;
+  *buf++ = *cur++; *buf++ = *cur++; *buf++ = *cur++;
+  cur = names + level3rafsdir(id) * 4;
+  *buf++ = *cur++; *buf++ = *cur++; *buf++ = '\0';
+
+  return;
+}
+
+/* conversion of RiscOS name to other OS
+   returns nr of characters in output name */
+int filename_conv(char* buf, const rafs_direntry* riscos)
+{
+  char* ptr = buf;
+  const char* riscos_name = riscos->name;
+  char c;
+  int filetype;
+  boolean noextension = TRUE;
+
+  while ((c = *riscos_name++) != 0) {
+    if (c == '.' || c == '/') {
+      c ^= '.' ^ '/';
+      noextension = FALSE;
+    }
+    else if (c == '$' || c == '<') c ^= '$' ^ '<';
+    *ptr++ = c;
+  }
+
+  if ((riscos->rafs_flags & 0xc0) != 0xc0 /* only for files */
+      && (riscos->load & 0xfff00000) == 0xfff00000) {
+    filetype = (riscos->load & 0xfff00) >> 8;
+    if (extensions && noextension && ext[filetype]) {
+      *ptr++ = FILESEP_CHAR;
+      strcpy(ptr, ext[filetype]);
+      ptr += strlen(ptr);
+      noextension = FALSE;
+    }
+    if (commatype && (!extensions || (extensions && noextension))) {
+      ptr += sprintf(ptr, ",%03x", filetype);
+    }
+  }
+  *ptr = 0;
+  return ptr - buf;
+}

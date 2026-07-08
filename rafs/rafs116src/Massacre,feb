@@ -1,0 +1,4 @@
+WimpTask RMKill raFSFiler
+WimpTask raFS:Dismount
+RMKill raFS
+ADFS:Close

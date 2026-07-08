@@ -1,0 +1,8 @@
+| Created by raFS V1.16 (05 May 1999), Copyright 1997-1999 Richard Atterer
+
+RMEnsure raFS 1.16 If "<raFS$RM>"="" Then Error !raFS wurde noch nicht vom Filer gesehen — die Disk kann nicht angemeldet werden
+RMEnsure raFS 1.16 If "<Wimp$State>"="desktop" AND "<raFS$Dir>"<>"" Then Filer_Run <raFS$Dir>.!Run
+RMEnsure raFS 1.16 RMLoad <raFS$RM>
+RMEnsure UtilityModule 3.50 Set Alias$Do %%*0
+raFS:Mount <Obey$Dir> -X
+If "<Wimp$State>"="desktop" Then Do Filer_OpenDir raFS::<raFS$Disc>.$

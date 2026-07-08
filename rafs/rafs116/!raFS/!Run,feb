@@ -1,0 +1,38 @@
+| raFS (C) 1997-1999 Richard Atterer
+| V1.16 (05-05-1999)
+
+Set raFS$Dir <Obey$Dir>
+IconSprites <raFS$Dir>.!Sprites
+RMEnsure UtilityModule 3.10 Error raFS does not work on RiscOS versions lower than 3.10 ˜ sorry!
+
+| *SetVars <max_filename_length> {<country_mapping>}* {<variable> <path>}*1
+| country_mapping::= <country_nr_to_try_instead> { =<country_nr> }*1
+| path can contain "%" in leaf, which will be replaced with country number
+| leafname will be truncated left of country nr if
+| length > max_filename_length
+/<raFS$Dir>.SetVars 10 6=31 7=14=30=35 raFS$Messages <raFS$Dir>.Messages% raFS$Templates <raFS$Dir>.Templates%
+
+| You can override the automatic language selection here
+|SetMacro raFS$Messages  <raFS$Dir>.Messages
+|SetMacro raFS$Templates <raFS$Dir>.Templates
+
+| Use the RMA instead of the sprite area on RiscOS 3.1
+| Value is initial amount of memory claimed, in kBytes
+| Make sure you change this in !Boot and !Run
+|SetEval raFS$UseRMA 16
+
+Set raFS$RM <raFS$Dir>.raFS
+RMEnsure UtilityModule 3.50 Set raFS$RM <raFS$Dir>.raFSSpr
+
+| Add more filing system names or image file types separated by commas
+| to disable integrity checks:
+Set raFS$NoChecks CDFS,&FC8
+
+RMEnsure raFS 1.16 RMLoad <raFS$RM>
+RMLoad <raFS$Dir>.!RunImage
+
+| Make raFS load Messages installed in Resources by raFSFiler
+raFS_Opt -LoadMessages Resources:$.Resources.raFS.Messages
+
+| switches: "-left", "-right", "-priority <nr>" for position on icon bar
+If "<Wimp$State>"="desktop" Then Desktop_raFSFiler

@@ -1,0 +1,86 @@
+
+FSBash is probably copyrighted by Acorn Computers (R.I.P.). It is the program
+used by them for verifying correct operation of ADFS.
+
+Due to minor differences in the behaviour of raFS and ADFS, raFS causes
+FSBash to report failures after a short while. A higher level of
+compatibility can be achieved by disallowing the renaming of open files for
+raFS.
+
+----------------------------------------------------------------------
+
+What all the "unimplemented" stuff was intended to be (slightly out of date)
+
+"NullDel": Nuke files when deleting, by overwriting first with 0 bytes, then
+with &FF bytes, then with 0 bytes again. NB overwriting just once or twice is
+insecure.
+
+"AddRW": Soft link
+"AddRO": Soft read-only link, with copy-on-write
+
+
+Directory format:
+-----------------
+4   nr of entries
+4   nr of directory names of files added with AddRO or AddRW
+4   ID of parent (max. 76.76.76.0)
+4   squash delay (1<<31 for 'same as parent')
+4*n offset to start of directory entries
+    (words must be sorted in ascending order, file names in ASCII order,
+    offsets are relative to start of these offsets)
+4*m if any, offset to directory names of files added with AddRO or AddRW
+4   offset to first unused byte after dir entries/dir names (also from
+    beginning of offsets, so that if there are no entries, this contains the
+    value 4)
+
+entry:
+4   load address
+4   exec address
+4   length
+4   attributes
+4   raFS attributes/flags:
+    bits
+     0-1: Squash; 0=same as parent, 1=enabled, 2=disabled
+     2-3: NullDel; 0=same as parent, 1=enabled, 2=disabled
+     4-5: Encrypt; 0=same as parent, 1=enabled, 2=disabled
+     6-7: 0=normal file, 1=AddRO file, 2=AddRW file, 3=directory
+     8: if set(and bits 6-7= 1 or 2), file has been renamed; two names follow
+     9-10: Buffering; 0=same as parent, 1=enabled, 2=disabled
+   ? 11: if set, squashing the file didn't gain any space
+     20-31: if bits 9-10 = 1, number of buffer
+4   if encrypting: nr of pass phrase
+4   if flag bits 6-7 = 0 or 3, ID of file/directory
+                     = 1 or 2, nr of directory that contains this file
+4*? name of file/directory, zero-terminated, padded with zeroes to the next
+    multiple of 4.
+4*? only if flags bit 8 = 1, original name, null terminated, padded with 0s
+
+
+
+File '!Atterer'
+---------------
+64  disc name, null terminated, padded with zeroes
+4   there is guaranteed no unused ID lower than this one
+4   attribute flags for root directory:
+    bits
+     0-1 Squash; 1=enabled, 2=disabled
+     2-3 NullDel; 1=enabled, 2=disabled
+     4-5 Encrypt; 1=enabled, 2=disabled
+     9-10 Buffering; 1=enabled, 2=disabled
+     20-31 if bits 9-10 = 1, number of buffer
+4   if encrypting: nr of pass phrase
+4   number of buffer settings following
+20*o 4  nr for identifying this buffer
+     4  maximum size in bytes
+     4  write delay in seconds
+     4  read delay in seconds
+     4  in file: 0, in memory: nr of bytes already claimed
+
+
+Buffer
+4  nr for identifying this buffer
+4  maximum size in bytes
+4  write delay in seconds (0 => write immediately)
+4  read buffer flush delay in seconds (0 => free immediately after loading)
+4  dir write delay in seconds (0 => write immediately)
+4  squash delay in seconds

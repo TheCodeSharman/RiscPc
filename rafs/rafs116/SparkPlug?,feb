@@ -1,0 +1,17 @@
+WimpTask Error "If you used SparkPlug to unpack this archive, filenames with extensions have been extracted incorrectly. This program corrects the names."
+
+Rename <Obey$Dir>.!raFS.Docs.crea_gif    <Obey$Dir>.!raFS.Docs.crea/gif
+Rename <Obey$Dir>.!raFS.Docs.crea34_gif  <Obey$Dir>.!raFS.Docs.crea34/gif
+Rename <Obey$Dir>.!raFS.Docs.crea7_gif   <Obey$Dir>.!raFS.Docs.crea7/gif
+Rename <Obey$Dir>.!raFS.Docs.gpl_html    <Obey$Dir>.!raFS.Docs.gpl/html
+Rename <Obey$Dir>.!raFS.Docs.help_html   <Obey$Dir>.!raFS.Docs.help/html
+Rename <Obey$Dir>.!raFS.Docs.help34_html <Obey$Dir>.!raFS.Docs.help34/html
+Rename <Obey$Dir>.!raFS.Docs.help7_html  <Obey$Dir>.!raFS.Docs.help7/html
+Rename <Obey$Dir>.!raFS.Docs.ibar_gif    <Obey$Dir>.!raFS.Docs.ibar/gif
+Rename <Obey$Dir>.!raFS.Docs.ibar34_gif  <Obey$Dir>.!raFS.Docs.ibar34/gif
+Rename <Obey$Dir>.!raFS.Docs.ibar7_gif   <Obey$Dir>.!raFS.Docs.ibar7/gif
+Rename <Obey$Dir>.!raFS.Docs.pubkey_asc  <Obey$Dir>.!raFS.Docs.pubkey/asc
+Rename <Obey$Dir>.!raFS.Docs.rafs_gif    <Obey$Dir>.!raFS.Docs.rafs/gif
+Rename <Obey$Dir>.!raFS.Docs.tech_html   <Obey$Dir>.!raFS.Docs.tech/html
+Rename <Obey$Dir>.rafsln.rafsln_c        <Obey$Dir>.rafsln.rafsln/c
+Rename <Obey$Dir>.rafsln._rafsln_*       <Obey$Dir>.rafsln./rafsln_mapping

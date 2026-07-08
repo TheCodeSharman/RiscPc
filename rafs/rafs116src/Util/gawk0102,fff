@@ -1,0 +1,17 @@
+# gawk
+# set numbers of raFS## tokens, according to appearance in file
+# useful when new raFSxx tokens are introduced
+
+BEGIN {
+  outfile = "Mem:" substr(ARGV[1], match(ARGV[1], /[^.]*$/));
+}
+
+/^#?raFS[0-9]+:/ {
+  xx = sprintf("%2d", n++);
+  sub(/ /, "0", xx);
+  sub(/[0-9]+/, xx);
+  print > outfile;
+  next;
+}
+
+// { print > outfile; }

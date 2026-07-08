@@ -1,0 +1,531 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>Manual for the raFS filing system</TITLE>
+<META NAME="Author" CONTENT="Richard Atterer">
+<META NAME="Keywords" CONTENT="Atterer, Augsburg, Acorn, raFS, filing, system, long, filename, filenames, directory, directories, file, files">
+<META NAME="Description" CONTENT="Manual for the raFS filing system written by Richard Atterer">
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000FF" VLINK="#8800BB" ALINK="#FF0000">
+
+<H1 ALIGN="center"><A
+HREF="http://www.informatik.tu-muenchen.de/~atterer/"><IMG ALT="raFS"
+SRC="rafs.gif" WIDTH=206 HEIGHT=88 BORDER=0></A></H1>
+
+<P><HR>
+
+<P><H2><A NAME="top">Technical Details</A></H2>
+
+This part of the manual describes more technical aspects of raFS. It is not necessary for you to read it, but there are a few things here that aren't mentioned in the User Manual.
+
+<P>
+<UL>
+<LI><A HREF="#integrity">Corrupted discs</A> and how they are dealt with
+<LI><A HREF="#behave">Behaviour in special situations</A>
+<LI><A HREF="#limits">Limits of raFS</A>
+<LI><A HREF="#goddamnbugs">Known problems</A>
+<LI><A HREF="#cli">Command line interface</A>: <KBD><A HREF="#cli_filer">Desktop_raFSFiler</A>, <A HREF="#cli_filermenu">raFSFiler_Menu</A>, <A HREF="#cli_fs">raFS</A>, <A HREF="#cli_fs">raFS</A>, <A HREF="#cli_create">raFS_Create</A>, <A HREF="#cli_flush">raFS_Flush</A>, <A HREF="#cli_discs">raFS_Discs</A>, <A HREF="#cli_mount">Mount</A>, <A HREF="#cli_dismount">Dismount</A>, <A HREF="#cli_verify">Verify</A>, <A HREF="#cli_free">Free</A>, <A HREF="#cli_name">NameDisc</A>, <A HREF="#cli_unsafe">raFS_Unsafe</A>, <A HREF="#cli_safe">raFS_Safe</A>, <A HREF="#cli_opt">raFS_Opt</A>, <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A></KBD>
+<LI><A HREF="#call">Calling raFS from assembler</A>: <KBD><A HREF="#call_info">raFS_Info</A>, <A HREF="#call_nrofdiscs">raFS_NrOfDiscs</A>, <A HREF="#call_enumeratediscs">raFS_EnumerateDiscs</A>, <A HREF="#call_finddisc">raFS_FindDisc</A>, <A HREF="#call_discinfo">raFS_DiscInfo</A>, <A HREF="#call_memcopy">raFS_MemCopy</A>, <A HREF="#call_readvar">raFS_ReadVar</A>, <A HREF="#call_setvar">raFS_SetVar</A></KBD>
+<LI><A HREF="#format">File formats</A>
+</UL>
+
+
+
+<P><HR>
+
+<P><H2><A NAME="integrity">Corrupted discs</A></H2>
+
+raFS includes code to deal as cleanly as possible with discs that contain invalid directories or file references. For example, a disc may become corrupted due to changed but not yet saved directory data being lost when the computer crashes.
+
+<P>Whenever directory data is loaded into memory, the filing system performs a number of checks to ensure that it really represents a valid directory - incorrect directories could have disastrous effects. An error message of the form <SAMP>directory data in 'ADFS::4.$.A0.A0.A0' is invalid</SAMP> is given in this case.
+
+<P>Before a new file or directory is written to the host filing system, raFS also ensures that the directory doesn't contain any files with invalid names. If a file is found whose name is not one of the 77 names <TT>A0</TT> to <TT>Z1</TT>, the save operation fails with <SAMP>Name inside the directory containing a raFS disc is not of the form 'A0.A0.A0'</SAMP>
+
+<P>Finally, special code deals with files on raFS which refer to files on the host filing system that either don't exist or that have a different time/date stamp. If a file is missing, a dummy file (length zero, file type zero, date stamp 01-01-1900) is created to prevent other files from being assigned that ID. (Depending on the configured TimeZone of your machine, the year may also be displayed as 2248 instead of 1900.)
+
+<P>If the date stamp, file type or the file length does not match the directory entry, all open, load, save, delete and create operations on files will only produce an error like <SAMP>'ADFS::4.$.A0.A0.A0' does not belong to this directory entry - verify the raFS disc.</SAMP> In this state, the only possible operations are renaming the file, stamping it (or changing its access details) and deleting it (<EM>only</EM> if it refers to a dummy file). Stamping the file causes the data to be synchronized, so that any operation can be applied to it again, but <EM>only do this if you are very sure about it!</EM>
+
+<P>Because there are filing systems that cannot store the date stamp in centiseconds like the native RiscOS filing systems do, the stamp will still be considered valid if it doesn't differ by more than 24 hours from what the raFS directory entry contains. Some filing systems don't allow file stamps at all. Consequently, it is possible to disable the checks by setting the system variable raFS$NoChecks to a comma-separated list of filing system names or image file types of the form <KBD>&amp;FC8</KBD> before mounting discs on those filing systems. The names are matched case-sensitively.
+
+<P><H3><A NAME="integrity">Verifying</A></H3>
+
+The verify operation attempts to detect invalid raFS discs and to repair them. This is achieved with several passes:
+
+<OL>
+
+<LI>Scan the storage directory and its subdirectories and build a map of used IDs.
+<LI>Scan the directory structure of the raFS disc, taking note of referenced IDs in the map. This allows for detection of duplicate references and non-existent files/directories.
+<LI>If any unreferenced objects remain, test whether one of them represents valid directory data. Once such an unreferenced directory is found, re-insert it into "Lost+Found" and return to the second pass to have the contents of this new directory verified.
+<LI>If no more unreferenced directories can be found, directly insert any remaining files into "Lost+Found", except for zero length files; they are deleted.
+
+</OL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="behave">Behaviour in special situations</A></H2>
+
+There are a few points worth noting about how raFS behaves in certain situations. 
+
+<UL>
+
+<LI>As a result of raFS' ability to have a file opened more than once, it is also possible to save on top of an opened file. In this case, the file extent will be set to the size of the file that is saved.
+
+<LI>Once a file is opened multiple times, it is possible that the file extent becomes smaller than the sequential pointer. This happens only for those sequential pointers that don't belong to the file handle used for changing the extent, i.e. if file handles A and B were returned when a file was opened twice, and file handle A is used to set the extent, then the sequential pointer of A will be set to the extent if it is greater whereas the sequential pointer of B won't be. This is not a bug, the behaviour is intended!
+
+<LI>raFS will sometimes automatically close files on its discs. This happens when you use <KBD>Close</KBD> on one of raFS' host filing systems. For example, if you issue <KBD>ADFS:Close</KBD> and you have one raFS disc on ADFS and one on SCSIFS, any open files on the raFS disc stored on ADFS will be closed, but open files on the other disc remain unaffected.
+
+<P>raFS claims FindV (called by OS_Find) and FSCV (called by OS_FSControl) and will close its own files before FileSwitch closes them on the host filing system. This is done either only for one filing system in the case of OS_Find&nbsp;0,0 (close all files on current filing system), or for all filing systems in the case of OS_FSControl&nbsp;22 (close all open files) and OS_FSControl&nbsp;23 (shutdown all filing systems).
+
+<LI>Try running the following program on a file on a FileCore disc which is locked and has no write access, only read access. It uses OS_Args&nbsp;6 to ensure an open file's size:
+
+<P><CODE>a%=OPENIN"ADFS::4.$.</CODE><I>Filename</I><CODE>" <BR>SYS"OS_Args",6,a%,512&lt;&lt;10</CODE>
+
+<P>Whereas FileCore ensures the specified size regardless of whether or not write access was granted, raFS gets it right and ignores FSEntry_Args&nbsp;6 if the file is read-only. (By the way: Could this be used to compromise security when a FileCore-based filing system is shared over a network? Just a thought...)
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="limits">Limits of raFS</A></H2>
+
+The following gives some information about the limits imposed by raFS on its discs. In practice. you are very unlikely to reach any of them, though.
+
+<UL COMPACT>
+
+<LI>The maximum number of discs that can be mounted at the same time is 50. (This can easily be altered to up to 255 in the source code.)
+
+<LI>One disc may contain at most 76&middot;77&middot;77 = 450604 objects (an object is a directory or file). Note that FileCore-based filing systems cannot store more than 32766 disc objects on a disc anyway.
+
+<LI>Consequently, you can theoretically have up to 450603 entries in a directory...
+
+<LI>The limit for the length of filenames is about 500 characters, though FileSwitch imposes a limit of nearly 256 characters and the Filer will only handle properly up to 63 characters.
+
+<LI>Disc names can be up to 63 characters long. For longer names no error is given, instead the name is truncated. (However, at present RiscOS insists on a disc name length of 2 to 10 characters with OS_FSControl&nbsp;50 - you must use <KBD>NameDisc</KBD> for longer names.)
+
+<LI>Up to 65535 directories may be cached at the same time, otherwise things start going wrong.
+
+<LI>raFS is not re-entrant. This means that you cannot use raFS as the host filing system for another raFS disc - this wouldn't serve any purpose, anyway. Because this is no image filing system, it doesn't need to be re-entrant.
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="goddamnbugs">Known problems</A></H2>
+
+<UL>
+
+<LI>If access to a directory becomes extremely slow as soon as it contains several hundred files, this is no problem at all: Just increase the size of the directory cache!
+
+<LI>Should deletion of files on raFS be very slow and you are using Undelete by Quantum Software, turn off deletion protection either for raFS or for the storage directory on the host filing system. You should also <A HREF="http://acorn.cybervillage.co.uk/qs/">upgrade</A> to V1.50 of the Model module.
+
+<LI>There appears to be a problem in FileSwitch or in the Filer which causes crashes for very long disc names. Only use at most 16&nbsp;characters for now!
+
+<LI>For the RiscOS&nbsp;3.1 version, other programs may corrupt the sprite area and can make raFS crash. If this is the case for you, enable RMA support by uncommenting the relevant lines in <KBD>!raFS.!Boot</KBD> and <KBD>!raFS.!Run.</KBD>
+
+<LI>With older versions of the AlSystems SCSI podule (e.g. SCSIFS&nbsp;1.34), raFSFiler crashes when started, unless it is loaded before the desktop starts up (for example, by copying it into <KBD>!Boot.Choices.Boot.PreDesk</KBD>).
+
+<LI>Several users have experienced <SAMP>Cannot extend raFS buffers</SAMP> errors when there was still enough free memory left. This seems to be caused by the ANT internet suite (more specifically, the Mbuf Manager module). Apart from this, commands like <KBD>Copy</KBD> are known to cause the same error.
+
+<LI>If you get the error <SAMP>Name inside the directory containing an raFS disc is not of the form A0.A0.A0</SAMP> then this is probably caused by an older version of the ImageFSFix module - ArcFS version, <EM>earlier</EM> than V0.30 (25-Aug-1996). Note that the ImageFSFix modules supplied with SparkFS (e.g. V0.04) do not cause any problems.
+
+<LI>For every file on a raFS disc that is opened, raFS will open another one on the host filing system. Because file handles are used up twice as quickly, it is theoretically possible that e.g. the FontManager causes the main application to run out of file handles. However, this is unlikely to happen.
+
+<LI>Some filing system calls that are supported by FileCore for backward compatibility are now deprecated in favour of other calls. They are not implemented in raFS:
+
+<UL>
+
+<LI>OS_GBPB&nbsp;5 (read name and boot option) - use OS_FSControl&nbsp;37 and/or&nbsp;47
+
+<LI>OS_GBPB&nbsp;6 or&nbsp;7 (read directory name and privilege byte) - use OS_FSControl&nbsp;37
+
+<LI>OS_GBPB&nbsp;8 (read directory entries) - use OS_GBPB&nbsp;9
+
+</UL>
+
+<LI>If Filer_Action fails with <SAMP>Internal error, no stack for trap handler: Internal error: Branch through zero at...</SAMP> while deleting files, the reason is that it has attempted to access a directory in order to see whether it is empty, but the file on the host filing system which contains the directory data is not there. If you double-click on the relevant directory, you will get an error message saying something like <SAMP>Error when reading 'raFS::DiscName.$.X.Dir' - 'ADFS::HardDisc4.$.MyDisc.A0.V8.U2' not found</SAMP>
+
+<P>A similar thing happens when you try to rename an object whose file isn't found on the host filing system. This is a bug in the Filer_Action module. (The module's programmer assumed that there will never be an error under certain circumstances.)
+
+<LI>You may occasionally notice that the <B>Dismount</B> submenu is closed after a click with Adjust. This incorrect behaviour is also caused by the Filer.
+
+<LI>If an error occurs on the host filing system at a certain point during renaming a file, you may end up with two directory entries pointing to the same file. Don't attempt to delete one of them - this will also delete the actual file, so the second entry won't work any longer! Instead, verify the disc.
+
+<P>In practice, this is very unlikely to happen.
+
+<LI>Do not use <I>Memphis</I> (a memory-based filing system) as the host filing system for a raFS disc with the pre-RiscOS&nbsp;3.5 version of raFS (i.e. the one that uses the sprite area, just like Memphis does). This seems to work for a while, but sooner or later something causes data loss. I cannot be 100% sure, but my log files indicate that Memphis and not raFS itself is the culprit (Data that I write to Memphis and then re-load immediately afterwards is corrupted).
+
+<P>The reason for the problem might lie in the fact that Memphis might not expect that data saved to it is somewhere in the sprite area: raFS makes a call to FileSwitch to save data to Memphis. Upon receiving the query from FileSwitch, Memphis does some housekeeping, during which the size of one of its sprites is altered, so that the sprite that belongs to raFS is copied to a different memory location. Then Memphis "saves" the area of memory specified by FileSwitch, but this no longer points to the correct data! The correct behaviour of Memphis would be to check whether the data to be saved is in the sprite area, and if it is, to update its pointer to it whenever a sprite with a lower address changes size.
+<BR>[By the way: At present, raFS itself doesn't perform these checks either...]
+
+<P>It should be possible to use Memphis at the same time as raFS as long as it is not the host filing system. However, don't blame me if something screws up...
+
+<LI>...there might be the odd bug.
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="cli">Command line interface</A></H2>
+
+<P>The raFSFiler module provides two <TT>*</TT>commands:
+
+<DL>
+
+<DT><KBD><A NAME="cli_filer">Desktop_raFSFiler</A></KBD> <I>[</I><KBD>-choices</KBD><I>] [</I><KBD>-newdisc</KBD><I>] [</I><KBD>-left</KBD><I>] [</I><KBD>-right</KBD><I>] [</I><KBD>-priority</KBD> <I>&lt;nr&gt;]</I>
+
+<DD>If issued without any arguments, this command causes raFS to install its icon on the icon bar. You can change the position of the icon bar icon by adding <KBD>-left</KBD>, <KBD>-right</KBD> and <KBD>-priority</KBD> switches to the command <EM>in the !Run file.</EM>
+
+<P>The <KBD>-choices</KBD> and <KBD>-newdisc</KBD> switches are useful for executing when the icon bar icon is clicked on. They open the "Choices" and "Create new disc" windows, respectively.
+
+<P><KBD>Desktop_raFSFiler</KBD> also supports <KBD>-options</KBD>, <KBD>-mount</KBD>, <KBD>-select</KBD> and <KBD>-adjust</KBD> switches, but these are intended for internal use only.
+
+<DT><KBD><A NAME="cli_filermenu">raFSFiler_Menu</A></KBD> <I>&lt;command&gt; &lt;menutitle&gt;</I> <I>[</I><KBD>-X</KBD> <I>&lt;OSunits&gt;] [</I><KBD>-Y</KBD> <I>&lt;OSunits&gt;] [</I><KBD>-one</KBD><I>&nbsp;|&nbsp;</I><KBD>-first</KBD><I>]</I>
+
+<DD>This command is intended to be executed by a click on the icon bar menu. It opens a menu with the names of all currently mounted discs and with the specified string as the menu's title string. Once one of the names has been selected, the following substitutions take place before the command is executed:
+
+<UL>
+<LI><KBD>%0</KBD> in the string is replaced with the disc name.
+<LI><KBD>%1</KBD> is replaced with the path of the disc's storage directory.
+<LI><KBD>%2</KBD> is replaced with the path of the parent of the disc's storage directory.
+</UL>
+
+By default, the menu is opened at the position of the pointer, but this can be overridden by giving absolute coordinates for the upper left corner of the menu with the <KBD>-X</KBD> and <KBD>-Y</KBD> switches. For <KBD>-Y</KBD>, negative values have a special meaning - they indicate that the (absolute) value is the y coordinate of the <EM>lower</EM> edge of the menu, making it possible to position the menu above the icon bar with a value of -96 (which must be specified as <KBD>0-96</KBD> because of the leading dash).
+
+<P>In some cases, it may be desirable not to open the menu if only one disc is mounted, so the <KBD>-one</KBD> switch can be used to execute the command immediately if this is the case; otherwise, the menu is displayed first. 
+
+<P><KBD>-first</KBD> is similar to <KBD>-one</KBD>, but always executes the command immediately. If there is more than one disc, the first disc in the list is chosen. The <KBD>-first</KBD> and <KBD>-one</KBD> switches cannot be used at the same time.
+
+<P>If no discs are mounted at all, <KBD>raFSFiler_Menu</KBD> is ignored. Remember to enclose the command and menu title in quotation marks if they consist of more than one word.
+
+</DL>
+
+<P>raFS provides several <TT>*</TT>commands. While the raFSFiler module offers a more convenient way of working with discs, you may sometimes prefer to use the command line instead.
+
+<DL>
+
+<DT><KBD><A NAME="cli_fs">raFS</A></KBD>
+
+<DD>This command selects raFS as the current filing system. For raFS commands that are also supported by other filing systems, like <KBD>Mount</KBD>, you must switch to raFS with this command before using them. (Alternatively, you can use <KBD>raFS:Mount</KBD> to switch to raFS temporarily.)
+
+<DT><KBD><A NAME="cli_create">raFS_Create</A></KBD> <I>&lt;directory&gt; &lt;DiscName&gt;</I> <I>[</I><KBD>-app</KBD> <I>&lt;SpriteName&gt;]</I>
+
+<DD>This command sets up a storage directory for a disc, so that you can subsequently mount it with <KBD>Mount</KBD> <I>&lt;directory&gt;</I>. If you use a whole hard or floppy disc just for raFS, use the root directory "$" as the storage directory, otherwise choose a directory as near to the root as possible.
+
+<P>The storage directory is the directory to which all files saved to the disc will be written. If the specified directory does not already exist, it is created. If it isn't empty, raFS will give an error.
+
+<P>If the given directory's leafname begins with "!", the optional <KBD>-app</KBD> switch can be used to specify the name of a sprite to use for this application, for example <KBD>-app&nbsp;directory</KBD> to make it look like an ordinary directory. This sprite must be present in the Wimp's pool when the command is issued. raFS also saves a <I>!Run</I> file so that double-clicking on the application will mount the disc and open its root directory. The <KBD>-app</KBD> switch has no effect if the first character of the leafname is not "!".
+
+<P>To delete a complete raFS disc, make sure it has been dismounted and then <KBD>Wipe</KBD> the storage directory.
+
+<DT><KBD><A NAME="cli_flush">raFS_Flush</A></KBD>
+
+<DD>This command saves the directory information of any altered directories to the host filing system. However, in contrast to <KBD>Dismount</KBD> the cached directories remain in memory. It is useful to ensure that a subsequent crash will not cause data to be lost.
+
+<DT><KBD><A NAME="cli_discs">raFS_Discs</A></KBD>
+
+<DD><KBD>raFS_Discs</KBD> or the equivalent <KBD>raFS_Disks</KBD> gives a list of all discs that are mounted at the time the command is entered. One line of text will be printed for each disc, consisting of the disc name followed by a space character and the name of the disc's storage directory.
+
+<P>Future versions of raFS may print out additional information after that described above, with further items appended to the printed lines after spaces. Take this into account when writing programs that make use of this command's output.
+
+<DT><KBD><A NAME="cli_mount">Mount</A></KBD> <I>&lt;directory&gt;</I> <I>[</I><KBD>-readonly</KBD><I>] [</I><KBD>-path</KBD><I>] [</I><KBD>-X</KBD><I>]</I>
+
+<DD>This command makes sure that you can access the raFS disc stored in the specified directory, e.g. that you can open the root directory "raFS::<I>DiscName</I>.$". It will also set the current directory to the disc's root directory, unset the User Root Directory (URD), and set the system variable raFS$Disc to the new disc's name. A file called <I>Lock</I> is created inside the storage directory if possible.
+
+<P>Two discs with the same name cannot be mounted at the same time - an error will be given if this is attempted. However, if you try to mount a disc that is already mounted (i.e. the disc of that name has the same storage directory as specified in the <KBD>Mount</KBD> command), raFS will give no error and will ignore the command.
+
+<P>raFS automatically decides whether or not the disc is read-only by looking at the file <I>!Atterer.</I> If this file does not have write access (either because it resides on a read-only filing system or because you set its attributes in order to permanently "write protect" the disc), all attempts to modify files or directories will be faulted.
+
+<P>The optional <KBD>-readonly</KBD> switch (short <KBD>-ro</KBD>) write protects the disc even if <I>!Atterer</I> has write access.
+
+<P>Any <KBD>-path</KBD> switch appended to the command will only come into effect if the disc stored in the specified directory has the same name as one of the currently mounted discs. In this case, it is assumed that the name of that disc's storage directory has changed (e.g. because you renamed a directory in the path) and that raFS should update its workspace accordingly. <EM>Use this with care!</EM> You must not use this feature to set the path to the storage directory of a different disc!
+
+<P>When mounting discs without an <KBD>-X</KBD> switch appended to the <KBD>Mount</KBD> command, raFS looks for a file called <I>!Mount</I> in the storage directory. If the file is not present, the disc is just mounted, but if <I>!Mount</I> is found, it is <KBD>Run</KBD>. Apart from that, nothing happens; the disc is <EM>not</EM> mounted if <I>!Mount</I> is run. However, it can be an Obey file containing the command "<KBD>raFS:Mount&nbsp;&lt;Obey$Dir&gt;&nbsp;-X</KBD>". The presence of the <KBD>-X</KBD> switch indicates to raFS that the disc should be mounted without searching for <I>!Mount.</I> (Be careful not to create a loop by forgetting to add the <KBD>-X</KBD> switch!) With this system, it is possible to execute *commands before and after the disc is mounted.
+
+<DT><KBD><A NAME="cli_dismount">Dismount</A></KBD> <I>[&lt;DiscName&gt;]</I>
+
+<DD>This command does the opposite of <KBD>Mount</KBD>, removing the specified disc (or all mounted discs if you omit the name) from its internal list and saving any cached directory data. Discs must <EM>always</EM> be dismounted before you reset or switch off the computer, but usually you don't need to use <KBD>Dismount</KBD> because raFS is automatically called when the desktop shuts down and when you issue <KBD>Shutdown.</KBD>
+
+<P>Note that in case raFS is <KBD>RMKill</KBD>ed, it will try to dismount all discs. However, any errors while doing this will be ignored, and the module will <EM>not</EM> refuse to die, which means you lose data! It behaves like this because if it refused to be <KBD>RMKill</KBD>ed, you would not be able to reload it unless you reset the machine.
+
+<P>Before a disc is dismounted, raFS sets the system variable raFS$DDisc to its name, removes the <I>Lock</I> file and tries to run any file called <I>!Dismount</I> residing in the storage directory. If errors occur during its execution, they are ignored; the disc is always dismounted. You must not dismount raFS discs in a <I>!Dismount</I> file. When the module is <KBD>RMKill</KBD>ed, the <I>!Dismount</I> files are <EM>not</EM> executed.
+
+<DT><KBD><A NAME="cli_verify">Verify</A></KBD> <I>[</I><KBD>-quiet</KBD><I>] &lt;DiscName&gt;</I>|<KBD>*</KBD>
+
+<DD>Performs a verify operation for the disc. Unless the <KBD>-quiet</KBD> switch is present, verifying is interactive, i.e. before altering the disc in any way, the user is prompted.
+
+<P>Specifying <KBD>*</KBD> instead of the disc name does <EM>not</EM> verify all discs - rather, it verifies those discs that need verifying, either because they weren't dismounted properly or because a file could not be accessed due to inconsistencies.
+
+<DT><KBD><A NAME="cli_name">NameDisc</A></KBD> <I>&lt;OldDiscName&gt; &lt;NewDiscName&gt;</I>
+
+<DD>This command (or also <KBD>NameDisk</KBD>) is used to change the name of a disc. Obviously, the disc must have been mounted for it to work.
+
+<DT><KBD><A NAME="cli_free">Free</A></KBD>
+
+<DD>The <KBD>Free</KBD> command is just passed on to the host filing system that the currently selected raFS directory is stored on, e.g. if the disc is on ADFS, <KBD>ADFS:Free</KBD> will be executed.
+
+<DT><KBD><A NAME="cli_unsafe">raFS_Unsafe</A></KBD> <I>[</I><KBD>-verbose</KBD><I>]</I>
+
+<DD>By default, raFS only saves changed directory data to the host filing system after a delay. Usually, this is desirable because it is faster, but sometimes you may want to temporarily switch on write-through of the cache, so any changes are saved immediately. Instead of <KBD>raFS_Opt&nbsp;-dd&nbsp;1</KBD>, you can also switch on write-through with this command.
+
+<P>The <KBD>-verbose</KBD> switch has the same functionality as for <KBD>raFS_Safe</KBD> below.
+
+<DT><KBD><A NAME="cli_safe">raFS_Safe</A></KBD> <I>[</I><KBD>-smash</KBD><I>] [</I><KBD>-verbose</KBD><I>]</I>
+
+<DD>This does the opposite of <KBD>raFS_Unsafe</KBD>, re-enabling the chosen delay values for saving directory cache contents. Note that an internal counter is kept, which means that in order to disable write-through after issuing <KBD>raFS_Unsafe</KBD> twice, you would also have to execute <KBD>raFS_Safe</KBD> twice. (After that, any additional <KBD>raFS_Safe</KBD> will have no effect.) If the number of <KBD>raFS_Unsafe</KBD> commands is unknown, you can use <KBD>raFS_Safe&nbsp;-smash</KBD> to disable write-through immediately.
+
+<P>A <KBD>-verbose</KBD> switch makes raFS print out the value of the internal counter after it has been modified.
+
+<P><KBD>raFS_Unsafe</KBD> and <KBD>raFS_Safe</KBD> can be added to a Wimp application's !Run file if the application tends to crash the computer, in such a way that write-through is disabled once the application is quit:
+
+<P><I>other commands, e.g. WimpSlot, IconSprites etc.</I>
+<BR><CODE>raFS_Unsafe</CODE>
+<BR><CODE>Run &lt;</CODE><I>App</I><CODE>$Dir&gt;.!RunImage %*0</CODE>
+<BR><CODE>raFS_Safe</CODE>
+
+<DT><KBD><A NAME="cli_opt">raFS_Opt</A></KBD> <I>[</I><KBD>-DirCache</KBD> <I>&lt;kB&gt;] [</I><KBD>-DirsaveDelay</KBD> <I>&lt;cs&gt;] [</I><KBD>-DirsaveMods</KBD> <I>&lt;nr&gt;] [</I><KBD>-DirUpcall 0|1</KBD><I>] [</I><KBD>-OpenRename 0|1</KBD><I>] [</I><KBD>-MsgTimeout</KBD> <I>&lt;cs&gt;] [</I><KBD>-LoadMessages</KBD> <I>&lt;name&gt;]</I>
+
+<DD>This command is used to influence various miscellaneous aspects of raFS' behaviour, or to output the current settings if no parameters are given. Each of the optional keywords is followed by a value, in some cases just <KBD>0</KBD> or <KBD>1</KBD> to switch on and off. The keywords can be abbreviated to the characters written in uppercase, e.g. <KBD>-dc</KBD> instead of <KBD>-DirCache.</KBD> However, case doesn't matter on the command line; <KBD>-dircache</KBD> or <KBD>-dC</KBD> are the same as <KBD>-DirCache.</KBD>
+
+<P>Currently, the following keywords have an effect:
+
+<UL>
+
+<LI><A NAME="cli_optdc"><KBD>-DirCache</KBD></A> <I>&lt;kBytes&gt;</I> selects the amount of memory that will be used for cacheing directory information. There is one directory cache for all discs. You can switch directory cacheing off completely by specifying <KBD>-DirCache&nbsp;0</KBD>, but this makes raFS <EM>very</EM> slow. The recommended minimum for the cache size is 16k - when the filing system module is loaded, the value defaults to 30k.
+
+<LI><A NAME="cli_optdd"><KBD>-DirsaveDelay</KBD></A> <I>&lt;centiseconds&gt;</I> sets the delay between the last change to a directory and the moment it is saved to the host filing system. Supplying a value of <KBD>0</KBD> causes no automatic saving whereas a value of <KBD>1</KBD> makes raFS save immediately after each change. The default value is 500 - five seconds.
+
+<P>If both this and <KBD>-DirsaveMods</KBD> below are enabled at the same time, the directory will be saved when the delay or the number of changes is reached, whichever comes first.
+
+<LI><A NAME="cli_optdm"><KBD>-DirsaveMods</KBD></A> <I>&lt;number&gt;</I> allows you to specify the number of changes allowed to be made to a buffered directory before it must be saved to the host filing system. For instance, if you want to have the directory saved after every 5 files written/deleted/renamed, use <KBD>-DirsaveMods&nbsp;5</KBD>. Again, supplying a value of <KBD>0</KBD> switches the counting off and a value of <KBD>1</KBD> forces immediate write-through. The maximum for this value is 255, the default is 10.
+
+<P>When the number of changes is counted, stamping of files, changing their access details or closing open files is not taken into account. This is necessary to ensure a Filer copy operation only increases the count by 1.
+
+<LI><A NAME="cli_optdu"><KBD>-DirUpcall</KBD></A> followed by <KBD>0</KBD> or <KBD>1</KBD> disables or enables whether raFS will cause directory displays to be updated immediately when the size of a directory changes. (Unlike with other filing systems, the directory size is not fixed and when it changes, this will be reflected.) By default, this is switched off because it causes a lot of flickering when the Filer continually updates its displays. Even when the Upcalls are switched off, the directory size is updated eventually when you re-open the parent of that directory or write to it.
+
+<P>By the way: Have you noticed that RiscOS does not have an Upcall for informing that an object's size has changed? I'm using OS_Upcall&nbsp;3,1 (Writing catalogue information), but even this excludes the size.
+
+<LI><A NAME="cli_optor"><KBD>-OpenRename</KBD></A> followed by <KBD>0</KBD> or <KBD>1</KBD> disables or enables whether it is possible to rename an open file. The default value is 1.
+
+<LI><A NAME="cli_optmt">If</A> a disc has not been dismounted properly and the desktop is active, raFS opens an error box. To prevent this from stopping the boot process, the error box is closed automatically after, by default, five seconds. <KBD>-MsgTimeout</KBD> can be used to specify a different delay in centiseconds.
+
+<LI><A NAME="cli_optlm"><KBD>-LoadMessages</KBD></A> followed by the name of a Messages file is special in that it doesn't set internal variables. Instead, this is used to override the hard-coded English defaults used for error messages, help texts and the !Mount/!Run files.
+
+<P>You can use <KBD>-LoadMessages&nbsp;null:</KBD> to discard the messages and revert to the default ones.
+
+</UL>
+
+<DT><KBD><A NAME="cli_execafter">raFS_ExecAfter</A></KBD> <I>&lt;centiseconds&gt; &lt;command line&gt;</I>
+
+<DD>This command has little to do with raFS. It simply passes the specified command line to the CLI after the given delay. Due to the way this is achieved, only few commands can be used. <KBD>Filer_Run</KBD> is the only way to start a program using this command (if at least one disc is always mounted, you can also use <KBD>raFSFiler_Menu -first</KBD>).
+
+</DL>
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="call">Calling raFS from assembler</A></H2>
+
+<P>As of version 1.10, there is a way of calling certain routines inside the raFS module directly from assembler. raFSFiler uses these calls to get information about discs and current settings.
+
+<P>To call an raFS routine, you must first find out the address of the module workspace with:
+
+<P><CODE>&nbsp;&nbsp;&nbsp;&nbsp;SYS "XOS_Module",18,"raFS" TO R0%,R1%,R2%,R3%,workspace%</CODE>
+
+<P>Move the returned value into R11 before calling raFS with the following instructions:
+
+<P><CODE>&nbsp;&nbsp;&nbsp;&nbsp;MOV LR,PC
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;LDR PC,[R11,#rout_offset%]</CODE>
+
+<P>If you use <CODE>MOV LR,PC</CODE> (and not <CODE>ADD LR,PC,#0</CODE>) before calling the routine, the N, Z and C flags will be preserved. When calling raFS from SVC code, you must use <CODE>MOV</CODE>, otherwise the processor will switch to USR mode once the call returns.
+
+<P>The <CODE>rout_offset%</CODE> is zero for the routine described first below, and increases in the order the routines are described. The Docs directory contains a small BASIC program which sets up the offsets with a horrible EVAL trick and which also provides a macro for the BASIC assembler so the above can be reduced to, e.g. <CODE>FNcall(raFS_Info)</CODE>.
+
+<P>Registers not mentioned in "On exit" are preserved. (Of course, R14 is corrupted.) For all calls, R11 must point to the workspace of the raFS module. Processor must be in USR or SVC mode, R13 must point to a full descending stack with at least 1k free.
+
+<P>In the following description, any bits in fields that are not described are reserved. It should not be assumed that they are zero, and when setting the word's value, they must be preserved.
+
+<DL>
+
+<DT><CODE><A NAME="call_info">raFS_Info</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>-
+<P><B>On exit:</B>
+<BR>R0 = module version number * 100
+<BR>R1 = maximum number of discs this version can have mounted
+<BR>R2 = bit 0 set =&gt; module's heap is in sprite area, bits 24-31 = country number (1 for UK, 7 for Germany / as of V1.12, is always 1)
+<BR>R3-R5 corrupted
+<P>Never returns an error.
+
+
+<DT><CODE><A NAME="call_nrofdiscs">raFS_NrOfDiscs</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>-
+<P><B>On exit:</B>
+<BR>R0 = number of discs currently mounted
+<P>Never returns an error.
+
+
+<DT><CODE><A NAME="call_enumeratediscs">raFS_EnumerateDiscs</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R9 = -1 for first call
+<P><B>On exit:</B>
+<BR>R0 = word-aligned pointer to zero-terminated disc name
+<BR>R1 = word-aligned pointer to unterminated name of storage directory
+<BR>R2 = length of name of storage directory
+<BR>R9 = disc number (also value of R9 for next call to this routine) or -1 and C set if no more discs
+
+<P>Never returns an error. The information must be copied away immediately; it may change during any call to raFS (except raFS_MemCopy) or accesses to the filing system.
+
+<P>After the disc name there are 1 to 4 zero bytes, up to the next word boundary, so you can find the length faster by first loading words and only looking at the high byte with <CODE>TST Rx,#&amp;FF&lt;&lt;24</CODE>
+
+
+<DT><CODE><A NAME="call_finddisc">raFS_FindDisc</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R1 =&gt; zero-terminated disc name
+<P><B>On exit:</B>
+<BR>R0 = word-aligned pointer to zero-terminated disc name
+<BR>R1 = word-aligned pointer to unterminated name of storage directory
+<BR>R2 = length of name of storage directory
+<BR>R8 = internal ID of the disc's root directory
+<BR>R9 = disc number
+<BR>R14 = length of disc name
+
+<P>If a disc of the given name is not mounted, an error is returned. Again, the returned pointers to the disc name (whose case may differ from that passed to the routine) and storage directory are read-only and must be copied away immediately.
+
+
+<DT><CODE><A NAME="call_discinfo">raFS_DiscInfo</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R9 = disc number
+<P><B>On exit:</B>
+<BR>R0 = word-aligned pointer to zero-terminated disc name
+<BR>R1 = word-aligned pointer to unterminated name of storage directory
+<BR>R2 = length of name of storage directory
+<BR>R3 = flags:
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;bit 0 set =&gt; the disc is read-only
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;bit 1 set =&gt; integrity checks are performed (raFS$NoChecks)
+<BR>R8 = internal ID of the disc's root directory
+<BR>or C set if disc of that number not mounted
+
+<P>If the given disc number is in the valid range (zero to maximum number - 1) and a disc of that number does not exist, this returns with C set. Obviously, this call is much faster than raFS_FindDisc because it doesn't have to search for the disc name.
+
+
+<DT><CODE><A NAME="call_memcopy">raFS_MemCopy</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R2 =&gt; source (word-aligned)
+<BR>R3 =&gt; destination (word-aligned)
+<BR>R4 = number of bytes to copy (multiple of 4)
+<P><B>On exit:</B>
+<BR>Registers preserved
+<P>The memory areas may overlap.
+
+
+<DT><CODE><A NAME="call_readvar">raFS_ReadVar</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R0 = number of variable to read
+<P><B>On exit:</B>
+<BR>R0 = value / pointer to string (depending on variable type)
+<BR>R1 corrupted
+
+<P>Currently, the following variables are supported:
+<UL>
+<LI>0 =&gt; DirCache (kBytes) - is internally stored as bytes, so don't set to a value higher than &amp;3fffff
+<LI>1 =&gt; DirsaveDelay (centiseconds)
+<LI>2 =&gt; DirsaveMods (nr)
+<LI>3 =&gt; Misc flags:
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;Bit 0 set =&gt; DirUpcall happens
+<LI>4 =&gt; MsgTimeout (nr)
+</UL>
+
+
+<DT><CODE><A NAME="call_setvar">raFS_SetVar</A></CODE>
+
+<DD><B>On entry:</B>
+<BR>R0 = number of variable to set value of
+<BR>R1 = new value
+<P><B>On exit:</B>
+<BR>R0, R1 corrupted
+<P>R0 on entry contains the same values as for raFS_ReadVar
+
+
+</DL>
+
+
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I><P><HR
+WIDTH="41%">
+
+
+
+<P><H2><A NAME="format">File formats</A></H2>
+
+This section outlines the format of a raFS disc.
+
+In the following description, an ID word is of the form &amp;00zzyyxx where xx is the first level directory, yy the second, and zz the leaf name, e.g. &amp;00010203 is the file 'B0.A2.A1'. The root directory is always 'A0.A0.A0'.
+
+<H3>The <I>!Atterer</I> file</H3>
+
+<P><PRE>Size Description
+64   disc name, null terminated, padded with zeroes
+4    there is guaranteed no unused ID lower than this one
+4    attribute flags for root directory (0 at present)
+4    0 (unimplemented)
+4    o = number of buffer settings following (always 0 at present)
+??*o buffer settings</PRE>
+
+<H3>Directory format</H3>
+
+<P><PRE>Size Description
+4    n = nr of entries
+4    m = 0 (unimplemented)
+4    ID of parent (max. 76.76.76.0) - word contains -1 for root
+4    &amp;80000000 (unimplemented)
+4*n  offset to start of directory entries
+     (words must be sorted in ascending order, filenames in ASCII order,
+     offsets are relative to start of these offsets)
+4*m  if any, offset to... (unimplemented)
+4    offset to first unused byte after dir entries/dir names (also from
+     beginning of offsets, so that if there are no entries, this contains the
+     value 4)</PRE>
+
+<P>This is followed by the individual entries, if any:
+
+<P><PRE>4    load address
+4    exec address
+4    length (or FileSwitch handle if flag bit 12 set)
+4    attributes
+4    raFS attributes/flags:
+     bits 0-1: 0 (unimplemented)
+          2-3: 0 (unimplemented)
+          4-5: 0 (unimplemented)
+          6-7: 0=normal file, 1/2 unimplemented, 3=directory
+          12:  if set, file is open =&gt; 'length' contains FileSwitch handle
+4    0 (unimplemented)
+4    ID of file/directory
+4*?  name of file/directory, zero-terminated, padded with zeroes to the next
+     multiple of 4.
+4*?  (unimplemented, always null at present)
+</PRE>
+
+<P>If an entry with bit 12 set is encountered upon loading directory data, raFS checks whether its own list of files contains that file ID together with the FileSwitch handle found in the directory entry. If there is no such entry in the list of open files, it is assumed that the machine crashed and the length is restored.
+
+<P ALIGN="right"><I><A HREF="#top">Back to the top of the page</A></I>
+
+</BODY></HTML>

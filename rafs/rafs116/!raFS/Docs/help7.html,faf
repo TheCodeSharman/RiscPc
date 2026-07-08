@@ -1,0 +1,515 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>Anleitung f&uuml;r das raFS-Dateisystem</TITLE>
+<META NAME="Author" CONTENT="Richard Atterer">
+<META NAME="Keywords" CONTENT="Atterer, Augsburg, Acorn, raFS, filing, system, long, filename, filenames, directory, directories, file, files">
+<META NAME="Description" CONTENT="Anleitung fur das raFS-Dateisystem, geschrieben von Richard Atterer">
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000FF" VLINK="#8800BB" ALINK="#FF0000">
+
+<H1 ALIGN="center"><A HREF="http://www.informatik.tu-muenchen.de/~atterer/"><IMG ALT="raFS" SRC="rafs.gif" WIDTH=206 HEIGHT=88 BORDER=0></A></H1>
+
+<P>Das Dateisystem raFS erlaubt es, lange Dateinamen zu verwenden und beliebig viele Dateien in Verzeichnissen zu speichern. Gespeicherte Dateien werden auf einem "Host"-Dateisystem, z.B. ADFS, als einzelne Dateien gespeichert.
+<P ALIGN="center">raFS ist Free Software, geschrieben von Richard Atterer.
+
+<P><HR>
+
+<P><H4><A NAME="top">Teil I - Anleitung</A></H4>
+
+<UL>
+<LI><A HREF="#release">Anmerkungen zu dieser Version</A> - bitte lesen!
+<LI><A HREF="#intro">Einf&uuml;hrung</A>
+<LI><A HREF="#usage">Benutzung</A> - raFS' System, Daten zu speichern
+<UL>
+  <LI><A HREF="#discs">Mit Disks arbeiten</A> - Schreibschutz, Benennen, abmelden
+  <LI><A HREF="#create">Neue Disks erzeugen</A>
+  <LI><A HREF="#choices">Das Einstellungen-Fenster</A>
+</UL>
+<LI><A HREF="#verify">&Uuml;berpr&uuml;fen fehlerhafter Disks</A>
+<LI><A HREF="#contact">Kontakt zum Autor</A>
+<LI><A HREF="#history">&Uuml;berblick &uuml;ber die Versionen</A>
+<LI><A HREF="gpl.html">GNU General Public License</A>
+</UL>
+
+<P><H4>Teil II - Technische Details (Englisch)</H4>
+
+<UL>
+<LI><A HREF="tech.html#integrity">Corrupted discs</A> and how they are dealt with
+<LI><A HREF="tech.html#behave">Behaviour in special situations</A>
+<LI><A HREF="tech.html#limits">Limits of raFS</A>
+<LI><A HREF="tech.html#goddamnbugs">Known problems</A>
+<LI><A HREF="tech.html#cli">Command line interface</A>: <KBD><A HREF="tech.html#cli_filer">Desktop_raFSFiler</A>, <A HREF="tech.html#cli_filermenu">raFSFiler_Menu</A>, <A HREF="tech.html#cli_fs">raFS</A>, <A HREF="tech.html#cli_create">raFS_Create</A>, <A HREF="tech.html#cli_flush">raFS_Flush</A>, <A HREF="tech.html#cli_discs">raFS_Discs</A>, <A HREF="tech.html#cli_mount">Mount</A>, <A HREF="tech.html#cli_dismount">Dismount</A>, <A HREF="tech.html#cli_verify">Verify</A>, <A HREF="tech.html#cli_name">NameDisc</A>, <A HREF="tech.html#cli_unsafe">raFS_Unsafe</A>, <A HREF="tech.html#cli_safe">raFS_Safe</A>, <A HREF="tech.html#cli_opt">raFS_Opt</A>, <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A></KBD>
+<LI><A HREF="tech.html#call">Calling raFS from assembler</A>: <KBD><A HREF="tech.html#call_info">raFS_Info</A>, <A HREF="tech.html#call_nrofdiscs">raFS_NrOfDiscs</A>, <A HREF="tech.html#call_enumeratediscs">raFS_EnumerateDiscs</A>, <A HREF="tech.html#call_finddisc">raFS_FindDisc</A>, <A HREF="tech.html#call_discinfo">raFS_DiscInfo</A>, <A HREF="tech.html#call_memcopy">raFS_MemCopy</A>, <A HREF="tech.html#call_readvar">raFS_ReadVar</A>, <A HREF="tech.html#call_setvar">raFS_SetVar</A></KBD>
+<LI><A HREF="tech.html#format">File formats</A>
+</UL>
+
+<P><HR>
+
+
+
+<P><H2><A NAME="release">Anmerkungen zu Version 1.15 (05-05-1999)</A></H2>
+
+<P>raFS ist mittlerweile sehr stabil. Trotzdem hei&szlig;t das nicht, da&szlig; man nicht vorsichtig sein sollte, wenn man raFS seine wertvollen Daten anvertraut. <EM>Bitte mache von wichtigen Daten, die auf raFS geschrieben werden, immer eine Sicherheitskopie!</EM>
+
+<P>Wichtige Hinweise zur Benutzung von raFS:
+<UL>
+<LI>Immer den Computer herunterfahren, nie einfach einen Reset durchf&uuml;hren.
+<LI>Immer wenn der Pfadname des Ablageverzeichnisses sich ge&auml;ndert hat, die Disk durch einen Doppelklick auf das Verzeichnis neu anmelden.
+<LI>Immer die Disk pr&uuml;fen, wenn auf einzelne Dateien nicht mehr zugegriffen werden kann und raFS in einer Fehlermeldung zum Pr&uuml;fen auffordert. <EM>Niemals</EM> versuchen, eine dieser Dateien zu l&ouml;schen!
+<LI>Niemals eine der Dateien im Ablageverzeichnis &auml;ndern.
+<LI>Niemals eine <EM>angemeldete</EM> Disk (mit einer <I>Lock-</I>Datei im Ablageverzeichnis) auf CD-ROM brennen! ;-)
+</UL>
+
+<P>Falls raFS die einzige Kopie deiner Lieblingsdatei &uuml;berschreibt, sage nicht, ich h&auml;tte dich nicht gewarnt...
+
+
+<P><HR WIDTH="41%">
+
+
+
+
+<P><H2><A NAME="intro">Einf&uuml;hrung</A></H2>
+
+Die Standard-Dateisysteme von Acorn (alle, die FileCore benutzen) schr&auml;nken die L&auml;nge von Dateinamen auf 10 Zeichen und die maximal m&ouml;gliche Anzahl von Dateien in einem Verzeichnis auf 77 ein, was manchmal ziemlich &auml;rgerlich ist. Deswegen gab es schon mehrere Versuche, FileCore zu umgehen. Viele der entstandenen Programme sind Image-Dateisysteme, die einzelne Dateien auf der Platte so ansprechen, als w&auml;ren sie Verzeichnisse mit Dateien und weiteren Unterverzeichnissen:
+
+<UL>
+
+<LI><I><A HREF="http://www.findon.demon.co.uk/arcfs/">ArcFS</A></I> und <I><A HREF="http://www.pilling.demon.co.uk">SparkFS</A></I> lassen lange Dateinamen als Nebenprodukt ihrer eigentlichen Aufgabe, dem Komprimieren der Dateien, zu. Sie sind verl&auml;&szlig;lich, wenn auch recht langsam, und sie kosten Geld.
+
+<LI><I><A HREF="http://login.eunet.no/~guttorvi/strong.html">StrongHelp</A></I> wurde geschrieben, um viele einzelne Hilfe-Dateien in einer gro&szlig;en Datei speichern zu k&ouml;nnen. Eigentlich ist es nicht f&uuml;r andere Dinge gedacht, aber man kann es trotzdem zum Speichern beliebiger Dateien verwenden. Es zerst&ouml;rt allerdings manchmal Image-Dateien.
+
+<LI>Genau wie StrongHelp speichert auch <I><A HREF="http://www.wonderworks.co.uk/">X-Files</A></I> seine Dateien unkomprimiert. Es ist langsam, enth&auml;lt einige Bugs und verbringt gerne lange Zeit damit, freien Platz in seinen Image-Dateien zu sammeln, sobald diese mehrere Megabytes gro&szlig; sind.
+
+<LI><I><A HREF="http://www.tribbeck.com/longfiles/">LongFiles</A></I> ist kein Image-Dateisystem, stattdessen klinkt es sich in die Aufrufe ein, die Programme f&uuml;r Dateioperationen an RiscOS machen. Version 2 ist recht robust, aber dennoch bleibt es ein Hack. Pro Verzeichnis l&auml;&szlig;t es maximal 76 Objekte zu.
+
+<LI><I><A HREF="http://www.wss.co.uk/">WIN95FS</A></I> ist ein wenig teuer, wenn man nur lange Dateinamen, aber keinen Support f&uuml;r WINDOW~1 braucht.
+
+<LI><I>TBAFS</I>, ebenfalls ein kommerzielles Dateisystem, bietet neben Datenkomprimierung auch PC-Support an.
+
+</UL>
+
+<P>raFS ist weder ein Image-Dateisystem noch ein Hack: Es wurde als "normales" Dateisystem geschrieben. Die Dateien, die man auf raFS speichert, werden nicht in einer gro&szlig;en Datei abgespeichert, sondern als einzelne Dateien innerhalb einer Verzeichnisstruktur abgelegt, die das Programm auf einem anderen Dateisystem erstellt. Damit ist es m&ouml;glich, die F&auml;higkeiten dieses Host-Dateisystems zum Verwalten einzelner Dateien vorteilhaft auszunutzen, was viel effektiver ist. Dar&uuml;ber hinaus sind die Chancen besser, seine Daten doch noch zur&uuml;ckzubekommen, falls einmal etwas schiefgehen sollte.
+
+<P>raFS hat folgende Merkmale:
+
+<UL>
+
+<LI>100% in Assembler geschrieben
+
+<LI>Da es sich nicht um ein Image-Dateisystem handelt, gibt es keine Probleme mit Programmen wie InfoZip oder sFTP, und die Gr&ouml;&szlig;e einer Disk ist nicht auf 4GB (oder sogar nur 2GB auf einem FileCore-Dateisystem) beschr&auml;nkt.
+
+<LI>Verzeichnisdaten werden gepuffert, so da&szlig; Zugriffe sehr schnell sind.
+
+<LI>Unterst&uuml;tzung f&uuml;r mehrere "Disks" (bis zu 50).
+
+<LI>Einfaches Erzeugen und Anmelden von Disks im Desktop (mit dem raFSFiler).
+
+<LI>Es wird entweder die Sprite-Area, die RMA (RiscOS-Versionen vor 3.5) oder eine eigene Dynamische Area (RiscOS 3.5 und sp&auml;ter) f&uuml;r die Puffer benutzt. Falls die Sprite-Area verwendet wird, geschieht dies auf eine Weise, die kompatibel mit anderen Programmen ist, die das ebenfalls tun, z.B. Memphis.
+
+<LI>Arbeitet mit <I>CDFS</I> und <I>Access+</I> zusammen.
+
+<LI>Unterst&uuml;tzung verschiedener Sprachen.
+
+<LI>Unterst&uuml;tzt das mehrfache &Ouml;ffnen von Dateien (einschlie&szlig;lich Laden/Speichern).
+
+<LI>Es gibt korrekte Fehlernummern aus!
+
+</UL>
+
+<P>Die Anleitung wurde in zwei Teile aufgeteilt. Dieser erste Teil ist f&uuml;r Anwender gedacht, die raFS im Desktop benutzen wollen, w&auml;hrend der zweite (englische) Teil detaillierter auf die F&auml;higkeiten des Dateisystems eingeht. Es ist nicht notwendig, ihn zu lesen, da die meisten Informationen nur f&uuml;r Fortgeschrittene und Programmierer relevant sind.
+
+<P>Ich hoffe, da&szlig; dir dieses Programm n&uuml;tzlich sein wird!
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="usage">Benutzung</A></H2>
+
+raFS wird in den Speicher geladen, indem man <I>!raFS</I> oder eine Applikations-Disk (wie das Beispiel <I>!raFSDisc</I>) doppelklickt, und installiert ein Symbol auf der Icon-Bar. Falls du das Programm beim Starten des Rechners automatisch geladen haben willst, kannst du es in dein <KBD>!Boot.Choices.Boot.PreDesk</KBD>-Verzeichnis kopieren.
+
+<P>Bevor du loslegst, sollte dir die Weise, auf die raFS seine Disks ablegt, klar sein. Eigentlich ist das Wort "Disk" etwas irref&uuml;hrend - raFS verwendet n&auml;mlich <EM>kein</EM> eigenes Diskettenformat. Dennoch werde ich von "Disks" sprechen, da sie genauso gehandhabt werden wie dies z.B. ADFS mit Disketten tut: Sie k&ouml;nnen erzeugt, an- und abgemeldet werden, und ihr Name erscheint in Verzeichnisnamen in etwa so: "raFS::<I>DiskName</I>.$.&nbsp;..." Im Gegensatz zu Image-Dateisystemen werden raFS-Disks nicht in einer einzigen gro&szlig;en Datei, sondern als einzelne Dateien in einem Verzeichnis gespeichert.
+
+<P>raFS kann die Daten, die in seine Disks gespeichert werden, in zweierlei Arten von Verzeichnissen ablegen: Entweder in einem Applikations-Verzeichnis, dessen Namen mit "!" beginnt und das mit einem speziellen Symbol dargestellt wird, oder in einem normalen Verzeichnis, dem man nicht ansieht, da&szlig; es sich von anderen unterscheidet, bis man es doppelklickt. Tut man dies und raFS ist geladen, so wird die in dem Verzeichnis gespeicherte raFS-Disk von raFS beim System angemeldet und deren Root-Verzeichnis wird anstelle des Verzeichnisses, das man doppelgeklickt hat, ge&ouml;ffnet.
+
+<P>Ist das Programm nicht geladen, wenn man auf ein normales Verzeichnis mit einer raFS-Disk klickt, oder ist es geladen, aber man dr&uuml;ckt beim Klicken die Shift-Taste, dann wird das eigentliche Verzeichnis ge&ouml;ffnet. Es enth&auml;lt eine Datei mit dem Namen <I>!Atterer</I> (ja, ich wei&szlig;, da&szlig; ich bescheiden bin, es so zu nennen), eine namens <I>!Mount</I> und ein Verzeichnis <I>A0</I> mit weiteren Unterverzeichnissen und Dateien mit &auml;hnlichen Namen.
+
+<P><STRONG>Ver&auml;ndere oder l&ouml;sche keine dieser Dateien, au&szlig;er du bist dir deiner Sache sicher!</STRONG>
+
+<P>Es sollte angemerkt werden, da&szlig; raFS seine eigenen Verzeichnisse von anderen dadurch unterscheidet, da&szlig; es nach der <I>!Mount-</I>Datei sucht und diese lediglich mit <KBD>Obey</KBD> ausf&uuml;hrt, wenn das Verzeichnis ge&ouml;ffnet werden soll. Die Datei, die normalerweise ausgef&uuml;hrt wird, l&auml;dt raFS, falls das noch nicht geschehen ist, deswegen kannst du einfach <I>!Mount</I> doppelklicken, wenn du ein raFS-Verzeichnis &ouml;ffnen wolltest, aber raFS nicht geladen war. (Zum Ausf&uuml;hren wird <KBD>Obey</KBD> und nicht einfach <KBD>Run</KBD> genommen, weil der Dateityp von <I>!Mount</I> nicht unbedingt korrekt sein wird - z.B., wenn man einen PC dazu verwendet, eine raFS-Disk auf CD-ROM zu brennen.)
+
+<P>Beim Anmelden einer Disk wird im Ablageverzeichnis eine Datei namens <I>Lock</I> erzeugt, beim Abmelden wird diese wieder gel&ouml;scht. Dies dient dazu, zu pr&uuml;fen, ob in das Ablageverzeichnis geschrieben werden kann, au&szlig;erdem kann eine Disk, deren Ablageverzeichnis umbenannt wurde, durch den Inhalt der Datei wiedererkannt werden. Ist eine Disk noch nicht angemeldet worden, aber die <I>Lock-</I>Datei trotzdem schon vorhanden, weigert sich raFS entweder, sie anzumelden (z.B. wenn auf sie &uuml;ber ein Netzwerk zugegriffen werden kann und sie schon ein anderer Computer angemeldet hat) oder das Programm gibt nur eine Warnung verbunden mit der Aufforderung aus, die Disk zu pr&uuml;fen, meldet sie aber trotzdem an (wenn dein Computer abgest&uuml;rzt ist oder ein Reset stattfand, seit die Disk angemeldet wurde).
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P>
+
+
+
+<H3><A NAME="discs">Mit Disks arbeiten</A></H3>
+
+<TABLE><TR>
+
+<TD>Das Icon-Bar-Men&uuml; stellt viele oft ben&ouml;tigte Operationen zur Verf&uuml;gung. Wenn keine Disks angemeldet sind, sind die Eintr&auml;ge unterhalb der gestrichelten Linie ausgegraut.
+
+<UL>
+
+<LI>Mit <B>Schreibschutz</B> kann man Disks vor ungewollten Schreibzugriffen sch&uuml;tzen. Wenn von einer Disk lediglich gelesen werden kann, ist ihr Name im Untermen&uuml; angew&auml;hlt. Die Option funktioniert nicht f&uuml;r Disks, die auf DOSFS gespeichert sind, da dieses Dateisystem sich nicht korrekt verh&auml;lt.
+
+<LI>Mit <B>Benennen</B> kann man den Namen einer Disk &auml;ndern. (Du hattest schon so eine Ahnung in der Richtung, nicht wahr?)
+
+<LI><B>Abmelden</B> entfernt die gew&auml;hlte Disk von der Liste aller Disks, die RiscOS bekannt sind - versucht man anschlie&szlig;end, auf die Disk zuzugreifen, bekommt man den Fehler <SAMP>Disk nicht bekannt</SAMP>. Man kann alle angemeldeten Disks abmelden, indem man "Abmelden" ausw&auml;hlt, ohne in das Untermen&uuml; zu gehen.
+
+<LI>Beim Anw&auml;hlen eines Disknamens im <B>Pr&uuml;fen-</B>Untermen&uuml; wird die Disk auf Fehler &uuml;berpr&uuml;ft - <A HREF="#verify">siehe unten</A>.
+
+<LI><B>"$" &ouml;ffnen</B> &ouml;ffnet das Verzeichnis f&uuml;r die angew&auml;hlte Disk oder auch f&uuml;r alle angemeldeten Disks, wenn man den Men&uuml;eintrag im Hauptmen&uuml; anw&auml;hlt.
+
+</UL>
+
+<P><EM>Wichtig:</EM> Falls du einmal ein Ablageverzeichnis verschieben oder die Diskette/Platte umbenennen willst, auf der es gespeichert ist, melde die Disk danach neu an (z.B. indem du sie doppelklickst), damit raFS wei&szlig;, wie der neue Name hei&szlig;t.
+
+</TD>
+
+<TD><IMG ALT="[Das Icon-Bar-Men&uuml;]" SRC="ibar7.gif" WIDTH=139 HEIGHT=253></TD>
+
+</TR></TABLE>
+
+<P>Der Men&uuml;eintrag <B>Flush</B> wird normalerweise nicht ben&ouml;tigt. Wenn er angew&auml;hlt wird, speichert raFS alle ge&auml;nderten aber noch nicht abgespeicherten Verzeichnisdaten. Man sollte einen Flush des Verzeichnis-Cache durchf&uuml;hren, wenn raFS wegen eines Fehlers daran gehindert wurde, &Auml;nderungen automatisch abzuspeichern. (z.B., wenn man auf Abbruch geklickt hat, als man darum gebeten wurde, eine Diskette mit einer raFS-Disk einzulegen.)
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P>
+
+
+
+<H3><A NAME="create">Neue Disks erzeugen</A></H3>
+
+<TABLE><TR>
+
+<TD VALIGN="top">Neue Disks k&ouml;nnen auf einfache Weise mit dem Fenster erzeugt werden, das ge&ouml;ffnet wird, wenn der Mauszeiger &uuml;ber dem <B>Neue Disk</B>-Men&uuml;eintrag nach rechts gef&uuml;hrt wird. Mit der "App"-Option oder durch Angabe eines Ablageverzeichnis-Namens, der mit "!" beginnt, wird ausgew&auml;hlt, ob ein normales oder ein Applikations-Verzeichnis erstellt wird. Nachdem man einen Namen f&uuml;r die neue Disk angegeben hat, wird sie erzeugt, indem das Symbol in ein Verzeichnis gezogen wird.
+
+</TD>
+
+<TD><IMG ALT="[Das Fenster 'Neue Disk erzeugen']" WIDTH=202 HEIGHT=172 SRC="crea7.gif"></TD>
+
+</TR></TABLE>
+
+<P>raFS hat die n&uuml;tzliche Eigenschaft, da&szlig; auch eine ganze Festplatte oder Diskette f&uuml;r eine raFS-Disk genutzt werden kann. Wenn man z.B. auf das Symbol des Diskettenlaufwerks klickt, um das Root-Verzeichnis anzeigen zu lassen, sucht das Programm in gleicher Weise nach einer <I>!Mount-</I>Datei wie bei Doppelklicks auf Verzeichnis-Symbole. Will man solch eine Disk erzeugen, mu&szlig; man den Namen des Root-Verzeichnisses eingeben (z.B. <KBD>ADFS::HD.$</KBD>) und, nachdem man noch einen Namen f&uuml;r die Disk gew&auml;hlt hat, auf <B>Erzeugen</B> klicken.
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P>
+
+
+
+<H3><A NAME="choices">Das Einstellungen-Fenster</A></H3>
+
+Durch einen Shift-Spezial-Klick auf raFS' Icon-Bar-Symbol oder durch Anw&auml;hlen des Men&uuml;eintrags <B>Einstellungen...</B> wird das Einstellungen-Fenster ge&ouml;ffnet, in dem man verschiedene Aspekte des Programms ver&auml;ndern kann. Die neuen Werte k&ouml;nnen auch gespeichert werden.
+
+<P><B>Beim Starten Disks anmelden:</B> In den Feldern dieses Teils des Fensters k&ouml;nnen die Namen von bis zu drei Ablageverzeichnissen angegeben werden, indem man die Verzeichnisse auf eines der Felder zieht. Die in den Verzeichnissen gespeicherten Disks werden dann von raFS automatisch jedesmal angemeldet, wenn es geladen wird.
+
+<P><B>Kommandos bei Klicks auf der Icon-Bar:</B> Hier kann man die Kommandos &auml;ndern, die ausgef&uuml;hrt werden, wenn das Icon-Bar-Symbol angeklickt wird, wobei auch beachtet wird, ob Shift oder Ctrl gedr&uuml;ckt ist. Einzelheiten zu den in der Grundeinstellung verwendeten Kommandos findest du <A HREF="tech.html#cli">hier</A>. In der Grundeinstellung passiert folgendes:
+
+<UL COMPACT>
+<LI>Auswahl &ouml;ffnet das Root-Verzeichnis einer Disk. Wenn nur eine Disk angemeldet ist, wird ihr Root-Verzeichnis sofort ge&ouml;ffnet, ansonsten wird ein Men&uuml; ge&ouml;ffnet.
+<LI>Spezial &ouml;ffnet das Fenster <B>Neue Disk erzeugen</B>.
+<LI>Shift-Auswahl &ouml;ffnet ein Men&uuml; aller angemeldeten Disks; die angew&auml;hlte Disk wird abgemeldet.
+<LI>Shift-Spezial &ouml;ffnet das <B>Einstellungen-</B>Fenster.
+<LI>Ctrl-Auswahl und Ctrl-Spezial f&uuml;hren <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> und <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> aus, wodurch Write-through ein- bzw. ausgeschaltet wird.
+<LI>Shift-Ctrl-Auswahl verursacht ein "Flush".
+<LI>Shift-Ctrl-Spezial f&uuml;hrt <KBD>raFS_Safe -smash</KBD> aus, um Write-through sofort auszuschalten.
+</UL>
+
+<P><B>Verzeichnis-Cache:</B> In diesem Teil des Fensters werden die Eigenschaften des Puffers festgelegt, den raFS f&uuml;r Verzeichnisse verwendet, damit Zugriffe schneller werden. Wenn die Daten eines Verzeichnisses ge&auml;ndert werden, z.B. durch L&ouml;schen einer Datei, wird dieses abge&auml;nderte Verzeichnis nicht sofort auf das Host-Dateisystem geschrieben, sondern erst verz&ouml;gert oder nachdem eine bestimmte Anzahl von &Auml;nderungen erreicht ist, je nachdem, welches dieser Ereignisse zuerst eintritt.
+
+<P>Hinweis: Da Verzeichnisse erst nach einiger Zeit abgespeichert werden, f&uuml;hrt ein Zur&uuml;cksetzen oder ein Absturz des Rechners unmittelbar nach Ver&auml;nderungen des Verzeichnisinhalts dazu, da&szlig; die abgespeicherten Verzeichnisdaten noch nicht aktualisiert worden sind. &Ouml;ffnet man das Verzeichnis sp&auml;ter wieder, scheinen gel&ouml;schte Dateien immer noch zu existieren, w&auml;hrend gerade erst gespeicherte nicht erscheinen! Es mu&szlig; verhindert werden, da&szlig; dieser Zustand eintritt, deswegen sollte man das verz&ouml;gerte Speichern abschalten, wenn man Anwendungen laufen l&auml;&szlig;t, die h&auml;ufig abst&uuml;rzen, vor allem, wenn sie es w&auml;hrend Dateizugriffen tun:
+
+<P>Sowohl f&uuml;r das Feld, in dem die Verz&ouml;gerung in Hundertstelsekunden angegeben wird, als auch das, das die Anzahl der &Auml;nderungen enth&auml;lt, haben die Werte 0 und 1 eine besondere Bedeutung: Durch 0 wird raFS mitgeteilt, da&szlig; das automatische Speichern nach einiger Zeit bzw. nach &Auml;nderungen komplett abgeschaltet werden soll. (Wenn beide Werte 0 sind, werden Verzeichnisse erst gespeichert, wenn die maximale Cache-Gr&ouml;&szlig;e erreicht wurde und f&uuml;r weitere Verzeichnisse Platz gemacht wird, sowie beim Abmelden der Disk.) Steht in einem der beiden Felder der Wert 1, werden jegliche &Auml;nderungen an den Verzeichnisdaten sofort auf dem Host-Dateisystem gespeichert. (Wenn du dich ein wenig mit <TT>*</TT>-Kommandos auskennst, kannst du Write-through auf elegantere Weise anschalten, indem du <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A>- und <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A>-Kommandos in die !Run-Dateien der Anwendungen einf&uuml;gst.)
+
+<P><B>Gemischt:</B> Eine Reihe von Optionen f&uuml;r raFSFiler.
+
+<UL COMPACT>
+<LI>Nach "!Mount" suchen: Wenn angeschaltet, sucht raFSFiler in allen Verzeichnissen, die ge&ouml;ffnet werden, nach Dateien namens <I>!Mount</I> und f&uuml;hrt sie aus.
+<LI>Schlie&szlig;en mit Spezial &ouml;ffnet Parent: Wenn angeschaltet, wird beim Schlie&szlig;en eines raFS-Root-Verzeichnisses mit Spezial das dem Ablageverzeichnis &uuml;bergeordnete Verzeichnis ge&ouml;ffnet.
+<LI><B>Beenden-</B>Eintrag im Icon-Bar-Men&uuml;: Wenn dir nicht gef&auml;llt, da&szlig; raFSFiler im Gegensatz zu ADFSFiler einen <B>Beenden-</B>Men&uuml;eintrag hat, kannst du diese Option ausschalten.
+<LI><B>Beenden</B> RMKillt: Beeinflu&szlig;t, ob die beiden raFS-Module beim Beenden aus dem Speicher entfernt werden. Ist die Option f&uuml;r raFS an, bedeutet das, da&szlig; alle Disks abgemeldet werden.
+</UL>
+
+<P>Am unteren Rand des Fensters sind vier Kn&ouml;pfe: <B>Grundeinstellungen</B> setzt alle Felder des Fensters mit Ausnahme der ersten drei auf die Grundeinstellungen zur&uuml;ck. Mit <B>Speichern</B> werden die aktuellen Einstellungen &uuml;bernommen und au&szlig;erdem abgespeichert. <B>Abbruch</B> verwirft eventuelle &Auml;nderungen in den Feldern - man kann auch mit Spezial auf den Knopf klicken, um die gerade aktiven Einstellungen wieder in die Felder einzuf&uuml;llen. <B>Setzen</B> &uuml;bernimmt die Einstellungen in den Feldern, jedoch gehen diese beim Ausschalten des Rechners verloren. Klickt man auf die letzten drei Kn&ouml;pfe mit Auswahl, wird das Einstellungen-Fenster geschlossen, mit Spezial bleibt es offen.
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="verify">&Uuml;berpr&uuml;fen fehlerhafter Disks</A></H2>
+
+Manchmal k&ouml;nnen raFS-Disks Fehler aufweisen. Meistens ist der Grund hierf&uuml;r, da&szlig; der Computer abst&uuml;rzte, nachdem Daten gespeichert wurden, aber noch bevor die ge&auml;nderten Verzeichnisdaten auf das Host-Dateisystem zur&uuml;ckgeschrieben werden konnten. Dies &auml;u&szlig;ert sich dann darin, da&szlig; auf einige Dateien nicht mehr zugegriffen werden kann, andere, die kurz vor dem Absturz gespeichert wurden, tauchen nicht im Verzeichnis auf, wieder andere scheinen noch vorhanden zu sein, obwohl sie gel&ouml;scht wurden.
+
+<P><STRONG>L&ouml;sche auf einer fehlerhaften Disk keinesfalls die Dateien, die Fehlermeldungen hervorrufen - dadurch k&ouml;nnten die Daten anderer Dateien gel&ouml;scht werden!</STRONG>
+
+<P>Das Pr&uuml;fen der Disk ist ein Mittel, die Fehler zu erkennen und zu reparieren. Um eine Disk zu pr&uuml;fen, w&auml;hle ihren Namen im <B>Pr&uuml;fen-</B>Untermen&uuml; auf der Icon-Bar an (oder benutze das <A HREF="tech.html#cli_verify"><TT>Verify</TT></A>-Kommando). Anstatt auf den Disknamen zu klicken kannst du auch nur den <B>Pr&uuml;fen-</B>Eintrag selbst anklicken, dann werden automatisch diejenigen Disks gepr&uuml;ft, bei denen vorher Fehler aufgetreten sind. Es werden die Namen der Verzeichnisse ausgedruckt, die gerade durchsucht werden, zusammen mit anderen Meldungen, von denen einige noch einer genaueren Erkl&auml;rung bed&uuml;rfen:
+
+<UL>
+<LI><SAMP>Korrektur: Erstes nicht gef&uuml;lltes Verzeichnis ist '<I>A0.B0</I>'</SAMP>: Kann auch bei korrekten Disks auftreten und ist nichts, wor&uuml;ber man sich Gedanken machen mu&szlig;.
+<LI><SAMP>Unterschiedliche Dateil&auml;ngen! 'Reparieren', wenn Daten in '<I>A0.B0.C0</I>' zu '<I>$.File</I>' geh&ouml;ren. '&Uuml;berspringen', wenn sie zu anderer Datei geh&ouml;ren</SAMP>: Da raFS sich nicht sicher ist, ob der Verzeichniseintrag auf die korrekten Daten zeigt, hat man hier die Wahl (es k&ouml;nnte ja auch noch einen weiteren, korrekten Verzeichniseintrag geben!). Wenn du dir nicht sicher bist, w&auml;hle &Uuml;berspringen.
+<LI><SAMP>Dateil&auml;nge wird auf Null gesetzt / Verzeichnis wird in ein leeres Verzeichnis umgewandelt</SAMP>: Dies bedeutet <EM>nicht,</EM> da&szlig; die Datei oder das Verzeichnis gel&ouml;scht wird. Tats&auml;chlich sind die Daten bereits verloren und raFS entfernt nur die <EM>Referenz</EM> auf sie.
+<LI><SAMP>Die Namen der verbleibenden <I>X</I> Dateien gehen leider verloren! Die Dateien werden in 'Lost+Found' eingef&uuml;gt</SAMP>: Eventuell werden weniger Dateien eingef&uuml;gt als angegeben, da Dateien, deren L&auml;nge Null ist, stattdessen gel&ouml;scht werden.
+</UL>
+
+Alle unreferenzierten Verzeichnisse und Dateien, die gefunden werden, werden in das <I>Lost+Found-</I>Verzeichnis kopiert, das im Root-Verzeichnis der Disk erzeugt wird.
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="contact">Kontakt zum Autor</A></H2>
+
+Falls du mir einen Bug-Report schicken willst, Vorschl&auml;ge dazu hast, was zuk&uuml;nftige Versionen von raFS unterst&uuml;tzen sollten oder mir nur allgemein sagen willst, wie wundervoll es ist, kannst du mich entweder per Email (bevorzugt) oder auf dem "normalen" Postweg erreichen.
+
+<P>Meine Email-Adresse ist <A HREF="mailto:atterer@informatik.tu-muenchen.de">atterer@informatik.tu-muenchen.de</A> (<A HREF="pubkey.asc">PGP-Schl&uuml;ssel</A>). Die aktuellste Version von raFS bekommt man auf meiner Homepage, <A HREF="http://www.informatik.tu-muenchen.de/~atterer/">http://www.informatik.tu-muenchen.de/~atterer/</A>.
+
+<P>Falls du mir einen Besuch abstatten willst, um mir deine Meinung dazu zu sagen, da&szlig; raFS alle deine Dateien gel&ouml;scht hat, ist hier die Postadresse:
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Richard Atterer
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Beethovenstra&szlig;e 30
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;86391 Stadtbergen
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<I>Deutschland</I>
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="history">&Uuml;berblick &uuml;ber die Versionen</A></H2>
+
+Vielen Dank an folgende Leute f&uuml;r Vorschl&auml;ge und Bug-Reports: Stefan&nbsp;Bellon, Emil&nbsp;Brunavs, Peter&nbsp;Burwood, Nick&nbsp;Clark, Dave&nbsp;Daniels, Justin&nbsp;Fletcher, Mike&nbsp;Gregory, Tony&nbsp;Houghton, Rick&nbsp;Hudson, Hans&nbsp;de&nbsp;Jong, James&nbsp;Larcombe, Vincent&nbsp;Lefevre, Marko&nbsp;Lukat, Robin&nbsp;Moffatt, Jakob&nbsp;Stoklund&nbsp;Olesen, David&nbsp;Pilling, Tim&nbsp;Rowledge, Darren&nbsp;Salt, Reiner&nbsp;Schulz, Dick&nbsp;Tanis, David&nbsp;Thomas, Reuben&nbsp;Thomas, Martin&nbsp;Tillman.<P>
+
+<B>V1.15 (14-11-1998)</B>
+
+<UL COMPACT>
+
+<LI>Weniger strenge Vorgehensweise, wenn nach Resets oder Abst&uuml;rzen <I>Lock-</I>Dateien zur&uuml;ckbleiben: Es wird nur eine Warnung ausgegeben. Wenn hierzu ein Fehlerfenster ge&ouml;ffnet wird, schlie&szlig;t es sich nach einer <A HREF="tech.html#cli_optmt">w&auml;hlbaren Zeitspanne</A> wieder von selbst,
+
+<LI>Beim Anw&auml;hlen des <B>Pr&uuml;fen-</B>Eintrags des Icon-Bar-Men&uuml;s oder bei <A HREF="tech.html#cli_verify"><KBD>Verify&nbsp;*</KBD></A> werden genau die Disks gepr&uuml;ft, f&uuml;r die es n&ouml;tig ist,
+
+<LI>Bugfix im Code f&uuml;r das Pr&uuml;fen von Disks: Ge&ouml;ffnete Dateien werden jetzt korrekt behandelt,
+
+<LI>Wenn <I>!raFS</I> in <KBD>!Boot.Choices.Boot.PreDesk</KBD> kopiert wurde, verz&ouml;gert sich das Anmelden der Disks, die beim Starten automatisch angemeldet werden, nicht mehr, bis die Welcome-Screen angezeigt wurde,
+
+<LI>Neues Kommando <A HREF="tech.html#cli_filermenu"><KBD>raFSFiler_Menu</KBD></A> erzeugt benutzerdefinierte Men&uuml;s mit den Namen aller Disks; die Grundeinstellungen wurden ge&auml;ndert und benutzen es,
+
+<LI>Das <KBD>rafsln-</KBD>Utility erlaubt es, raFS-Disks auf Unix-Systemen zu lesen - ein Binary f&uuml;r ARMLinux liegt dem Quelltext bei,
+
+<LI>Einige Verbesserungen, um die Benutzung von schreibgesch&uuml;tzten Disketten im DOS-Format zu erlauben - solche Disks m&uuml;ssen mit <KBD>-ro</KBD> angemeldet werden,
+
+<LI>raFSFiler sucht jetzt im Root-Verzeichnis von Image-Dateien nach  <I>!Mount-</I>Dateien,
+
+<LI>Vincent Lefevre hat die Templates und Messages freundlicherweise ins Franz&ouml;sische &uuml;bersetzt,
+
+<LI>Fehler bei <KBD>Mount</KBD> behoben, der verhinderte, da&szlig; alle Kombinationen der Kommandozeilen-Switches angenommen wurden.
+
+</UL>
+
+
+<B>V1.14 (15-10-1998)</B>
+
+<UL COMPACT>
+
+<LI><A HREF="#verify">Verify</A> sucht nach Fehlern in einer Disk und repariert sie,
+
+<LI>Eine <I>Lock-</I>Datei wird beim Anmelden im Ablageverzeichnis erzeugt, so da&szlig; bekannt ist, ob auf die Disk geschrieben werden kann und ob das Ablageverzeichnis umbenannt wurde,
+
+<LI>Das &Ouml;ffnen von Verzeichnissen (mit dem einige Programme deren Vorhandensein &uuml;berpr&uuml;fen) funktioniert jetzt unabh&auml;ngig von den Zugriffsrechten,
+
+<LI>Von Dateien, die nur zum Schreiben ge&ouml;ffnet wurden, kann auch gelesen werden,
+
+<LI>Die RiscOS&nbsp;3.1-Version benutzt optional anstelle der Sprite-Area die RMA, um Inkompatibilit&auml;ten mit anderen Programmen zu verhindern,
+
+<LI>Die Dateien <I>!Atterer, !Mount</I> und <I>!Dismount</I> k&ouml;nnen auch <I>_Atterer, _Mount</I> und <I>_Dismount</I> hei&szlig;en - Kompatibilit&auml;t mit ISO CD-ROMs,
+
+<LI>raFSFiler benutzt sowohl das URI-Protokoll als auch die ANT-URL-Message, um URLs zu senden,
+
+<LI>Beim Eintippen eines sehr langen Namens im Fenster 'Neue Disk erzeugen' wird das Namensfeld nicht mehr zerst&ouml;rt,
+
+<LI>Einige kleinere Bugs behoben.
+
+</UL>
+
+
+<B>V1.13 (10-05-1998)</B>
+
+<UL COMPACT>
+
+<LI>Ich war versucht, endlich ein Easter-Egg in raFS einzubauen, habe mich dann aber doch zur&uuml;ckgehalten, da dies wohl nicht ganz das ist, was man in einem <EM>Dateisystem</EM> sehen will :-)
+
+<LI>Zwei Bugs wurden in einer Zwischenversion 1.12a ausgebessert: Der eine verursachte manchmal <SAMP>Undefined instruction</SAMP>-Exceptions in raFSFiler, der andere verhinderte in den meisten F&auml;llen, da&szlig; <KBD>raFS_Opt</KBD> funktionierte, da der <KBD>-LoadMessages</KBD>-Switch immer angegeben werden mu&szlig;te,
+
+<LI>raFSFiler wurde erweitert; jetzt k&ouml;nnen bis zu drei Disks beim Starten gemountet werden und bei Klicks auf das Icon-Bar-Symbol sind verschiedene Kommandos bei gedr&uuml;ckter Shift- oder Ctrl-Taste m&ouml;glich. Au&szlig;erdem erlauben neue Optionen es, den Wimp-Filter auf dem Filer auszuschalten und das Verhalten des <B>Beenden-</B>Men&uuml;eintrags zu beeinflussen.
+
+<LI>Im Fenster <B>Neue Disk erzeugen</B> geht das Erzeugen einer Disk, bei der Diskname und Name des Ablageverzeichnisses gleich sind, jetzt viel einfacher. (Ctrl-C kann dazu benutzt werden, den Namen vom oberen in das untere Feld zu kopieren.)
+
+<LI>Klicks mit Spezial auf das Root-Verzeichnis einer Disk f&uuml;hren dazu, da&szlig; das dem Ablageverzeichnis &uuml;bergeordnete Verzeichnis ge&ouml;ffnet wird. James Larcombe hat genau dies bereits in einem eigenen Modul implementiert, nur um dann zu erfahren, da&szlig; ich es schon selbst in raFSFiler eingebaut hatte - Entschuldigung!
+
+<LI>Neues Kommando <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A>.
+
+<LI>Eine einfache Pr&uuml;fung der Namen von Ablageverzeichnissen gibt eine Warnung aus, wenn versucht wird, eine raFS-Disk anzumelden, die selbst auf raFS gespeichert ist,
+
+<LI><A HREF="tech.html#cli_optor"><KBD>raFS_Opt&nbsp;-OpenRename</KBD></A> w&auml;hlt aus, ob es m&ouml;glich ist, ge&ouml;ffnete Dateien umzubenennen. In der Voreinstellung ist es m&ouml;glich,
+
+<LI>Bei <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> und <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> wird ein <KBD>-verbose</KBD>-Switch unterst&uuml;tzt,
+
+<LI>Die Variable <A HREF="tech.html#integrity">raFS$NoChecks</A> erlaubt es, auch Dateitypen von Image-Dateien anzugeben, um f&uuml;r diese die Integrit&auml;ts-Checks auszuschalten,
+
+<LI>In der Messages-Datei kann man eine <I>!Dismount-</I>Datei angeben, die beim Erzeugen neuer Ablageverzeichnisse automatisch in diese geschrieben wird. Allerdings wird in der Grundeinstellung keine <I>!Dismount-</I>Datei erzeugt,
+
+<LI>Memory-Leak in raFSFiler behoben, der auftrat, wenn beendet und das Modul anschlie&szlig;end mit <KBD>Desktop_raFSFiler</KBD> neu gestartet wurde,
+
+<LI>Name der dynamischen Area wird aus den Messages gelesen,
+
+<LI>Bugfix: Wenn eine Datei ohne Schreiberlaubnis mit <KBD>OPENOUT</KBD> ge&ouml;ffnet wurde, gab es f&uuml;r alle Schreibversuche einen Fehler, aber dennoch wurde der Extent auf Null zur&uuml;ckgesetzt. Verh&auml;lt sich jetzt genau wie FileCore: Der Extent wird als Null zur&uuml;ckgegeben, in Wirklichkeit aber beibehalten.
+
+</UL>
+
+
+<B>V1.12 (22-02-1998)</B>
+
+<P>Auf einer <I>Acorn User</I>-Coverdisk ver&ouml;ffentlicht.
+
+<UL COMPACT>
+
+<LI>Es ist jetzt nicht mehr n&ouml;tig, verschiedene Versionen der raFS(Spr)-Module je nach Sprache zur Verf&uuml;gung zu stellen; stattdessen k&ouml;nnen die Standard-Texte (auf Englisch) mithilfe des Befehls <A HREF="tech.html#cli_optlm"><KBD>raFS_Opt&nbsp;-LoadMessages</KBD></A> &uuml;berschrieben werden
+
+<LI>Dick Tanis hat die Programmtexte freundlicherweise ins Holl&auml;ndische &uuml;bersetzt - vielen Dank!
+
+<LI>Die Gr&ouml;&szlig;e von Image-Dateien wurde <EM>noch immer</EM> auf Null gesetzt - ist jetzt definitiv behoben. Allerdings f&uuml;hrt das neue Verhalten dazu, da&szlig; SparkFS beim &Uuml;berschreiben von Archiven durch Erzeugen eines neuen Archivs mit demselben Namen einen Fehler ausgibt,
+
+<LI>Es ist nicht mehr m&ouml;glich, ein Verzeichnis in sich selbst zu verschieben - dies f&uuml;hrte dazu, da&szlig; nicht mehr auf den Inhalt des Verzeichnisses zugegriffen werden konnte,
+
+<LI>"Workaround" daf&uuml;r, da&szlig; in der englischen Version der Untermen&uuml;-Titel auf "Enter new na" verk&uuml;rzt wurde - der Text ist jetzt "New name" :-) Die Verst&uuml;mmelung ist auf einen Bug in MessageTrans&nbsp;0.31 und fr&uuml;her zur&uuml;ckzuf&uuml;hren - in V0.32 wurde dieser behoben,
+
+<LI>Fehler von V1.11 korrigiert, die zu <SAMP>Pa&szlig;t nicht zu diesem Verzeichniseintrag</SAMP> oder <SAMP>Die Datei ist nicht zum &Auml;ndern geöffnet</SAMP> f&uuml;hrten,
+
+<LI>Gibt jetzt keinen <SAMP>Disk wurde bereits angemeldet</SAMP>-Fehler mehr aus, wenn der Ablageverzeichnis-Pfad sich in der Gro&szlig;-/Kleinschreibung vom beim Anmelden verwendeten Pfad unterscheidet.
+
+</UL>
+
+
+<B>V1.11 (14-02-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>Umgehung eines gef&auml;hrlichen Bugs:</STRONG> Die Gr&ouml;&szlig;e von Image-Dateien wurde manchmal auf Null zur&uuml;ckgesetzt, wenn auf die Datei zugegriffen wurde,
+
+<LI>Schwerwiegender Bug behoben: Falls eine Datei dadurch &uuml;berschrieben wurde, da&szlig; eine neue mit dem gleichen Namen gespeichert wurde, wurden die Verzeichnisdaten nicht als ge&auml;ndert markiert, was zu <SAMP>Pa&szlig;t nicht zu diesem Verzeichniseintrag</SAMP>-Fehlern f&uuml;hren konnte,
+
+<LI>Das &Ouml;ffnen einer Datei mit <KBD>OPENOUT</KBD> konnte ebenfalls zu <SAMP>Pa&szlig;t nicht zu diesem Verzeichniseintrag</SAMP> f&uuml;hren, wenn die Datei nicht unmittelbar nach dem Schlie&szlig;en gestempelt wurde,
+
+<LI>Der sequential pointer einer Datei wird auf korrekte Werte gesetzt, wenn versucht wird, &uuml;ber das Ende der Datei hinaus Daten zu lesen,
+
+<LI>(Nur in der englischen Version) Problem mit "Enter new na" als Untermen&uuml;-Titel behoben,
+
+<LI><A HREF="tech.html#cli_filer"><KBD>Desktop_raFSFiler</KBD></A> kann jetzt auch mit dem <KBD>-newdisc</KBD>-Schalter aufgerufen werden, um das "Neue Disk erzeugen"-Fenster zu &ouml;ffnen,
+
+<LI>Im "Neue Disk"-Fenster wird die Disk sofort erzeugt, nachdem das Symbol auf ein Verzeichnis gezogen wurde,
+
+<LI><A HREF="tech.html#cli_free"><KBD>Free</KBD></A>-Kommando wurde implementiert,
+
+<LI>Verhalten von <KBD>Mount</KBD> korrigiert - jetzt wird nicht mehr das CSD auf das Root-Verzeichnis der neuen Disk gesetzt, sondern nur FileSwitch$raFS$CSD,
+
+<LI>Ist das CSD nicht eingestellt (z.B. nach <KBD>NoDir</KBD>), greifen <KBD>Dir</KBD> und <KBD>Cat</KBD> auf das Root-Verzeichnis zu, anstatt einen <SAMP>Disk nicht bekannt</SAMP>-Fehler hervorzurufen,
+
+<LI>(Nur RiscPC-Version) Bugfix: Traten beim Speichern von Verzeichnisdaten Fehler auf, konnte das sp&auml;ter zu dem Fehler <SAMP>Verzeichnisdaten sind ung&uuml;ltig</SAMP> f&uuml;hren,
+
+<LI>Maximale Gr&ouml;&szlig;e der dynamischen Area jetzt 1&nbsp;MB statt des gesamten verf&uuml;gbaren RAMs,
+
+<LI>Problem mit dem raFSFiler behoben; dieser beklagte sich manchmal: <SAMP>Die Message-Datei ist bereits geöffnet</SAMP>,
+
+<LI>Verzeichnisdaten werden beim Speichern auf das Host-Dateisystem jetzt in allen F&auml;llen als "Data" (&amp;FFD) gestempelt.
+
+</UL>
+
+
+<B>V1.10 (10-01-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>Es gibt jetzt einen raFSFiler!</STRONG>
+
+<LI>raFS wurde bei Acorn registriert, ihm wurde die Dateisystem-Nummer 142 zugewiesen,
+
+<LI>Gr&ouml;&szlig;eres Update der Anleitung, &Uuml;bersetzung des ersten Teils,
+
+<LI>Das Dateisystem-Modul kann direkt von Assembler aus aufgerufen werden,
+
+<LI><EM>Endlich</EM> gibt es Unterst&uuml;tzung f&uuml;r das Speichern von Verzeichnissen nach einer Verz&ouml;gerung (<A HREF="tech.html#cli_optdd"><KBD>-DirsaveDelay</KBD></A>-Schalter von <A HREF="tech.html#cli_opt"><KBD>raFS_Opt</KBD></A>) oder nach einer bestimmten Anzahl von &Auml;nderungen der Verzeichnisdaten (<A HREF="tech.html#cli_optdm"><KBD>-DirsaveMods</KBD></A>-Schalter),
+
+<LI><A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> und <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> wurden geschrieben, um Write-through nur vor&uuml;bergehend einzuschalten,
+
+<LI>Unterst&uuml;tzung von <A HREF="tech.html#cli_mount"><I>!Mount</I></A>- und <A HREF="tech.html#cli_dismount"><I>!Dismount</I></A>-Dateien, zusammen mit dem <KBD>-X</KBD>-Schalter des <KBD>Mount</KBD>-Kommandos,
+
+<LI><KBD>Mount</KBD> und <KBD>Dismount</KBD> setzen raFS$(D)Disc auf den Namen der an-/abgemeldeten Disk,
+
+<LI><A HREF="tech.html#cli_create"><KBD>raFS_Create</KBD></A> schreibt jetzt eine <I>!Mount</I>-Datei in Ablageverzeichnisse. Der neue <KBD>-app</KBD>-Schalter veranla&szlig;t es au&szlig;erdem, bei Applikations-Verzeichnissen noch <I>!Sprites</I>- und <I>!Run</I>-Dateien hinzuzuf&uuml;gen,
+
+<LI>Disk-<A HREF="tech.html#integrity">Integrity-Checks</A> wurden zu den Operationen &Ouml;ffnen, Laden, Speichern, L&ouml;schen und Erzeugen hinzugef&uuml;gt, ebenso wird jetzt die Variable raFS$NoChecks unterst&uuml;tzt,
+
+<LI>Ein "Feature" wurde verbessert - wenn man eine Datei in ein anderes Verzeichnis verschob, wurde sie von raFS in den Speicher geladen, anschlie&szlig;end aber sofort wieder aus diesem gel&ouml;scht - hoppla! :-)
+
+<LI><A HREF="tech.html#cli_name"><KBD>NameDisc</KBD></A> pr&uuml;fte nicht nach, ob eine Disk mit dem neuen Namen schon angemeldet war - jetzt erzeugt dies einen Fehler. Au&szlig;erdem wird die abge&auml;nderte <I>!Atterer</I>-Datei jetzt sofort gespeichert und der neue Name der Disk kann l&auml;nger als 10 Zeichen sein (funktionierte nicht, weil OS_FSControl&nbsp;50 verwendet wurde - jetzt wird der Name direkt ge&auml;ndert),
+
+<LI><A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A> entgeht nicht mehr, da&szlig; eine Disk mit dem gleichen Namen schon angemeldet ist, wenn die Gro&szlig;-/Kleinschreibung der Namen verschieden ist,
+
+<LI>Ein relativ ernster Bug wurde gefunden, er trat bei einem <KBD>Close</KBD> auf einem von raFS' Host-Dateisystemen auf, wenn raFS auf diesem Dateisystem Dateien ge&ouml;ffnet hatte,
+
+<LI>Bei einem Service_Shutdown werden jetzt nicht mehr sofort alle Disks abgemeldet (dadurch wurden Anwendungen, die nach raFS beendet wurden, daran gehindert, etwas auf einer raFS-Disk zu speichern), stattdessen wird ein <A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> ausgef&uuml;hrt (nur, wenn <KBD>raFS_Unsafe</KBD> nicht schon vorher ausgef&uuml;hrt wurde),
+
+<LI>Kleinerer Bugfix: Unter unwahrscheinlichen Umst&auml;nden kam es dazu, da&szlig; bei einem Fehler w&auml;hrend des Abspeicherns von Dateien eine unreferenzierte Datei zur&uuml;ckblieb,
+
+<LI>Wird das Modul mit <KBD>RMRun</KBD> gestartet, so wird raFS als aktuelles Dateisystem gew&auml;hlt,
+
+<LI>Gr&ouml;&szlig;tm&ouml;gliche Anzahl von Disks wurde auf 50 erh&ouml;ht, die Standardgr&ouml;&szlig;e des Verzeichnis-Cache ist jetzt 30k.
+
+</UL>
+
+
+<B>V1.02 beta (30-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Neues Kommando <A HREF="tech.html#cli_discs"><KBD>raFS_Discs</KBD>,</A>
+
+<LI>Wird jetzt eine Datei nur f&uuml;r Ausgabe ge&ouml;ffnet, nicht auch f&uuml;r Eingabe, wird ihr Extent auf Null gesetzt. Da raFS in beiden F&auml;llen genau die gleichen Aufrufe bekommt, wird das dadurch erreicht, da&szlig; die Routine auf FindV sich merkt, wie OS_Find zuletzt aufgerufen wurde,
+
+<LI><KBD>Mount, Dismount</KBD> und <KBD>NameDisc</KBD> sind jetzt Dateisystem-Befehle,
+
+<LI>Der <KBD>-path</KBD>-Schalter wurde zum  <A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A>-Kommando hinzugef&uuml;gt,
+
+<LI><KBD>Mount</KBD> gibt jetzt keine Fehlermeldung mehr aus, wenn versucht wird, die gleiche Disk zweimal anzumelden; das Kommando (und auch <KBD>Dismount</KBD>) setzt das CSD/URD auf korrekte Werte,
+
+<LI>Fix f&uuml;r einen Bug, der verhinderte, da&szlig; Verzeichnisse wieder ge&ouml;ffnet werden konnten, nachdem sie aus dem Verzeichnis-Cache geflusht worden waren, wenn ein Dateiname eines der Zeichen <TT>#%&amp;*@\^</TT> enthielt,
+
+<LI><KBD>Back</KBD> funktioniert jetzt,
+
+<LI><A HREF="tech.html#format">Dateiformate</A> sind in der Anleitung angegeben.
+
+</UL>
+
+
+<B>V1.01 beta (09-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Bugfix in <KBD>raFS_Flush</KBD> und <KBD>Dismount</KBD>,
+
+<LI>Separate RiscPC-Version des Moduls, die eine Dynamische Area verwendet.
+
+</UL>
+
+
+<B>V1.00 beta (30-10-1997)</B>
+
+<UL COMPACT>
+
+<LI>Erste ver&ouml;ffentlichte Version: Lange Dateinamen, beliebig viele Dateien in Verzeichnissen, Verzeichnis-Cache; kein Datei-Cache oder automatisches Abspeichern von ge&auml;nderten Verzeichnissen.
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Zur&uuml;ck zum Inhaltsverzeichnis</A></I>
+
+</BODY></HTML>

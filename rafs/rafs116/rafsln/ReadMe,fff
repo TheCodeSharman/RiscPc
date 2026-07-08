@@ -1,0 +1,28 @@
+ ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+  Help for rafsln
+ ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+ 
+This is version 1.02 of rafsln, 28™11™1998.
+Copyright Richard Atterer.
+This program is Free Software, see the raFS copyright notice for details.
+
+
+rafsln allows you to read raFS discs on Unix systems. It creates a directory structure resembling that of the raFS disc and fills it with symbolic or hard links to the ”A0.A0.A0• files.
+
+Syntax: rafsln [-s] [-e] [-c] <DirContaining!Atterer> [<DestinationDir>]
+  -s  Make symbolic links instead of hard links
+  -e  Add extensions to names not containing any dots
+  -c  Add filetype after comma; filename,fff‘
+
+If the destination directory is omitted, .‘ is used. Inside that directory, the program creates a subdirectory named like the raFS disc.
+
+When using the -e switch to add extensions to the filenames, rafsln looks for a file called ”.rafsln_mapping• in your home directory. You can use this file to specify which filetypes are mapped to which extensions. The file format is very simple ˜ see the supplied example.
+
+If both the -e and -c switches are present, the program first tries to find an extension in the mappings file. Only if this fails, the filetype is added in hexadecimal notation after a comma.
+
+The binary is for a.out ARMLinux.
+
+  __   _
+  |_) /|  Richard Atterer
+  | \/¯|  atterer@informatik.tu-muenchen.de
+  ¯ ´` ¯

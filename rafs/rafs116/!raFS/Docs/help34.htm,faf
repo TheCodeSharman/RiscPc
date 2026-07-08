@@ -1,0 +1,839 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>Handleiding voor het raFS opslagsysteem</TITLE>
+<META NAME="Author" CONTENT="Richard Atterer (Vertaling Kees Grinwis/Dick Tanis Tabsoft">
+<META NAME="Keywords" CONTENT="Atterer, Augsburg, Acorn, raFS, filing, system, long, filename, filenames, directory, directories, file, files">
+<META NAME="Description" CONTENT="Handleiding voor het raFS opslagsysteem, geschreven door Richard Atterer">
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000FF" VLINK="#8800BB"
+ALINK="#FF0000">
+
+<H1 ALIGN="center"><A
+HREF="http://www.informatik.tu-muenchen.de/~atterer/"><IMG ALT="raFS"
+SRC="rafs.gif" WIDTH=206 HEIGHT=88 BORDER=0></A></H1>
+
+<P>raFS is een opslagsysteem waarrmee lange bestandsnamen en een onbeperkt
+aantal objecten in mappen kunt opslaan. De bestanden die u bewaart
+worden op een onderliggende opslagsysteem, b.v. ADFS, als afzonderlijke
+bestanden opgeslagen.
+<P ALIGN="center">raFS is Free Software, geschreven door Richard Atterer.
+
+<P><HR>
+
+<P><H4><A NAME="top">Deel I - Handleiding</A></H4>
+
+<UL>
+<LI><A HREF="#release">Opmerkingen voor deze versie </A> - lezen aub!
+<LI><A HREF="#intro">Introductie</A>
+<LI><A HREF="#usage">Gebruik</A> - raFS' systeem van opslaan van bestanden
+<UL>
+  <LI><A HREF="#discs">Werken met disks</A> - schrijfbeveiliging, hernoemen, afmelden
+  <LI><A HREF="#create">Cre&euml;eren van nieuwe disks</A>
+  <LI><A HREF="#choices">Het instelvenster</A>
+</UL>
+<LI><A HREF="#verify">Controlen van beschadigde disks</A>
+<LI><A HREF="#contact">Contact met de auteur</A>
+<LI><A HREF="#history">Overzicht van de verschillende versies</A>
+<LI><A HREF="gpl.html">Copyright/Auteursrechten: GNU General Public License</A>
+</UL>
+
+<P><H4>Deel II - Technische details (Engels)</H4>
+
+<UL>
+<LI><A HREF="tech.html#integrity">Corrupted discs</A> and how they are dealt with
+<LI><A HREF="tech.html#behave">Behaviour in special situations</A>
+<LI><A HREF="tech.html#limits">Limits of raFS</A>
+<LI><A HREF="tech.html#goddamnbugs">Known problems</A>
+<LI><A HREF="tech.html#cli">Command line interface</A>: <KBD><A HREF="tech.html#cli_filer">Desktop_raFSFiler</A>, <A HREF="tech.html#cli_fs">raFS</A>, <A HREF="tech.html#cli_create">raFS_Create</A>, <A HREF="tech.html#cli_flush">raFS_Flush</A>, <A HREF="tech.html#cli_discs">raFS_Discs</A>, <A HREF="tech.html#cli_mount">Mount</A>, <A HREF="tech.html#cli_dismount">Dismount</A>, <A HREF="tech.html#cli_name">NameDisc</A>, <A HREF="tech.html#cli_unsafe">raFS_Unsafe</A>, <A HREF="tech.html#cli_safe">raFS_Safe</A>, <A HREF="tech.html#cli_opt">raFS_Opt</A></KBD>
+<LI><A HREF="tech.html#call">Calling raFS from assembler</A>: <KBD><A HREF="tech.html#call_info">raFS_Info</A>, <A HREF="tech.html#call_nrofdiscs">raFS_NrOfDiscs</A>, <A HREF="tech.html#call_enumeratediscs">raFS_EnumerateDiscs</A>, <A HREF="tech.html#call_finddisc">raFS_FindDisc</A>, <A HREF="tech.html#call_discinfo">raFS_DiscInfo</A>, <A HREF="tech.html#call_memcopy">raFS_MemCopy</A>, <A HREF="tech.html#call_readvar">raFS_ReadVar</A>, <A HREF="tech.html#call_setvar">raFS_SetVar</A></KBD>
+<LI><A HREF="tech.html#format">File formats</A>
+</UL>
+
+<P><HR>
+
+
+
+<P><H2><A NAME="release">Opmerkingen bij versie 1.16 (05-05-1999)</A></H2>
+
+<P>raFS is op dit moment erg stabiel maar dit betekent niet dat u niet voorzichtig
+moet zijn als u aan raFS uw waardevolle gegevens toevertrouwd. <EM>Ik moedig u aan
+om van uw waardevolle gegevens daarom een veiligheidskopie te maken, indien u deze
+wegschrijft met raFS.</EM>
+
+<P>Belangrijke dingen die u bij het gebruik van raFS moet onthouden zijn:
+<UL>
+<LI>Sluit u computer netjes af, restart (reset) hem niet gelijk.
+<LI>Meld een disk opnieuw aan als het pad van de plaats waar de disk staat
+gewijzigd is. Dit doet u door op de map te dubbelklikken.
+<LI>Controleer altijd een disk als raFS meldt dat een bestand niet geopend kan
+worden en dat u de diskcontrole moet gebruiken. Dus probeer <EM>nooit</EM> een
+bestand te wissen waarvan raFS zegt dat deze beschadigd is!
+<LI>Wijzig geen enkel bestand in de bewaarmap (die op het onderliggende
+opslagsysteem) van een raFS disk.
+<LI>Brandt nooit een <EM>aangemelde</EM> disk (met een beveiligigsbestand
+<I>"Lock"</I> in de bewaarmap) op een CD-ROM! ;-)
+</UL>
+
+<P>Als raFS de enige kopie van uw favoriete bestand overschrijft, zeg dan niet dat
+ik u niet gewaarschuwd heb.
+
+<P><HR WIDTH="41%">
+
+
+
+
+<P><H2><A NAME="intro">Introductie</A></H2>
+
+De standaard-opslagsystemen van Acorn (d.w.z. alle die de FileCore gebruiken)
+beperken de lengte van bestandsnamen tot 10 tekens en het maximaal mogelijke
+bestanden tot 77 per map, hetgeen nogal irritant is. Daarom zijn er al meerdere
+pogingen geweest om de FileCore te omzeilen. De meeste gemaakte programma's
+zijn image-opslagsystemen, deze spreken een enkele bestand op disk zo aan, als
+was het een disk die bestanden en mappen bevat:
+
+<UL>
+
+<LI><I>ArcFS</I> en <I>SparkFS</I> maken lange bestandsnamen mogelijk als een
+bijproduct van hun primaire doel, het comprimeren van bestanden. Ze zijn
+betrouwbaar, maar zijn relatief langzaam en zijn niet gratis.
+
+<LI><I>StrongHelp</I> werd gescreven, om veel afzonderlijke help-bestanden
+effectief in 1 bestand op te slaan. Eigenlijk is er niet gedacht aan opslag
+van andere zaken, maar men zou het kunnen gebruiken voor de opslag van gegevens.
+Het beschadigt echter soms image-bestanden.
+
+<LI>Net zo als StrongHelp slaat ook <I>X-Files</I> zijn bestanden
+ongecomprimeerd. Het is langzaam, bevat enkele fouten en besteedt veel tijd
+aan het verzamelen van de vrije ruimte in zijn image-bestand, zodra deze meerdere
+megabytes groot geworden is. Soms wordt het image-bestand zelfs beschadigd
+tijdens zo'n actie.
+
+<LI><I>LongFile</I> is geen image-opslagsysteem, inplaats hiervan onderschept het
+de aanroepen die programma's voor bestandsoperaties naar RiscOS sturen. Versie 2,
+is aardig stabiel maar het blijft een hack en het staat slechts 76 bestanden toe
+
+<LI><I><A HREF="http://www.wss.co.uk/">WIN95FS</A></I> is gewoon duur als u het
+alleen voor lange bestandsnamen wilt gebruiken inplaats voor WINDOW~1.
+
+<LI><I>TBAFS</I>, is ook commercieel, biedt compressie en PC-ondersteuning.
+
+</UL>
+
+<P>raFS is nog een image-opslagsysteem nog een hack: Het is geschreven als
+normaal opslagsysteem. De bestanden die U bewaart naar raFS worden niet in
+&eacute;&eacute;n groot bestand opgeslagen, maar als afzonderlijke bestanden
+in een map-structuur, die het programma aanmaakt op een ander opslagsysteem.
+Hiermee is het mogelijk om volledig gebruik te maken van de mogelijkheden om
+bestanden te beheren van het onderliggende opslagsysteem, hetgeen veel flexibeler
+is. Hiernaast is de kans dat een bestand gered kan worden, als er iets fout gaat,
+veel groter.
+
+<P>raFS heeft de volgende eigenschappen:
+
+<UL>
+
+<LI>100% geschreven in assembler
+
+<LI>Omdat het geen image-opslagsysteem is, zijn er geen problemen met InfoZip,
+sFTP enz. en de omvang is niet beperkt tot 4GB (of zelfs 2GB op
+FileCore-gebaseerde opslagsystemen).
+
+<LI>Buffert map-gegevens, zodat bestandstoegang zeer snel is. 
+
+<LI>Ondersteund meerdere "disks" (tot 50 stuks).
+
+<LI>Gemakkelijk aanmaken en aanmelden van disks in de desktop (met de raFSFiler).
+
+<LI>Er wordt gebruik gemaakt van het systeem-sprite gebied en de RMA (RiscOS-versie
+eerder dan V3.5) of een dynamische gebied (RiscOS 3.5 en hoger) voor de buffering.
+Als het systeem-sprite gebied gebruikt wordt, dan wordt dit gedaan op een manier
+die compatibel is met andere programma's die er gebruik van maken, b.v. Memphis.
+
+<LI>Werkt met <I>CDFS</I> en <I>Access+.</I>
+
+<LI>Er is ook een Duitse en Nederlandse versie (als u dat laatste tenminste nog
+niet gemerkt had...)
+
+<LI>Volledige ondersteuning voor het meervoudig openen van bestanden
+(inclusief inlezen/bewaren).
+
+<LI>Het geeft de juiste fout-nummers weer!
+
+</UL>
+
+<P>Deze documentatie is opgedeeld in twee delen. Het eerste deel is bedoeld
+voor mensen die raFS op de desktop willen gebruiken, terwijl het tweede
+(engelse) deel de interface van het opslagsysteem meer in detail beschrijft.
+Het is niet nodig om deze te lezen, omdat de meeste informatie alleen voor
+gevorderden en programmeurs relevant zijn. 
+
+<P>Ik hoop dat dit programma nuttig zal zijn!
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="usage">Gebruik</A></H2>
+
+raFS wordt in het geheugen geladen, als u op <I>!raFS</I> of een
+applicatie-disk (zoals het voorbeeld <I>!raFSDisc</I>) dubbelklikt, en
+installeerd een symbool op de symbolenbalk. Indien u het programma bij het
+opstarten automatisch geladen wilt hebben, kunt u het in uw
+<KBD>!Boot.Choices.Boot.PreDesk</KBD>-map kopi&euml;ren.
+
+<P>Voor u begint moet de manier waarop raFS zijn disks beheert duidelijk zijn.
+Eigenlijk is het woord "disk" misleidend - raFS gebruikt namelijk <EM>geen</EM>
+eigen diskformaat. Toch zal ik van "disks" spreken, omdat deze namelijk
+op dezelfde manier behandeld worden als b.v. ADFS met diskettes omgaat: Ze
+kunnen aangemaakt, hernoemd, aangemeld en afgemeld worden en hun naam verschijnt
+in het map-venster in de vorm "raFS::<I>Disknaam</I>.$.&nbsp;..." In
+tegenstelling tot image-opslagsystemen worden raFS-disks niet in
+&eacute;&eacute;n bestand, maar als afzonderlijke bestanden in een map opgeslagen.
+
+<P>raFS kan de gegevens, die in zijn disks opgeslagen worden, in twee soorten
+mappen opslaan: Ofwel in een applicatie-map, wiens naam begint met "!" en
+wordt weergegeven met een speciaal symbool. De tweede mogelijkheid is een
+normale map, die niet onderscheiden kan worden van een normale map totdat er op
+wordt gedubbelklikt. Als men dit doet en raFS is geladen, dan wordt de in de
+map opgeslagen raFS-disk aangemeld en de hoofdmap van de raFS disk wordt
+geopend in plaats van de map waar u op gedubbelklikt heeft.
+
+<P>Als het programma niet geladen is als u dubbelklikt op een normale map die
+een raFS disk bevat of als het gelezen is, maar u houdt de SHIFT-toets ingedrukt
+bij het dubbelklikken, dan ziet u de werkelijke inhoud van de map: Een bestand
+genaamd <I>!Atterer</I> (ja, ik weet dat ik bescheiden ben, om het zo te
+noemen), een bestand genaamd <I>!Mount</I> en een map <I>A0</I> met verdere
+onderliggende mappen en bestanden met vergelijkbare namen.
+
+<P><STRONG>Verander of wis deze bestanden niet, tenzij u weet wat u doet!</STRONG>
+
+<P>Er dient opgemerkt te worden dat raFS zijn eigen mappen onderscheidt van
+andere, door het zoeken naar het <I>!Mount</I>-bestand en deze slechts start
+met <KBD>Obey</KBD> als de map zou moeten worden geopend. Het bestand, dat
+normaal uitgevoerd wordt, laadt ook raFS, als dit nog niet gebeurt is, daarom
+kunt u simpelweg op <I>!Mount</I> dubbelkliken als u een raFS-map openen wilt,
+maar raFS nog niet geladen was. (Voor het uitvoeren wordt <KBD>Obey</KBD> en
+niet simpelweg <KBD>Run</KBD> gebruikt, omdat het bestandstype niet altijd
+correct hoeft te zijn - b.v. als PC gebruikt is om een raFS-disk op een
+CD-ROM te branden.)
+
+<P>Wanneer u een disk aanmeldt wordt, wordt een bestand genaamd <I>Lock</I> in
+de bewaarmap van de desbetreffende raFS disk aangemaakt en wordt weer verwijdert
+wanneer de disk afgemeld wordt. Dit mechanisme wordt gebruikt om te controleren
+of er naar de bewaarmap geschreven mag worden en met de inhoud van dit bestand
+kan raFS de disk toch herkennen wanneer u de naam van bewaarmap van de raFS disk
+gewijzigd heeft. Als een disk nog niet aangemeld is en er staat een <I>Lock</I>-
+bestand dan weigert raFS deze disk aan te melden (bv. als het al aangemeld door
+een raFS op een andere machine via een netwerk) of geeft een waarschuwing dat
+u deze disk moet controleren (omdat toen de disk was aangemeld: de computer vastliep
+of herstart is).
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P>
+
+
+
+<H3><A NAME="discs">Werken met disks</A></H3>
+
+<TABLE><TR>
+
+<TD>Het symbolenbalk-menu stelt vaak gebruikte operaties ter beschikking.
+Als er geen disks zijn aangemeld, zijn de opties onder de stippellijn
+weggegrijsd.
+
+<UL>
+
+<LI>Met <B>Alleen-lezen</B> kan men disks beveiligen tegen ongewild schrijven
+beveiligen. Als de disk schrijfbeveiligd is, dan is de naam aangevinkt in het
+submenu. Deze optie werkt niet voor disks die op DOSFS opgeslagen zijn, omdat
+dit opslagsysteem zich niet correct gedraagt.
+
+<LI>Met <B>Naam&nbsp;disk</B>, kunt u de naam van een disk wijzigen. (U dacht
+al zoiets, nietwaar?)
+
+<LI><B>Meld af</B> verwijdert de geselecteerde disk van de lijst met disks die
+bij RiscOS bekend zijn - probeert men daarna toch de disk te benaderen, dan
+verschijnt de foutmelding <SAMP>Disk niet aanwezig</SAMP>. Ook nu kan men alle
+aangemelde disks afmelden door de optie "Afmelden" te kiezen zonder naar het
+sub-menu te gaan.
+
+<LI>Door een disknaam te selecteren in het <B>Controleer</B>-submenu start
+een diskcontrole op die raFS disk - <A HREF="#verify">zie hieronder</A> voor
+meer details.
+
+<LI><B>Open&nbsp;hoofd</B> opent de hoofdmap voor de geselecteerde disk of voor
+alle aangemelde disks als de menu-optie in het hoofdmenu van de symbolenbalk
+wordt aangeklikt.
+
+</UL>
+
+<P><EM>Belangrijk:</EM> Indien u een opslagmap wilt verplaatsen of de schijf
+waar deze op opgslagen is wilt hernoemen, dan <EM>moet</EM> u de disk weer
+aanmelden bij raFS (bv. door er op te dubbelklikken) zodat de nieuwe naam bij
+raFS bekend is.
+
+</TD>
+
+<TD><IMG ALT="[The icon bar menu]" WIDTH=117 HEIGHT=253 SRC="ibar34.gif"></TD>
+
+</TR></TABLE>
+
+<P>De menu-optie <B>Maak leeg</B> is onder normale omstandigheden niet
+noodzakelijk. Als u deze optie aanklikt dan worden alle gewijzigde, maar nog
+niet bewaarde gegevens opgeslagen. U moet de buffers echter alleen leegmaken,
+als raFS dit door een fout niet automatisch zelf kon doen. (b.v. indien u op
+Afbreken geklikt had, als er gevraagd werd een diskette, met daarop een
+raFS-disk, in te voeren in de diskdrive.)
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P>
+
+
+
+<H3><A NAME="create">Cre&euml;eren van nieuwe disks</A></H3>
+
+<TABLE><TR>
+
+<TD VALIGN="top">Nieuwe disks kunnen op een eenvoudige manier aangemaakt worden,
+met het venster dat verschijnt als men de muispijl naar rechts verplaatst bij
+de menu-optie <B>Nieuwe disk</B>. Met de "App"-optie of door invoer van een
+applicatie-naam, die met "!" begint", word gekozen of men een normale of een
+applicatie map gemaakt moet worden. Nadat u een naam voor de nieuwe disk
+ingevoerd heeft, wordt deze gemaakt zodra men het symbool naar een map venster
+sleept.
+
+</TD>
+
+<TD><IMG ALT="[The 'Create new disc' window]" WIDTH=202 HEIGHT=175
+SRC="crea34.gif"></TD>
+
+</TR></TABLE>
+
+<P>raFS heeft de nuttige eigenschap dat ook een hele harde schijf of een
+diskette voor een raFS-disk gebruikt kan worden. Als u klikt op b.v. het
+diskdrive-symbool, om de hoofdmap te openenen, zoekt het programma op eenzelfde
+manier naar een <I>!Mount</I>-bestand als bij het dubbelklikken op een
+map-symbool. Om een zo'n disk aan te maken, dan moet u de naam van de hoofdmap
+invoeren (b.v. <KBD>ADFS::HD.$</KBD>), de naam voor de nieuwe disk kiezen en
+daarna op <B>Cre&euml;er</B> klikken.
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P>
+
+
+
+<H3><A NAME="choices">Het instelvenster</A></H3>
+
+Het aanklikken van het raFS-symbool op de symbolenbalk met
+PASAAN of het aanklikken van de menu-optie <B>Keuzes...</B> opent een
+venster waarin men verschillende instellingen van het programma kan wijzigen.
+U kunt in dit venster ook uw voorkeuren opslaan.
+
+<P><B>Aanmelden van mappen bij opstarten:</B> In deze invoervelden van dit
+gedeelte kunt u de namen van 3 disks opgeven, als men deze op 1 van deze drie
+invoervelden sleept. De in deze mappen opgeslagen raFS-disks worden dan steeds
+als raFS opgestart wordt automatisch aangemeld.
+
+<P><B>Commando's bij het aanklikken symbolenbalk:</B> De commando's die worden
+uitgevoerd bij het aanklikken van het symbool van de raFSFiler op de symbolenbalk
+kunnen voor elke muisklik, KIES/PASAAN plus combinaties met de SHIFT/CTRL toetsen,
+worden ingesteld. Klik <A HREF="tech.html#cli">hier</A> voor meer details van de
+commando's die standaard staan ingesteld. Standaard zijn deze waarden ingesteld:
+
+<UL COMPACT>
+<LI>KIES opent de hoofdmap van een aangemelde disk. Als er maar &eacute;&eacute;n 
+disk aangemeld is dan wordt de hoofdmap direct geopend anders wordt een menu
+weergegeven.
+<LI>PASAAN opent het venster waarmee u nieuwe disks kunt aanmaken.
+<LI>SHIFT-KIES opent een menu van alle aangemelde disks. Als u op &eacute;&eacute;n
+van de disknamen in het menu klikt, wordt die disk afgemeld.
+<LI>SHIFT-PASAAN opent het <B>instelvenster</B>.
+<LI>CTRL-KIES en CTRL-PASAAN voeren respectievelijk de commado's
+<A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> en
+<A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> uit waardoor het bufferen
+uit of aan wordt gezet.
+<LI>SHIFT-CTRL-KIES zorgt dat de buffers worden leeggemaakt.
+<LI>SHIFT-CTRL-PASAAN voert het commando <KBD>raFS_Safe -smash</KBD> uit waardoor
+buffering direct wordt uitgezet.
+</UL>
+
+<P><B>Mapbuffer:</B>In dit gedeelte van het instelvenster kunt u de mapbuffer
+van raFS instellen. Deze mapbuffer wordt gebruikt door raFS en versnelt de
+toegang tot de disks. Wanneer u in een map iets wijzigd, bv. het wissen van
+een bestand, dan wordt de gewijzigde informatie niet direct weggeschreven,
+maar na een bepaalde tijd of na een bepaald aantal bewerkingen.
+
+<P>Opmerking: Het feit dat de inhoud van mappen pas na een bepaalde tijd bewaard
+worden betekent dat als u de inhoud van een map verandert en uw computer daarna
+direct herstart (reset) zal de inhoud van de map niet ververst zijn. Als u de map
+daarna opent bestaan gewiste bestanden nog steeds en nieuwe aangemaakte bestanden
+zijn er gewoon niet! Dit moet natuurlijk voorkomen worden. Dus als uw software
+heeft dat uw computer vaak vast laat lopen bij handelingen met het opslagsysteem
+kunt u die vertraging als volgt uit zetten:
+
+<P>Voor de beide invoervelden waarin u de vertraging in centiseconden invult en
+het veld waar u het aantal bewerkingen invult hebben de waarden 0 en 1 een speciale
+betekenis. Een 0 betekent dat de vertraging en het aantal bewerkingen waarna de
+gewijzigde informatie bewaard compleet wordt uitgezet (Als beide waarden 0 zijn dan
+worden gewijzigde mappen alleen bewaart om ruimte te maken wanneer de mapbuffer vol
+zit en wanneer disks afgemeld worden.) Een waarde van 1 in beide invoervelden
+forceert dat elke wijziging in een map direct wordt doorgevoerd naar het onderliggende
+opslagsysteem. (Als u een beetje verstand hebt van <TT>*</TT>commando's kunt u beter
+omgaan met applicaties die uw systeem vaak laat vastlopen door de commando's
+<A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> en
+<A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> aan de !Run toe te voegen.)
+
+<P><B>Diversen:</B> Een paar opties van de raFSFiler.
+
+<UL COMPACT>
+<LI>In mappen naar !Mount zoeken: Als deze optie aan staat kijkt de raFSFiler naar
+<I>!Mount</I> in elke map die geopend wordt en voert die uit.
+<LI>Sluiten raFS:$ met PASAAN opent vorige: Als deze optie aan staat dan wordt de
+bovenliggende map geopend waarin de raFS disk staat als u het map-venster van de
+hoofdmap van deze disk sluit met PASAAN.
+<LI>Menukeuze <B>Stop</B> in symbolenbalk-menu: Als u er niet van houdt dat de
+raFSFiler in tegenstelling tot de ADFSFiler een menukeuze <B>Stop</B> heeft dan
+moet u deze optie uit zetten.
+<LI><B>Stop</B> verwijdert: hiermee kunt u instellen welke raFS modules uit het
+geheugen verwijdert moeten worden als menukeuze <B>Stop</B> aanklikt. Opmerking:
+Als u de module raFS verwijdert dan worden alles disks afgemeld.
+</UL>
+
+<P>Aan de onderkant van het venster zijn vier knoppen: <B>Standaard</B> vult de
+"fabriekswaarden" in de invoervelden. <B>Bewaar</B> zorgt dat raFS de gewijzigde
+instellingen gebruikt en bewaart de gewijzigde instellingen. De <B>Annuleer</B>
+knop sluit het venster zonder dat de gewijzigde instellingen gebruikt worden. Als
+u met PASAAN op deze knop klikt dan worden de vorige instellingen in de invoervelden
+ingevuld. <B>Stel in</B> zorgt dat raFS de gewijzigde instellingen gebruikt maar
+bewaart ze niet. Dit betekent dat de volgende keer dat raFS opgestart wordt,
+de oude instellingen gebruikt worden. Als u op de laatste drie knoppen met KIES klikt
+dan wordt het venster gesloten, klikt u met PASAAN dan blijft het venster
+gewoon open.
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="verify">Controleren van beschadigde disks</A></H2>
+
+Soms kan een raFS disk beschadigd raken. Dit kan gebeuren als de computer vastloopt
+direct na het bewaren van gegevens zodat raFS de gewijzigde gegevens nog niet heeft
+kunnen opslaan op het onderliggende opslagsysteem. Hierdoor kunnen sommige bestanden
+niet geopend worden of net bewaarde bestanden staan niet meer in de map of bestanden
+die net zijn gewist zijn nog steeds aanwezig.
+
+<P><STRONG>Probeer deze bestanden van beschadigde disks nooit te wissen want u kan
+daardoor gegevens van andere bestanden wissen!</STRONG>
+
+<P>Met de controleer optie kunt u beschadigde disks opsporen en repareren. Om dit
+proces te starten moet u de disknaam in de <B>Controleer</B> submenu aanklikken (of
+u gebruikt het <A HREF="tech.html#cli_verify"><TT>Verify</TT></A>-commando). Inplaats
+van het aanklikken van de disknaam kunt u ook de menukeuze <B>Controleer</B>
+aanklikken. Nu worden alleen de disks die foutmeldingen gaven bij het aanmelden
+gecontroleerd. De namen van de mappen die gecontroleerd worden en nog wat andere
+meldingen worden weergegeven tijdens het controleren. Sommige van deze meldingen
+hebben nog wat extra uitleg nodig:
+
+<UL>
+<LI><SAMP>Correctie: Eerste ongevulde map is '<I>A0.B0</I>'</SAMP>: Deze melding kunt
+u ook op correcte disk krijgen en u hoeft zich daarover geen zorgen te maken.
+<LI><SAMP>Verschillende bestandsgrootte! 'Repareer' als '<I>A0.B0.C0</I>' bij
+'<I>$.Bestand</I>' hoort. 'Sla over' als de gegevens bij een ander bestand
+hoort</SAMP>: U wordt hier voor een keuze gesteld omdat raFS niet zeker weet of het
+object in de map naar de juiste gegevens wijst (en er kan een object zijn dat
+<EM>wel</EM> correct is!). Als u het niet zeker weet kies dan Sla over.
+<LI><SAMP>De grootte van het bestand wordt op nul gezet / map wordt in een lege map
+omgezet</SAMP>: Dit betekent <EM>niet</EM> dat een bestand of een map gewist wordt
+maar dat de gegevens al verloren zijn en dat raFS gewoon de <EM>referentie</EM> van
+die gegevens verwijdert
+<LI><SAMP>Sorry, de namen van de overgebleven <I>n</I> bestanden zijn verloren
+gegaan! Ze worden in 'Lost+Found' gezet</SAMP>: Het aantal bestanden dat in
+'Lost+Found' wordt gezet kan minder zijn dan wat de melding aangeeft omdat bestanden
+met een bestandsgrootte van nul gewoon gewist worden.
+</UL>
+
+Elke map en bestand zonder referentie worden in de <I>Lost+Found</I> map gekopieerd,
+raFS maakt deze map in de hoofdmap van de disk.
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P><HR WIDTH="41%">
+
+
+
+<P><H2><A NAME="contact">Contact met de auteur</A></H2>
+
+Als u mij een fouten-rapport (bug report) wilt sturen, suggesties voor toekomstige
+versies van raFS of mij alleen maar wilt vertellen hoe prachtig dit programma is,
+kunt u contact met mij opnemen via email (voorkeur) of "gewoon" via een brief.
+
+<P>Mijn email-adres is
+<A HREF="mailto:atterer@informatik.tu-muenchen.de">atterer@informatik.tu-muenchen.de</A> (<A HREF="pubkey.asc">PGP-sleutel</A>). Om de laatste versie van raFS op te halen moet u langs mijn internet-pagina gaan <A HREF="http://www.informatik.tu-muenchen.de/~atterer/">http://www.informatik.tu-muenchen.de/~atterer/</A>.
+
+<P>In het geval dat u mij een bezoekje wilt brengen en u uw mening wilt vertellen
+over het feit dat raFS al uw gegevens beschadig heeft, is hier mijn adres:
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Richard Atterer
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Beethovenstra&szlig;e 30
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;86391 Stadtbergen
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<I>Deutschland</I>
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I><P><HR
+WIDTH="41%">
+
+
+
+<P><H2><A NAME="history">Overzicht van de verschillende versies</A></H2>
+
+Ik wil de volgende mensen bedanken voor hun suggestie en hun fouten-rapport: Stefan&nbsp;Bellon, Emil&nbsp;Brunavs, Peter&nbsp;Burwood, Nick&nbsp;Clark, Dave&nbsp;Daniels, Justin&nbsp;Fletcher, Mike&nbsp;Gregory, Tony&nbsp;Houghton, Rick&nbsp;Hudson, Hans&nbsp;de&nbsp;Jong, James&nbsp;Larcombe, Vincent&nbsp;Lefevre, Marko&nbsp;Lukat, Robin&nbsp;Moffatt, Jakob&nbsp;Stoklund&nbsp;Olesen, David&nbsp;Pilling, Tim&nbsp;Rowledge, Darren&nbsp;Salt, Reiner&nbsp;Schulz, Dick&nbsp;Tanis, David&nbsp;Thomas, Reuben&nbsp;Thomas, Martin&nbsp;Tillman.<P>
+
+<B>V1.15 (14-11-1998)</B>
+
+<UL COMPACT>
+
+<LI>Als nu <I>Lock</I> bestanden in disks achterblijven na een directe herstart (reset)
+of nadat systeem vastgelopen is, wordt er alleen een waarschuwing gegeven. Na een foutmelding van de vensterbeheerder, sluit het venster automatisch na een bepaalde <A HREF="tech.html#cli_optmt">gespecificeerde tijd</A>,
+
+<LI>Het aanklikken van de menukeuze <B>Controleer</B> of het gebruik van het commando
+<A HREF="tech.html#cli_verify"><KBD>Verify&nbsp;*</KBD></A> werkt nu wel goed, de
+disks die gecontroleerd moeten worden, worden nu gecontroleerd,
+
+<LI>Fout opgelost in de diskcontrole: Er wordt nu rekening gehouden met openstaande
+bestanden,
+
+<LI>Als <I>!raFS</I> in de map <KBD>!Boot.Choices.Boot.PreDesk</KBD> wordt gezet dan
+wordt het aanmelden van disks die tijdens het starten aangemeld moeten worden direct
+uitgevoerd inplaats van te wachten op het welkom-scherm van RISC OS.
+
+<LI>Het nieuwe commando <A HREF="tech.html#cli_filermenu"><KBD>raFSFiler_Menu</KBD></A>
+maakt menu's met disknamen aan die door gebruiker gedefinieerd kunnen worden;
+de standaard instellingen zijn veranderd en gebruiken nu dit commando,
+
+<LI>Met het <KBD>rafsln</KBD> gereedschap (utility) kunt u raFS disks lezen op een
+Unix-systeem; een gecompileerde versie voor ARMLinux met de broncode zit er ook bij,
+
+<LI>Er zijn wat verbeteringen aangebracht om raFS te laten werken op beveiligde
+DOS geformateerde floppydisks; de disks moeten aangemeld worden via de <KBD>-ro</KBD>
+optie,
+
+<LI>raFSFiler kijkt nu naar <I>!Mount</I>-bestanden in de hoofdmap van image-bestanden,
+
+<LI>Vincent Lefevre heeft de templates en messages vertaald in het Frans,
+
+<LI>Fout verwijdert uit <KBD>Mount</KBD> waardoor niet alle opties met een commando
+meegegeven konden worden.
+
+</UL>
+
+
+<B>V1.14 (15-10-1998)</B>
+
+<UL COMPACT>
+
+<LI>Nieuw commando <A HREF="#verify">Verify</A> welke beschadigingen in disks opspoort
+en repareert,
+
+<LI>Een bestand <I>Lock</I> wordt bewaard in de bewaarmap van een disk zodat raFS weet
+of er op de media waarop de disk staat geschreven kan worden en of de bewaarmap werd
+hernoemd,
+
+<LI>Het openen van mappen (die sommige programma's gebruiken om hun aanwezigheid te
+testen) werkt nu afhankelijk van toegang-specificaties,
+
+<LI>Bestanden die alleen worden geopend om naar te schrijven kunnen nu ook gelezen
+worden,
+
+<LI>De RiscOS&nbsp;3.1 versie ondersteunt nu ook het gebruik van module-geheugen (RMA)
+inplaats van de systeem-sprite gebied om te zorgen om incompatibliteit met andere
+programma's zoals SparkFS te voorkomen,
+
+<LI>De bestanden <I>!Atterer, !Mount</I> en <I>!Dismount</I> kunnen ook
+<I>_Atterer, _Mount</I> en <I>_Dismount</I> als naam hebben voor compatibliteit met
+ISO CD-ROMs.
+
+<LI>raFSFiler gebruikt nu het URL-protocol van ANT als ook het URI-protocol om een URL
+naar een browser te zenden,
+
+<LI>Bij het invoeren van een lange naam in het 'Cre&euml;er nieuwe disk'-venster wordt het invoerveld niet meer beschadigd,
+
+<LI>Een paar kleine fouten (bugs) zijn opgelost.
+
+</UL>
+
+
+<B>V1.13 (10-05-1998)</B>
+
+<UL COMPACT>
+
+<LI>Ik was erg geneigd om een 1 april grap in raFS te stoppen maar ik heb er maar
+vanaf gezien omdat ik denk dat de mensen daar niet zo blij mee zullen zijn als er
+zoiets in een <EM>opslagsysteem</EM> zit :-)
+
+<LI>Twee fouten zijn opgelost in een tussenversie 1.12a: Eentje veroorzaakte een
+ongedefinieerde instructie uitzondering in de raFSFiler, de andere zorgde dat
+<KBD>raFS_Opt</KBD> meestal niet werkte omdat de <KBD>-LoadMessages</KBD> optie
+toevallig Territory afhankelijk was gemaakt,
+
+<LI>De raFSFiler is verbeterd zodat deze 3 disks tijdens het opstarten kan aanmelden
+en kan verschillende commando's uitvoeren wanneer er op het symbool van de raFSFiler
+op de symbolenbalk wordt geklikt met SHIFT of CTRL, met een paar nieuwe opties kan u
+het filter op de Filer en de menukeuze <B>Stop</B> uitzetten,
+
+<LI>In het <B>Cre&euml;er nieuwe disk</B>-venster gaat het aanmaken van een disk met
+dezelfde naam als de disknaam veel makkelijker. (Ook kan er CTRL-C gebruikt worden
+om de naam van het bovenste invoerveld in het onderste invoerveld te kopi&euml;ren.)
+
+<LI>Met PASAAN op het afsluitsymbool van een map-venster van de hoofdmap van een
+disk wordt de map waarin de disk staat, geopend. Excuses aan James Larcombe die deze
+functie in een aparte module het gestopt terwijl ik tot de ontdekking kwam dat ik
+het al zelf in de raFSFiler had staan!
+
+<LI>Commando <A HREF="tech.html#cli_execafter">raFS_ExecAfter</A> toegevoegd,
+
+<LI>Controle op namen van bewaarmappen, er wordt een waarschuwing gegeven als u een
+raFS disk wilt aanmelden die op een raFS disk is aangemaakt,
+
+<LI>Met <A HREF="tech.html#cli_optor"><KBD>raFS_Opt&nbsp;-OpenRename</KBD></A> kunt
+u instellen of openstaande bestanden hernoemd kunnen worden. Standaard, is dit nu
+mogelijk,
+
+<LI>De <KBD>-verbose</KBD> optie is toegevoegd aan <A HREF="tech.html#cli_unsafe">
+<KBD>raFS_Unsafe</KBD></A> en <A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A>
+
+<LI>De variabele <A HREF="tech.html#integrity">raFS$NoChecks</A> is nu uitgebreid
+zodat u image-bestanden kan uitsluiten voor integriteitscontroles,
+
+<LI>U kan een standaard <I>!Dismount</I> bestand aanmaken in de Messages-bestand
+zodat raFS bij het commando <KBD>raFS_Create</KBD> automatisch dat bestand ook in
+de bewaarmap zet zoals <I>!Mount</I>, standaard wordt er geen <I>!Dismount</I>
+bestand aangemaakt,
+
+<LI>Een 'geheugen-lek' in de raFSFiler is nu opgelost, de fout trad op als de module
+werd gestopt en dan aansluitend weer werd opgestart met <KBD>Desktop_raFSFiler</KBD>,
+
+<LI>De naam van het dynamisch gebied is nu ge&iuml;nternationaliseerd,
+
+<LI>Fout opgelost: Als een bestand zonder schrijf-toegang werd geopend met
+<KBD>OPENOUT</KBD>, werd er wel een foutmelding gegeven maar de bestandslengte werd
+op nul gezet. Dit is nu veranderd zodat raFS hetzelfde reageert als de FileCore: De
+lengte wordt <EM>weergegeven</EM> als nul maar blijft in werkelijkheid onveranderd.
+
+</UL>
+
+
+<B>V1.12 (22-02-1998)</B>
+
+<P>Uitgegeven op een <I>Acorn User</I>-Coverdisk.
+
+<UL COMPACT>
+
+<LI>Het is nu niet meer nodig om verschillende versies van de raFS(Spr)-module voor
+elke taal te hebben daarentegen kunnen de standaard-teksten (in Engels) met het
+commando <A HREF="tech.html#cli_optlm"><KBD>raFS_Opt&nbsp;-LoadMessages</KBD></A>
+overschreven worden,
+
+<LI><A HREF="mailto:dtanis@mail.HZeeland.nl">Dick Tanis</A> heeft de programma-teksten
+op vriendelijke wijze in het Nederlands vertaald, hartelijk dank daarvoor!
+
+<LI>De grootte van image-bestanden kunnen nog <EM>steeds</EM> op nul gezet worden,
+dit is definitief opgelost. Echter dit heeft wel een andere consequentie dat het 
+overschrijven van een archief met een archief die dezelfde naam heeft een foutmelding
+oplevert (SparkFS en de Filer hebben ook dit probleem),
+
+<LI>Mappen kunnen nu niet meer naar zichzelf verplaatst worden, hierdoor kon de
+inhoud van de map niet meer aangesproken worden.
+
+<LI>"Omlegging" omdat in de Engelse versie de titel in het submenu waar de disk
+hernoemd kan worden, de titel afgebroken werd tot "Enter new na", is deze veranderd
+in "New name" :-) Het afbreken kwam door een fout in de module MessageTrans&nbsp;0.31
+en eerder, dit is nu opgelost in versie 0.32,
+
+<LI>Fouten in versie 1.11 gecorrigeerd die leide tot foutmeldingen zoals <SAMP>Hoort
+niet bij deze map inhoud</SAMP> of <SAMP>Niet open om gegevens te verversen</SAMP>,
+
+<LI>Klaagt niet langer meer over <SAMP>Disk is al aangemeld</SAMP> als de kapitalen
+van de letters van het pad van de bewaarmap niet overeen kwamen met de naam die werd
+gebruikt bij de eerst keer dat de disk werd aangemeld.
+
+</UL>
+
+
+<B>V1.11 (14-02-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>Omleggen van gevaarlijke fout (bug):</STRONG> De lengte van
+image-bestanden werd soms op nul gezet als het bestand werd aangesproken
+
+<LI>Grote fout opgelost: Als een bestand werd overschreven door een bestand met een
+dezelfde naam, werden de map-gegevens niet als 'veranderd' gemarkeerd waardoor u
+fouten kreeg zoals <SAMP>Hoort niet bij deze map inhoud</SAMP>,
+
+<LI>Nog een fout opgelost die zelfde fout zoals <SAMP>Hoort niet bij deze map
+inhoud</SAMP> veroorzaakt, dit kwam doordat een bestand dat werd geopend met
+<KBD>OPENOUT</KBD> na het sluiten geen nieuwe datum kreeg,
+
+<LI>De sequentie pointer wijst nu naar de juiste waarde wanneer er geprobeerd wordt
+na het einde van een bestand gegevens in te lezen,
+
+<LI>(Alleen in de Engelse versie) probleem opgelost met de raFSFiler submenu-titel
+die te vroeg afgebroken werd als "Enter new na",
+
+<LI>Kan nu ook <KBD>-newdisc</KBD> optie gebruiken met
+<A HREF="tech.html#cli_filer"><KBD>Desktop_raFSFiler</KBD></A> om het
+"Cre&euml;er nieuwe disk"-venster te openen,
+
+<LI>In het "Cre&euml;er nieuwe disk"-venster wordt de nieuwe disk direct aangemaakt
+na het slepen van het symbool naar een map-venster,
+
+<LI><A HREF="tech.html#cli_free"><KBD>Free</KBD></A> toegevoegd,
+
+<LI>Het gedrag van <KBD>Mount</KBD> is gecorrigeerd, nu wordt de CSD niet naar de
+hoofdmap gezet maar alleen FileSwitch$raFS$CSD,
+
+<LI>Als er geen CSD is (bv. na <KBD>NoDir</KBD>), spreken <KBD>Dir</KBD> en
+<KBD>Cat</KBD> de hoofdmap aan inplaats van een foutmelding
+<SAMP>Disk niet aanwezig</SAMP> te geven,
+
+<LI>(Alleen RiscPC versie) Fout opgelost: Fouten tijdens het bewaren van de
+map-gegevens konden fouten zoals <SAMP>De gegevens in de map zijn ongeldig</SAMP>
+opleveren,
+
+<LI>Maximale grootte van dynamische gebied is 1&nbsp;MB, is niet langer afhankelijk
+van totale RAM-geheugen,
+
+<LI>Probleem opgelost met raFSFiler die klaagt over
+<SAMP>Messages-bestand is al open</SAMP>,
+
+<LI>Map-gegevens worden nu bewaard als type Data (&amp;FFD) op het onderliggende
+opslagsysteem onder alle omstandigheden.
+
+</UL>
+
+
+<B>V1.10 (10-01-1998)</B>
+
+<UL COMPACT>
+
+<LI><STRONG>Er is een nu een raFSFiler!</STRONG>
+
+<LI>raFS is nu geregistreerd bij Acorn en heeft als opslagsysteem nummer 142 gekregen,
+
+<LI>Zeer verbetere documentatie, eerste stuk is in Duits vertaald,
+
+<LI>De FS-module kan nu direct van assembler aangeroepen worden,
+
+<LI><EM>Eindelijk</EM> is er ondersteuning toegevoegd die de buffer automatisch
+leegmaakt en de inhoud naar disk bewaart na een vertraging
+(<A HREF="tech.html#cli_optdd"><KBD>-DirsaveDelay</KBD></A> optie van
+<A HREF="tech.html#cli_opt"><KBD>raFS_Opt</KBD></A>) of na een aantal bewerkingen
+van de map-gegevens (<A HREF="tech.html#cli_optdm"><KBD>-DirsaveMods</KBD></A> optie),
+
+<LI><A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> en
+<A HREF="tech.html#cli_safe"><KBD>raFS_Safe</KBD></A> toegevoegd om tijdelijk direct
+leegmaken van de mapbuffer te forceren,
+
+<LI>Ondersteuning voor <A HREF="tech.html#cli_mount"><I>!Mount</I></A> en
+<A HREF="tech.html#cli_dismount"><I>!Dismount</I></A>-bestanden toegevoegd, samen met
+de <KBD>-X</KBD> optie voor het <KBD>Mount</KBD>-commando,
+
+<LI><KBD>Mount</KBD> en <KBD>Dismount</KBD> stelt de variabele raFS$(D)Disc in op
+de aan-/afgemelde disk,
+
+<LI><A HREF="tech.html#cli_create"><KBD>raFS_Create</KBD></A> maakt nu een
+<I>!Mount</I>-bestand aan in de bewaarmap van de raFS-disk. De nieuwe <KBD>-app</KBD>
+optie zorgt dat er ook een !Sprites- en een !Run-bestand wordt aangemaakt voor
+applicatie-mappen,
+
+<LI><A HREF="tech.html#integrity">Integriteitscontroles</A> van disks toegevoegd die
+worden uitgevoerd tijdens het openen, laden, bewaren, wissen en cre&euml;eren van
+objecten en er is ondersteuning voor de raFS$NoChecks variabele,
+
+<LI>Een "functie" werd verbeterd, wanneer u een bestand in een andere map verplaatste,
+probeerde raFS dit bestand in het geheugen te laden en maar werd daarna direct
+weggegooid, oeps! :-)
+
+<LI><A HREF="tech.html#cli_name"><KBD>NameDisc</KBD></A> controleerde niet of een
+disk met de nieuwe naam al aangemeld was, het geeft nu een foutmelding. Behalve dat
+wordt nu het gewijzigde <I>!Atterer</I>-bestand direct bewaard na het commando en
+kan de disknaam nu langer zijn dan 10 karakters (dit werkte eerst niet omdat
+OS_FSControl&nbsp;50 werd gebruikt, nu wordt de naam direct veranderd),
+
+<LI><A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A> heeft nu door, dat disknamen
+die hetzelfde zijn maar waarvan de hoofdletters verschillen ook hetzelfde zijn.
+
+<LI>Een ernstige fout is opgelost die optrad bij het afsluiten (<KBD>Close</KBD>) van
+&eacute;&eacute;n van de onderliggende opslagsystemen als raFS op dat opslagsysteem
+openstaande bestanden had staan.
+
+<LI>Wanneer het systeem afgesloten wordt (Service_Shutdown) meldt raFS niet alle
+disks meer af (waardoor programma's die pas na raFS afsloten worden niets meer
+naar een raFS-disk kan schrijven), maar wordt een
+<A HREF="tech.html#cli_unsafe"><KBD>raFS_Unsafe</KBD></A> uitgevoerd (alleen als
+het <KBD>raFS_Unsafe</KBD> commando al niet eerder uitgevoerd was.
+
+<LI>Kleine fout opgelost: Onder onwaarschijnlijke omstandigheden kan een foutmelding
+tijdens het bewaren een bestand opleveren zonder referentie,
+
+<LI>Wanneer de module via <KBD>RMRun</KBD> geladen wordt, wordt raFS geselecteerd
+als het huidige opslagsysteem,
+
+<LI>Maximum aantal disks is opgeschroefd naar 50, standaard is de mapbuffer nu 30K.
+
+</UL>
+
+
+<B>V1.02 beta (30-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Commando <A HREF="tech.html#cli_discs"><KBD>raFS_Discs</KBD></A> toegevoegd,
+
+<LI>Wanneer een bestand wordt geopend voor uitvoer (niet verversen), wordt de lengte
+nu op nul gezet. Omdat raFS dezelfde oproep gebruikt voor de andere twee
+bestands-handelingen (invoer, verversen) wordt er een routine gebruikt aan FindV die
+de parameters ophaalt die het laatst met OS_Find zijn meegegeven,
+
+<LI>De commando's <KBD>Mount, Dismount</KBD> en <KBD>NameDisc</KBD> zijn nu
+opslagsysteem commando's geworden,
+
+<LI>De <KBD>-path</KBD> optie is aan <A HREF="tech.html#cli_mount"><KBD>Mount</KBD></A>
+toegevoegd,
+
+<LI>Het commando <KBD>Mount</KBD> gaf een foutmelding wanneer een disk twee keer
+werd aangemeld; Dat commando en het commando <KBD>Dismount</KBD> stelt nu de CSD/URD
+correct in,
+
+<LI>Fout opgelost waardoor mappen niet opnieuw geopend konden wanneer de buffer leeg
+gemaakt was, dit kwam voor bij objecten die &eacute;&eacute;n van de volgende karakters
+<TT>#%&amp;*@\^</TT> in hun bestandsnaam hadden,
+
+<LI>Het commando <KBD>Back</KBD> functioneert nu,
+
+<LI><A HREF="tech.html#format">Bestandsformaten</A> worden uitgelegd in dit document.
+
+</UL>
+
+
+<B>V1.01 beta (09-11-1997)</B>
+
+<UL COMPACT>
+
+<LI>Fout opgelost in <KBD>raFS_Flush</KBD> en <KBD>Dismount</KBD>,
+
+<LI>Aparte RiscPC-module die gebruik maakt van dynamische gebieden.
+
+</UL>
+
+
+<B>V1.00 beta (30-10-1997)</B>
+
+<UL COMPACT>
+
+<LI>Eerste versie die openlijk werd uitgebracht: Lange bestandnamen, oneindig aantal
+objecten per map, mapbuffer; geen bestandsbuffer of automatisch leegmaken van de
+mapbuffer.
+
+</UL>
+
+<P ALIGN="right"><I><A HREF="#top">Terug naar de inhoudsopgave</A></I>
+
+</BODY></HTML>

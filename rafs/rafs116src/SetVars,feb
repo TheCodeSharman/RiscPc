@@ -1,0 +1,31 @@
+
+Set raFS$SrcDir <Obey$Dir>
+Set raFS$Dir <Obey$Dir>.!raFS
+Set raFS$LogDir <Obey$Dir>
+Set Lib$Path <Obey$Dir>.Lib.
+
+| Recommended if developing
+|Configure ADFSBuffers 0
+
+|SetEval raFS$UseRMA 1
+Unset raFS$UseRMA
+
+| often manages to flush log before machine freezes
+RMEnsure FlushLogOnError 0.00 RMLoad <raFS$SrcDir>.FlushLog 
+
+WimpTask ChangeDynamicArea -SpriteSize 512k
+
+| Murphy's Law states that the number of bugs (n_bugs) still remaining in
+| this program is:
+|            t_write · u_data · n_p²     s_log 
+|  n_bugs = ------------------------- - ------- + M
+|             t_debug · u_bugreport      s_src
+| where:
+|  t_debug     = time spent on debugging
+|  t_write     = time spent on writing new parts of the program
+|  n_p         = nr of partnerships of programmer while he wrote this
+|  u_data      = number of users that will trust important data to the FS
+|  u_bugreport = number of users that will send me bug reports
+|  s_log       = maximum logfile size reached (current record ~30MB)
+|  s_src       = size of source code
+|  M           = "Murphy's constant" (= sin(t) + 1 )
