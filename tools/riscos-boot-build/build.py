@@ -190,6 +190,15 @@ def main():
     else:
         log("  (local/rafs-config not present yet -> skipped; author it in RPCEmu and copy out)")
 
+    log("== 7. prune excluded root files ==")
+    for ex in cfg.get('exclude_root', []):
+        hits = list(OUT.glob(ex)) + list(OUT.glob(ex + ',???'))  # bare or ,xxx-typed, root only
+        if not hits:
+            log(f"  (no match for {ex})")
+        for p in hits:
+            p.unlink() if p.is_file() else shutil.rmtree(p)
+            log(f"  removed {p.relative_to(OUT)}")
+
     log(f"\nDONE. Disc tree: {OUT}")
     log("Deploy: copy its contents onto a fresh FileCore disc via RPCEmu HostFS.")
 

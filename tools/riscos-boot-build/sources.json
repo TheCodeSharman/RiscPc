@@ -59,5 +59,7 @@
     { "source": "Zap",      "path": "!Zap",                     "to": "Apps/!Zap" },
     { "source": "Zap",      "path": "!ZapFonts",                "to": "Apps/!ZapFonts" },
     { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" }
-  ]
+  ],
+  "_exclude_comment": "Root files dropped from the assembled disc: non-essential docs, and their host '.' becomes a '/' in the RISC OS leaf name (harmless, but tidy to omit).",
+  "exclude_root": ["LICENSE", "ReadMe.txt"]
 }
