@@ -26,7 +26,6 @@ DL = HERE / 'downloads'
 WORK = HERE / 'build'
 STAGE = WORK / '_stage'
 OUT = WORK / 'disc'
-RAFS_SRC = REPO / 'rafs' / 'rafs116' / '!raFS'
 RAFS_CONFIG = HERE / 'local' / 'rafs-config'
 
 
@@ -174,13 +173,15 @@ def main():
     )
     write_basic64_fallback(OUT)
 
-    log("== 5. PackMan + !RaFS into Utilities (not auto-booted) ==")
-    util = OUT / 'Utilities'
-    util.mkdir(exist_ok=True)
-    copytree(STAGE / 'PackMan' / 'Apps' / 'Admin' / '!PackMan', util / '!PackMan')
-    if not RAFS_SRC.exists():
-        sys.exit(f"!RaFS source not found at {RAFS_SRC}")
-    copytree(RAFS_SRC, util / '!RaFS')
+    log("== 5. place apps (PackMan/PartMgr in Utilities, StrongED/Zap in Apps, RaFS) ==")
+    for p in cfg.get('placements', []):
+        src = REPO / p['repo'] if 'repo' in p else STAGE / p['source'] / p['path']
+        dst = OUT / p['to']
+        if not src.exists():
+            sys.exit(f"placement source missing: {src}")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        copytree(src, dst)
+        log(f"  {p.get('source', p.get('repo'))}{('/' + p['path']) if 'path' in p else ''} -> {p['to']}")
 
     log("== 6. RaFS nested-!Packages config overlay ==")
     if RAFS_CONFIG.exists():

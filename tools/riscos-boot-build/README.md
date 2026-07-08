@@ -24,12 +24,17 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
 2. **PlingSystem** (ROOL "System resources") → the disc-based module sets
    `310/350/360/370/400` that older, 26-bit OSes need. These are **merged** into
    HardDisc4's `!System`.
-3. **PackMan** (Alan Buckley, `arm` arch = 26/32-bit) → `Utilities.!PackMan`.
-4. **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`.
+3. **Extra apps**, placed via the `placements` table in `sources.json`:
+   - **PackMan** (ROOL, `arm` = 26/32-bit) → `Utilities.!PackMan`
+   - **PartMgr** 1.05-1 (JASPP) → `Utilities.Caution.!PartMgr` (disc/partition tool)
+   - **StrongED** 4.69f14 (stronged.iconbar.com) → `Apps.!StrongED` + `!StrED_cfg`
+   - **Zap** 1.45 (zap.tartarus.org, 26-bit-era stable) → `Apps.!Zap` + `!ZapFonts`
+   - **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`
 
-PackMan and RaFS go in **`Utilities` and are not auto-booted** — RaFS is kept
-off the boot path deliberately (the ADFFS abort only appeared with RaFS active),
-so it loads only when you run it.
+StrongED and Zap aren't in ROOL's packaging, so they're pinned to their authors'
+sites by sha256. RaFS goes in **`Utilities` and is not auto-booted** — kept off
+the boot path deliberately (the ADFFS abort only appeared with RaFS active), so
+it loads only when you run it.
 
 ## The `!System` merge (what `!SysMerge` does)
 
