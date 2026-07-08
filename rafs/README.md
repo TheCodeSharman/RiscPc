@@ -33,9 +33,10 @@ sees the right types.
 **Revision-control caveat:** the core source (`raFSsource`, `raFSfilerS`,
 `Lib/*`, most `Util/*`) is **tokenised BBC BASIC** (`,ffb`) — opaque to
 `git diff` as-is. Text files (`Messages*`, `Util/Info`, `Util/gawk*`, the C and
-HTML) diff normally. To get readable diffs on the BASIC without altering the
-buildable tokenised bytes, add a detokenising `git` **textconv** filter via
-`.gitattributes` (TODO — not yet set up).
+HTML) diff normally. Readable diffs on the tokenised BASIC **are** set up via a
+`git` **textconv** filter (detokenise-for-display, bytes unchanged) — see
+`../tools/riscos-basic-detokenise/`: run its `setup.sh`, then `git diff` /
+`git show` on any `*,ffb` renders detokenised BASIC.
 
 Provenance: unpacked from
 `…/installs/riscos-371/hostfs/{rafs116,rafs116src},ddc`.
