@@ -1,0 +1,4 @@
+# Downloaded official archives (fetched + sha256-verified by build.py)
+downloads/
+# Assembled output tree (reproducible from the recipe)
+build/

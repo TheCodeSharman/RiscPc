@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""RISC OS zip -> HostFS tree extractor.
+
+RISC OS zips (created by Info-ZIP/SparkFS) store each file's load/exec addresses
+in an Acorn extra-field, NOT in the filename.  A plain `unzip` therefore drops
+every filetype.  This module reads that extra-field, recovers the filetype and
+datestamp, and writes files named with the HostFS `,xxx` suffix so the result
+drops straight onto RPCEmu's HostFS with correct types -- no renaming.
+
+Acorn extra-field: header id 0x4341 ('AC'); payload = 'ARC0' signature then
+load(4), exec(4), attr(4) little-endian.  A typed file has load = 0xFFFtttXX,
+so filetype = (load>>8)&0xFFF and the 40-bit datestamp = ((load&0xFF)<<32)|exec
+(centiseconds since 1900).  A load without 0xFFF at top is a real load/exec pair
+(no filetype, no datestamp).
+"""
+import zipfile, struct, os
+
+
+def acorn_meta(extra: bytes):
+    """Return {load, exec, ftype, stamp} from the Acorn extra-field, or None."""
+    i = 0
+    while i + 4 <= len(extra):
+        hid, sz = struct.unpack_from('<HH', extra, i)
+        body = extra[i + 4:i + 4 + sz]
+        if hid == 0x4341 and body[:4] == b'ARC0' and len(body) >= 16:
+            load, execa, attr = struct.unpack_from('<III', body, 4)
+            if (load & 0xFFF00000) == 0xFFF00000:
+                ftype = (load >> 8) & 0xFFF
+                stamp = ((load & 0xFF) << 32) | execa
+            else:
+                ftype, stamp = None, None
+            return {'load': load, 'exec': execa, 'ftype': ftype, 'stamp': stamp}
+        i += 4 + sz
+    return None
+
+
+def hostfs_basename(basename: str, meta) -> str:
+    """Append the HostFS ,xxx suffix for a typed file; leave untyped names alone."""
+    if meta and meta.get('ftype') is not None:
+        return f"{basename},{meta['ftype']:03x}"
+    return basename
+
+
+def extract(zippath, destdir, strip: str = ''):
+    """Extract `zippath` into `destdir` with HostFS ,xxx names.
+
+    `strip` is a leading path prefix removed from every entry (e.g. 'HardDisc4/').
+    Returns a manifest {output_relative_path_with_xxx: meta}.
+    """
+    z = zipfile.ZipFile(zippath)
+    manifest = {}
+    for info in z.infolist():
+        name = info.filename
+        if strip and name.startswith(strip):
+            name = name[len(strip):]
+        if not name or name.endswith('/'):
+            continue
+        meta = acorn_meta(info.extra)
+        parts = name.split('/')
+        parts[-1] = hostfs_basename(parts[-1], meta)
+        rel = '/'.join(parts)
+        outpath = os.path.join(destdir, *parts)
+        os.makedirs(os.path.dirname(outpath), exist_ok=True)
+        with open(outpath, 'wb') as f:
+            f.write(z.read(info))
+        manifest[rel] = meta
+    return manifest
+
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 3:
+        sys.exit("usage: roextract.py <zip> <destdir> [strip-prefix]")
+    m = extract(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else '')
+    typed = sum(1 for v in m.values() if v and v.get('ftype') is not None)
+    print(f"extracted {len(m)} files ({typed} typed) to {sys.argv[2]}")

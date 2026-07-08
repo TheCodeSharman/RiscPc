@@ -1,0 +1,29 @@
+{
+  "_comment": "Pinned official sources for the universal !Boot build. sha256 makes the build reproducible even though the URLs serve 'latest'. Re-pin (and re-verify the 3-module merge) when bumping a version.",
+  "sources": [
+    {
+      "name": "HardDisc4",
+      "file": "HardDisc4.zip",
+      "url": "https://www.riscosopen.org/zipfiles/platform/common/HardDisc4.zip",
+      "sha256": "54930a3c86188ed46fd9ef7f44ede198a31ba5335dcd027f4f085c854d1e8376",
+      "strip": "HardDisc4/",
+      "role": "disc-root: !Boot (all ROxxxHook incl. RO370Hook), Apps, Utilities, etc. Bundles its own RO5-era !System at !Boot.Resources.!System."
+    },
+    {
+      "name": "PlingSystem",
+      "file": "PlingSystem.zip",
+      "url": "https://www.riscosopen.org/zipfiles/platform/common/PlingSystem.zip",
+      "sha256": "994ca936834cca036d4de39bf433c6dd8e3ee201a67033889c83cf84fa6cc7eb",
+      "strip": "",
+      "role": "System resources: the disc-based module sets 310/350/360/370/400 that older (26-bit) OSes need. Merged into HardDisc4's !System, newest-version-wins."
+    },
+    {
+      "name": "PackMan",
+      "file": "PackMan_0.9.8-1_arm.zip",
+      "url": "https://packages.riscosopen.org/thirdparty/arm/AlanBuckley/PackMan_0.9.8-1_arm.zip",
+      "sha256": "05a9b393507ddd06d0b40dd113ab793bb5898ba5c57f144aee4ad506da4a39e2",
+      "strip": "",
+      "role": "Package manager (arm arch = 26/32-bit compatible). Placed in Utilities, not auto-booted."
+    }
+  ]
+}
