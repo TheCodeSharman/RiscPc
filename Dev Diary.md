@@ -1554,6 +1554,41 @@ Morning verdict on the Jul 8 plan, then a memory upgrade and a proper RAM soak.
   **Unrolling** is the free win — under cache-off the `CMP`/`B` loop-control is
   re-fetched every word, so unrolling M0–M4 amortises that without altering the
   access sequence.
+- **Abort-hunt filter (PackMan, same session):** a data abort *"abort on data
+  transfer at &039EFA5C"* loading PackMan came **right after a Ctrl-Break out of
+  Nevryon** — a *soft* reset (no POST, RAM not cleared), so residual game state (a
+  stale RMA / dynamic-area pointer Nevryon left behind) is the likely trigger. The
+  address is ~58 MB logical — near the top of the 26-bit map, i.e. a bogus pointer,
+  not a normal access. **Retry loaded clean** (a corrupt on-disc file would repeat;
+  it didn't). Rule going forward: **tag every abort with its preceding reset state
+  — a post-game *soft-reset* abort is noise (self-clearing); only a *cold-boot*
+  desktop abort counts as hardware/disc evidence.** After a full-screen game that
+  seizes the machine, **cold boot** (power/reset, re-runs POST) before loading apps.
+- **Testing discipline (the consequence):** games that need a cold reset **won't let
+  you `*Shutdown` cleanly** — so you can't dismount RaFS or clear RAM/module state the
+  polite way, and **carryover corruption from the previous game can't be ruled out**.
+  New rule: **cold power-cycle before *every* diagnostic test** (full power-off clears
+  DRAM + re-runs POST + cleanly re-mounts) so any abort is attributable to the test,
+  not leftover game debris. Confirmed live this session: **PackMan aborted after a
+  Ctrl-Break out of Nevryon, loaded fine from a cold boot.**
+- **Ref — ADFFS & why StrongARM breaks old games:** ADFFS (Jon Abbott / JASPP) layers
+  virtual-floppy (`.ADF`) → **MEMC/VIDC/IOC** hardware emulation → a per-game patch DB
+  → and, for the worst cases, a **full software ARM2/ARM250 emulator**. StrongARM fails
+  where the **ARM710 works** chiefly because of **self-modifying code + split I/D caches
+  + write buffer with no SMC coherency** (SA executes stale I-cache / unflushed writes →
+  crash); plus 26-bit PC/pipeline drift and raw speed breaking timing loops. The 710's
+  simpler near-unified cache is close to the ARM2/3 these games targeted, so native
+  patching suffices; SA increasingly needs full emulation. (Explains "710 fine, SA no
+  luck.")
+- **Ref — why RaFS verifies after an unclean shutdown:** RaFS is **image-based** (whole
+  volume — dir tree, long-filename tables, free map, data — in one container, bookkept
+  in RAM + inside the image). **No journal** + **cached metadata** means an abort/hard
+  reset can leave the image internally inconsistent; a **dirty/"mounted" flag** set on
+  mount and cleared only on clean dismount is what trips the verify next mount. It's
+  conservative because an image FS is tightly coupled (one torn write desyncs the whole
+  internal map) — and it's guarding the very volume **PackMan unpacks into**. A clean
+  RISC OS **`*Shutdown`** (dismounts + flushes) is what avoids the nag — but see the
+  testing-discipline note: games that force a cold reset make that impossible.
 - **Lessons for future-me:** (1) **RO 3.x caps a task slot at 28640 K** (28 MB app
   space − &8000) — a single BASIC/Wimp task **cannot** test all of >28 MB; full
   coverage needs a dynamic area or bare-metal. (2) **This box's BASIC assembler
