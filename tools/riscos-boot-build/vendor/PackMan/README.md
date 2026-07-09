@@ -23,6 +23,18 @@ SharedUnixLibrary that dropped 26-bit neutrality). The package's `Environment:
 arm` tag claims "all ARM machines", which 0.9.8 no longer honours on 26-bit —
 i.e. an upstream packaging error, not something on our side.
 
+## Local modification: `!Run` RaFS-mount hook
+
+`!PackMan/!Run` carries a small marked block (`--- riscos-boot-build … ---`) that,
+**on launch only**, mounts a RaFS disc at `!Boot.Resources.Pkg` (disc name `Pkg`)
+and points `Packages$Dir` at `RaFS::Pkg.$.!Packages`. This gives the package
+database (Cache + Info) long filenames on 26-bit FileCore, without loading RaFS at
+boot — RISC OS 3.7 FileCore is 10-char, and PackMan builds all its paths under
+`<Packages$Dir>` (no separate Cache/Info override exists). The block is
+`IfThere`-guarded, so it's a no-op until the RaFS disc is created; PackMan then
+falls back to its bundled `!Packages`. Create the disc in RPCEmu (`raFS_Create`),
+drop `!Packages` inside it, name it `Pkg`, and place it at `!Boot.Resources.Pkg`.
+
 ## Provenance
 
 Copied from `~/Projects/rpcemu/installs/riscos-371/hostfs/Apps/Admin/!PackMan`.
