@@ -18,14 +18,6 @@
       "role": "System resources: disc-based module sets 310/350/360/370/400. Merged into HardDisc4's !System, newest-version-wins."
     },
     {
-      "name": "PackMan",
-      "file": "PackMan_0.9.8-1_arm.zip",
-      "url": "https://packages.riscosopen.org/thirdparty/arm/AlanBuckley/PackMan_0.9.8-1_arm.zip",
-      "sha256": "05a9b393507ddd06d0b40dd113ab793bb5898ba5c57f144aee4ad506da4a39e2",
-      "strip": "",
-      "role": "Package manager (arm arch = 26/32-bit)."
-    },
-    {
       "name": "PartMgr",
       "file": "PartMgr_1.05-1.zip",
       "url": "http://www.jaspp.org.uk/packages/release-packages/PartMgr_1.05-1",
@@ -52,7 +44,7 @@
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
   "placements": [
-    { "source": "PackMan",  "path": "Apps/Admin/!PackMan",      "to": "Utilities/!PackMan" },
+    { "repo": "tools/riscos-boot-build/vendor/PackMan/!PackMan",  "to": "Utilities/!PackMan" },
     { "source": "PartMgr",  "path": "Apps/Utilities/!PartMgr",  "to": "Utilities/Caution/!PartMgr" },
     { "source": "StrongED", "path": "!StrongED",                "to": "Apps/!StrongED" },
     { "source": "StrongED", "path": "!StrED_cfg",               "to": "!Boot/Choices/!StrED_cfg" },
