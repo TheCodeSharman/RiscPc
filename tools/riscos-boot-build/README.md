@@ -42,9 +42,11 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      **`!ZapUser` → `!Boot.Choices`** (`Choices:!ZapUser`; without it Zap errors
      *"Please locate !ZapUser"*)
    - **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`
-   - **`!Browse`** + **`!WebCache`/`!WebServe`** (vendored, Acorn Internet suite) →
-     `$.Apps` / `!Boot.Resources`. Period browser; local-docs/retro only (no modern
-     HTTPS). See `vendor/Browse/README.md`.
+   - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — Acorn
+     starter-disc content, applied via the git-ignored **`local/acorn/`** overlay
+     (see below), *not* committed. Browse is a period browser (local-docs/retro
+     only, no modern HTTPS); Video holds the Acorn Replay demo movies (`,ae7`)
+     that `!ARPlayer` + `!Boot.Resources.!ARMovie` play; Images is the JPEG samples.
    - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
      — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
      Acorn 0.26.*
@@ -146,11 +148,22 @@ Copy the contents of `build/disc/` onto a fresh FileCore disc via RPCEmu HostFS
 (HostFS decodes the `,xxx` names back into real filetypes). Then snapshot the
 FileCore image as your known-good baseline.
 
-## `local/rafs-config/` (build input, author once in RPCEmu)
+## `local/*/` overlays (machine-local build inputs)
 
-The RaFS nested-`!Packages` config is fiddly to author by hand, so create it once
-inside RPCEmu, copy the resulting folder out via HostFS into `local/rafs-config/`,
-and commit it. `build.py` overlays it onto the disc root if present.
+Each directory under `local/` is a **HostFS-shaped overlay** (mirrors disc paths,
+`,xxx`-typed files) copied onto the disc root in step 6. `*.example` dirs are
+committed templates and never applied. Use these for content that isn't cleanly
+pinnable from a maintained source:
+
+- **`local/acorn/`** — **git-ignored**. Acorn starter-disc content that has no
+  usable pinnable source: `!Browse` + `!WebCache`/`!WebServe`, and `Images`/`Video`
+  (the 4corn loose files carry no RISC OS filetype; the marutan Easy-Start is a
+  116 MiB Google-Drive bundle). Sourced from your own RPCEmu 3.71 install
+  (`hostfs/{Apps/!Browse,!Boot/Resources/!Web*,Images,Video}`) so ~34 MiB of Acorn
+  media isn't republished in this public repo. Recreate by copying those paths
+  out of your install into `local/acorn/`.
+- **`local/rafs-config/`** — the RaFS nested-`!Packages` config (author once in
+  RPCEmu, copy out, commit).
 
 ## Re-pinning versions
 

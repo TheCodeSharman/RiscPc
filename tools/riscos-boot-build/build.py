@@ -26,7 +26,7 @@ DL = HERE / 'downloads'
 WORK = HERE / 'build'
 STAGE = WORK / '_stage'
 OUT = WORK / 'disc'
-RAFS_CONFIG = HERE / 'local' / 'rafs-config'
+LOCAL = HERE / 'local'
 
 
 def log(m): print(m, flush=True)
@@ -210,12 +210,15 @@ def main():
         added, kept = merge_tree_add_missing(src, OUT)
         log(f"  {name}: +{added} added, {kept} kept (ROOL already had)")
 
-    log("== 6. RaFS nested-!Packages config overlay ==")
-    if RAFS_CONFIG.exists():
-        copytree(RAFS_CONFIG, OUT)
-        log(f"  applied overlay from {RAFS_CONFIG}")
-    else:
-        log("  (local/rafs-config not present yet -> skipped; author it in RPCEmu and copy out)")
+    log("== 6. apply local overlays (local/*/ each mirrors disc paths; e.g. acorn = Browse+media, rafs-config) ==")
+    # `*.example` dirs are committed placeholder templates, never overlaid.
+    overlays = sorted(p for p in LOCAL.glob('*')
+                      if p.is_dir() and not p.name.endswith('.example')) if LOCAL.exists() else []
+    if not overlays:
+        log("  (no local/*/ overlays present)")
+    for ov in overlays:
+        copytree(ov, OUT)
+        log(f"  applied overlay from local/{ov.name}/")
 
     log("== 7. prune excluded root files ==")
     for ex in cfg.get('exclude_root', []):
