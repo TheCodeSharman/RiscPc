@@ -121,6 +121,14 @@
       "strip": "RPCEmu - 371/hostfs/",
       "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "Images", "Video"],
       "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; the disc content is identical to the Windows ed. -- only the bundled emulator binary differs). The only pinnable, correctly-typed source for the starter-disc extras that aren't on 4corn/ROOL: !Browse + !WebCache/!WebServe, Images (JPEG samples), Video (Acorn Replay demo movies, ,ae7). extract_only keeps just those out of the 116 MiB bundle."
+    },
+    {
+      "name": "NetSurf",
+      "file": "netsurf-3.11.zip",
+      "url": "https://download.netsurf-browser.org/netsurf/releases/pre-built/riscos/netsurf-3.11.zip",
+      "sha256": "6045f46c363f478a3579c17d89dc7e25e5c56ecb6dbadb659fc508c7871cd50f",
+      "strip": "",
+      "role": "NetSurf 3.11 -- a real CSS-capable browser that runs on RISC OS 3.7 (its !Run needs only 'RISC OS 3+' and uses CallASWI, so it's the single 26/32-neutral build for all RISC OS; the website's '4.02+' is mislabelled). Verified working on RO 3.7 (32 MB). Becomes the primary browser. !NetSurf -> Apps; its bundled !System (Iconv/Tinct/CryptRand/ARMEABISupport/URI/SharedULib) + !Boot (!Cache/!Unicode) deps are merged add-missing (ROOL keeps overlaps -- newer than NetSurf's minimums)."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -144,7 +152,13 @@
     { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebCache",    "to": "!Boot/Resources/!WebCache" },
     { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebServe",    "to": "!Boot/Resources/!WebServe" },
     { "source": "RpcemuBundle", "path": "Images",                       "to": "Images" },
-    { "source": "RpcemuBundle", "path": "Video",                        "to": "Video" }
+    { "source": "RpcemuBundle", "path": "Video",                        "to": "Video" },
+    { "source": "NetSurf",      "path": "!NetSurf",                     "to": "Apps/!NetSurf" }
+  ],
+  "_subtree_comment": "App-bundled !System/!Boot dependency trees merged add-missing (ROOL wins overlaps). NetSurf ships its module deps this way.",
+  "subtree_merges": [
+    { "source": "NetSurf", "from": "!System", "to": "!Boot/Resources/!System" },
+    { "source": "NetSurf", "from": "!Boot",    "to": "!Boot" }
   ],
   "_content_comment": "Whole-tree content merges (games/sound/movies/manuals). Each named source's extracted tree is added onto the disc file-by-file, but only where the target doesn't already exist -- i.e. HardDisc4/ROOL (always newer than Acorn 1997) wins every overlap, and these only ADD what ROOL lacks. This is the 'use the later version on overlap' rule, simplified because ROOL is unconditionally newer.",
   "content_merges": ["AcornDiversions", "AcornSound", "AcornReplay", "AcornARMovie", "AcornManuals"],

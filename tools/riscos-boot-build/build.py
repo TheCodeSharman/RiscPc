@@ -211,6 +211,14 @@ def main():
         added, kept = merge_tree_add_missing(src, OUT)
         log(f"  {name}: +{added} added, {kept} kept (ROOL already had)")
 
+    log("== 5c. subtree merges (app-bundled !System/!Boot deps, add-missing so ROOL wins overlaps) ==")
+    for m in cfg.get('subtree_merges', []):
+        src = STAGE / m['source'] / m['from']
+        if not src.exists():
+            sys.exit(f"subtree_merge source missing: {m['source']}/{m['from']}")
+        added, kept = merge_tree_add_missing(src, OUT / m['to'])
+        log(f"  {m['source']}/{m['from']} -> {m['to']}: +{added} added, {kept} kept")
+
     log("== 6. apply local overlays (local/*/ each mirrors disc paths; e.g. acorn = Browse+media, rafs-config) ==")
     # `*.example` dirs are committed placeholder templates, never overlaid.
     overlays = sorted(p for p in LOCAL.glob('*')

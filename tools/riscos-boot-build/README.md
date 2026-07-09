@@ -42,6 +42,13 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      **`!ZapUser` → `!Boot.Choices`** (`Choices:!ZapUser`; without it Zap errors
      *"Please locate !ZapUser"*)
    - **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`
+   - **`!NetSurf`** 3.11 (netsurf-browser.org) → `$.Apps` — **the primary browser.**
+     A real CSS-capable browser that runs on RISC OS 3.7: its `!Run` needs only
+     "RISC OS 3+" and uses `CallASWI`, so the single archive is 26/32-neutral for
+     all RISC OS (the site's "4.02+" is mislabelled; verified working on RO 3.7 in
+     32 MB). Its bundled `!System`/`!Boot` deps merge in via `subtree_merges`
+     (add-missing). Search with a no-JS engine (DuckDuckGo HTML/Lite work well;
+     Google needs JS). Acorn `!Browse` stays only as a light local-docs viewer.
    - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — from the
      pinned **`RpcemuBundle`** (marutan.net RPCEmu 3.71 Easy-Start, `extract_only`
      pulls just these 5 subtrees out of the 116 MiB bundle). These aren't on
