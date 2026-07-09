@@ -1597,3 +1597,77 @@ Morning verdict on the Jul 8 plan, then a memory upgrade and a proper RAM soak.
   I-fetch) — expected, not a bug; it's the cost of a valid March. (4) **Optimise a
   March carefully**: `STM` only the fill, never the interleave, unroll for speed.
   (5) **ObjAsm (DDE) = the TestSrc toolchain** when the bare-metal itch wins.
+
+### Jul 10 — fresh SD deployed + games verified; intermittency = TWO contact faults (DRAM socket + VRAM socket)
+- **Deployed the clean build to the real machine.** `dd`'d `hd4.hdf` → `/dev/mmcblk0`
+  (raw FileCore image, no RPCEmu header — starts with the disc record: `09`=512-byte
+  sectors, `3f`=63 spt, `10`=16 heads), and the **readback sha256 matched byte-for-byte**
+  (write clean, card+reader read true). Two checksummed baselines banked:
+  **`hd4-known-good-2026-07-09.hdf`** (pristine build) and **`…-post-games.hdf`**
+  (verified-working, games installed). The post-games image is the *new* corruption
+  reference — but compare **static app files**, not whole-disc hashes, since normal RISC OS
+  writes (Choices/scrap/PackMan/free-map) drift the whole-image hash on their own.
+- **Machine is up and doing its job:** boots the fresh SD, **network configured**,
+  **PackMan / JASPP / RaFS** all working (RaFS lazy-mounts on PackMan launch exactly as
+  designed — the off-boot-path hook survived to real hardware), games installed via JASPP and
+  **verified by actually playing** — Nevryon, Pandora's Box, Drop Ship all run clean. "No hang"
+  ≠ "no corruption"; a fresh *never-run* game (Pandora's Box) playing perfectly is the real
+  read+write integrity proof.
+- **IDE cable footnote:** the RiscPC header is the old **un-keyed** style (pin 20 present), so
+  modern **keyed** cables (moulded-shut pin-20 hole) won't seat — used an unkeyed one. The
+  apparent slowness was **ARM710 + fixed PIO**, *not* the cable: the same card reads **90 MB/s
+  steady in a PC reader**. Marginal cable = *retries* (stuttery), not uniform slow; `*Verify`
+  (read-only) is the discriminator.
+
+- **Root cause of the whole intermittency: not one fault — TWO marginal socket contacts.**
+  A re-worked board fails by *moving*: the symptom relocates with **any** perturbation (cable
+  swap, RAM swap, reseat, board flex) because jostling any marginal contact shifts the aggregate
+  margin. That's why nothing "fixed" it consistently — I was perturbing a marginal system into
+  different failure modes, not finding one culprit.
+  - **DRAM socket:** moving the SIMM **socket 0 → socket 1 "fixed" the boot** early on. Each
+    stick **passes March-U in isolation** (8 MB + 16 MB sticks — silicon good), and after
+    **DeoxIT + reseat** the populated **cache-off March-U soak is clean (pass 23, still running)**.
+    So the DRAM fault was *contact*, not silicon.
+  - **VRAM socket:** later, **reseating the VRAM cleared a separate boot-abort**. Two springs are
+    re-formed stubs from Jun 19 — **Vcd4** (serial/video `Vcd<>` port) and **pin 82 / D19**
+    (random/CPU `D<>` port) — mechanically marginal; *and* the intact springs feel slack (original
+    tension too *tight* → snapped two; now too *loose*).
+- **Why "disk corruption" was never the disk.** Everything written to the SD is **buffered in RAM
+  first**, so bad DRAM/VRAM corrupts the buffer and the machine faithfully writes garbage to a
+  *good* disc over a *good* cable. The card reading back byte-perfect in a PC reader (bypasses the
+  RiscPC's RAM) proved the media innocent. Per the Jun 19 port split — **`D<>` = CPU/random port
+  (POST-tested), `Vcd<>` = display/serial port** — a marginal **D19 on VRAM** corrupts *system*
+  memory (VRAM is **pooled as general RAM** on this box) → **aborts with no screen corruption**,
+  exactly the observed symptom.
+
+- **Decision: live-and-let-live.** Machine works; any fix risks disturbing a working repair.
+  - **Operating rule:** reseat the VRAM (and check DRAM seating) **whenever the box is open**.
+  - **Escalation trigger:** instability returning *after solid, undisturbed use*.
+  - **Fix menu (pre-reasoned, if/when needed):**
+    1. **DMM continuity + wiggle (power OFF)** to confirm *which* contacts and *how many* — probe
+       *across* each contact (board-side net ↔ card-side point on that finger's net), test the
+       broken pins **and** a sample of intact ones: only-broken-flaky → localised; intact-also-flaky
+       → general weak springiness. Beeper catches opens, Ω-mode catches elevated-but-not-open.
+       (Cold static test misses warm-only faults — pair with a thermal soak.)
+    2. **Re-tension the socket springs** — gentlest, root-cause, board never sees the iron. Aim for
+       the **Goldilocks middle** (too tight snapped two; too loose is now). Small even increments,
+       card out, test-fit firm-but-smooth. *Likely the real fix* — reseat-fixes-it ⇒ the fault is
+       the card-edge↔spring contact, not the solder joint.
+    3. **Co-grounded bodge** — most durable. VRAM is on top *and* the broken contact **was** the
+       top↔bottom conductor, so it must run VRAM-card → nearest **top-layer net access point** with
+       a **parallel ground-return wire** (co-routed, grounded both ends) to survive the un-grounded
+       run. Scope after.
+    4. **Thin-tin the card fingers** — they're **tin, not gold** (metallurgically fine), but watch
+       solder debris + insertion force on the near-gone stubs; thin, smooth, gentle test-fit. On
+       the removable card only — never risks the board.
+  - VRAM socket is **unobtainium to replace**, but you fix the **contact** (re-tension / bodge /
+    tin), not the socket — "unobtainium socket" ≠ "unfixable".
+- **Lessons for future-me:** (1) *Multi-marginal-contact boards fail by **moving*** — the symptom
+  relocating with every perturbation is the signature; stop hunting a single fault. (2) *Reseat-fixes-it
+  ⇒ card-edge↔spring contact*, not the solder joint. (3) *Emulator speed is a lying yardstick* —
+  RPCEmu's interpreter far outruns a real 40 MHz ARM710; "slow on real HW" is period-correct.
+  (4) Software aside worth its own note: **NetSurf ≥ 1.2 hard-hangs on RO 3.7 once the browser window
+  exceeds a vertical-height threshold** (reflow-loop; bisected 1.1-good / 1.2-bad, persists to 3.11);
+  identical module deps 1.1↔1.2 so it's a binary/redraw regression, not a dependency. Workaround: run
+  ≤ 640×480 (PackMan opens links in NetSurf, so it bites there too). RO4 is the real fix but not worth
+  the migration yet.
