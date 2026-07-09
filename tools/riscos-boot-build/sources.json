@@ -119,8 +119,8 @@
       "url": "https://drive.usercontent.google.com/download?id=1HWd67HYNRsIh9wgQZZT06GsANlYd4V4i&export=download&confirm=t",
       "sha256": "79ad2737236f45fc0a1657dfcd17366d39f6fc9bc2cb7b088019f0c5d6facb05",
       "strip": "RPCEmu - 371/hostfs/",
-      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "Images", "Video", "Diversions/elite", "Diversions/Ixion", "Diversions/Terramex", "Diversions/Cycloids", "Diversions/DinoSaw", "Diversions/ArgoSphere", "Diversions/!revolver", "Diversions/!Star3000"],
-      "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; the disc content is identical to the Windows ed. -- only the bundled emulator binary differs). The only pinnable, correctly-typed source for the starter-disc extras that aren't on 4corn/ROOL: !Browse + !WebCache/!WebServe, Images (JPEG samples), Video (Acorn Replay demo movies, ,ae7). extract_only keeps just those out of the 116 MiB bundle."
+      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "!Boot/Resources/!System/310/Modules/Network/URL", "Images", "Video", "Diversions/elite", "Diversions/Ixion", "Diversions/Terramex", "Diversions/Cycloids", "Diversions/DinoSaw", "Diversions/ArgoSphere", "Diversions/!revolver", "Diversions/!Star3000"],
+      "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; disc content identical to the Windows ed.). The LOWEST-priority app source: used only where nothing more authoritative provides an app. Supplies !Browse + !WebCache/!WebServe (bundle-only apps -- placed WHOLE, never merged), Images/Video content, and period games in Diversions/ (each being migrated to its official download; bundle is the fallback). It also carries the URL fetcher modules Browse needs (FileFetcher/FTPFetcher in 310/Modules/Network/URL) that HardDisc4/PlingSystem lack -- pulled in via a legitimate !System merge (add-missing, so our newer authoritative URL/AcornHTTP/AcornSSL win). extract_only keeps just those subtrees out of the 116 MiB bundle."
     },
     {
       "name": "NetSurf",
@@ -172,13 +172,20 @@
     { "source": "RpcemuBundle", "path": "Diversions/!revolver",         "to": "Apps/Games/!revolver" },
     { "source": "RpcemuBundle", "path": "Diversions/!Star3000",         "to": "Apps/Games/!Star3000" }
   ],
-  "_subtree_comment": "App-bundled !System/!Boot dependency trees merged add-missing (ROOL wins overlaps). NetSurf ships its module deps this way.",
+  "_subtree_comment": "The ONLY sanctioned merges: !System module sets and !Boot updates (never apps). Each named tree is merged add-missing (our more-authoritative HardDisc4/PlingSystem copy wins every overlap; only genuinely-missing modules/files are added). NetSurf ships its module deps this way; RpcemuBundle supplies Browse's FileFetcher/FTPFetcher; AcornARMovie is a !Boot.Resources update (!ARMovie playback support).",
   "subtree_merges": [
-    { "source": "NetSurf", "from": "!System", "to": "!Boot/Resources/!System" },
-    { "source": "NetSurf", "from": "!Boot",    "to": "!Boot" }
+    { "source": "NetSurf",      "from": "!System",                   "to": "!Boot/Resources/!System" },
+    { "source": "NetSurf",      "from": "!Boot",                     "to": "!Boot" },
+    { "source": "RpcemuBundle", "from": "!Boot/Resources/!System",   "to": "!Boot/Resources/!System" },
+    { "source": "AcornARMovie", "from": "!Boot",                     "to": "!Boot" }
   ],
-  "_content_comment": "Whole-tree content merges (games/sound/movies/manuals). Each named source's extracted tree is added onto the disc file-by-file, but only where the target doesn't already exist -- i.e. HardDisc4/ROOL (always newer than Acorn 1997) wins every overlap, and these only ADD what ROOL lacks. This is the 'use the later version on overlap' rule, simplified because ROOL is unconditionally newer.",
-  "content_merges": ["AcornDiversions", "AcornSound", "AcornReplay", "AcornARMovie", "AcornManuals"],
+  "_content_place_comment": "Non-!Boot/!System content (Acorn 3.7 games/sound/manuals). Each immediate child of the source's `container` dir is placed WHOLE onto the disc, but only where the authoritative disc (HardDisc4/ROOL) lacks that leafname. Whole apps only -- NEVER merged file-by-file (that spliced two !Flashers and duplicated !Help). ROOL keeps its whole app on every overlap; only Acorn-only extras are added.",
+  "content_place": [
+    { "source": "AcornDiversions", "container": "Diversions" },
+    { "source": "AcornSound",      "container": "Sound" },
+    { "source": "AcornReplay",     "container": "Replay" },
+    { "source": "AcornManuals",    "container": "Manuals" }
+  ],
   "_exclude_comment": "Root files dropped from the assembled disc: non-essential docs, and their host '.' becomes a '/' in the RISC OS leaf name (harmless, but tidy to omit).",
   "exclude_root": ["LICENSE", "ReadMe.txt"]
 }

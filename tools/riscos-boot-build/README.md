@@ -50,13 +50,15 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      (add-missing). Search with a no-JS engine (DuckDuckGo HTML/Lite work well;
      Google needs JS). Acorn `!Browse` stays only as a light local-docs viewer.
    - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — from the
-     pinned **`RpcemuBundle`** (marutan.net RPCEmu 3.71 Easy-Start, `extract_only`
-     pulls just these 5 subtrees out of the 116 MiB bundle). These aren't on
+     pinned **`RpcemuBundle`** (marutan.net RPCEmu 3.71 Easy-Start). These aren't on
      4corn/ROOL in usable form (4corn's loose Images/Video carry no filetype, and
      Browse isn't on the 3.7 disc at all), so the starter-disc bundle is the only
-     pinnable, correctly-typed source. Browse = period browser (local-docs/retro,
-     no modern HTTPS); Video = Acorn Replay demo movies (`,ae7`) played by
-     `!ARPlayer` + `!Boot.Resources.!ARMovie`; Images = JPEG samples.
+     pinnable, correctly-typed source. Each is placed **whole**. Browse also needs the
+     URL fetcher modules `FileFetcher`/`FTPFetcher`, which HardDisc4/PlingSystem don't
+     carry — pulled from the bundle's `310/Modules/Network/URL` via the `!System` merge
+     (add-missing, so our newer `URL`/`AcornHTTP`/`AcornSSL` win). Browse = period
+     browser (local-docs/retro, no modern HTTPS); Video = Acorn Replay demo movies
+     (`,ae7`) played by `!ARPlayer` + `!Boot.Resources.!ARMovie`; Images = JPEG samples.
    - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
      — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
      Acorn 0.26.*
@@ -73,18 +75,39 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      `$.Apps`; `!SaveCMOS`/`!Verify`/`!PhotoView` → `Utilities`. (`!HForm`/`!ResetBoot`
      are skipped — HardDisc4 already ships them in `Utilities.Caution`.)
 
-4. **Acorn 3.7 disc content** (`content_merges` in `sources.json`) — the Acorn-FTP
-   `diversions`/`sound`/`replay`/`ARMovie`/`manuals` zips, **merged add-missing**:
-   each tree is added only where HardDisc4/ROOL doesn't already have the file. Since
-   ROOL (2026) is unconditionally newer than Acorn (1997), that's exactly the "keep
-   the later version on overlap" rule (e.g. Diversions keeps ROOL's games and *adds*
-   the period Acorn ones). Brings the games, sample sounds, Replay movies + player
-   support, and the RISC OS manuals (incl. `!Bookworm`).
+4. **Acorn 3.7 disc content** (`content_place` in `sources.json`) — the Acorn-FTP
+   `diversions`/`sound`/`replay`/`manuals` zips. Each immediate child of the source's
+   `container` (e.g. `Diversions/`) is **placed whole** onto the disc, but only where
+   the authoritative disc (HardDisc4/ROOL) doesn't already have that leafname. So
+   Diversions keeps ROOL's games untouched and *adds* the period Acorn-only ones as
+   whole apps. Brings the games, sample sounds, Replay movies, and the RISC OS manuals
+   (incl. `!Bookworm`). (`ARMovie` playback support is a `!Boot.Resources` update, so it
+   goes through the `!Boot` merge below, not here.)
 
-   **Sourcing rule:** ROOL-maintained beats dead sources. Anything ROOL carries
-   (HardDisc4/PlingSystem/Bonus binaries/packages) comes from ROOL; the 4corn Acorn-FTP
-   archive is used only for content/apps ROOL doesn't have. Nothing Acorn is committed
-   — the zips are pinned by URL+sha256 and downloaded (git-ignored), like HardDisc4.
+## Core rule: whole apps, never merged
+
+The aim is the **cleanest possible `!Boot` drive**, each app taken **whole from its
+single most-authoritative source**. Two hard rules make that safe:
+
+> **Apps are never merged.** An app is copied entire from one source, or not at all.
+> Splicing two versions of an app file-by-file is what once produced a `!Flasher`
+> containing both a `!Help` *file* and a `!Help` *directory* — HostFS shows both as
+> `!Help`, and RISC OS then can't copy the app to FileCore. `place_children_add_missing`
+> therefore skips any item the target already has (by RISC OS leafname) rather than
+> descending into it.
+
+> **Only `!System` and `!Boot` may merge.** These aren't apps — they're the module
+> sets and boot structure, and merging them *add-missing* (our newer authoritative
+> copy wins every overlap) is the correct, sanctioned pattern. It's how Browse gets
+> its `FileFetcher`/`FTPFetcher` (from the bundle's `!System`) and how NetSurf's and
+> ARMovie's deps land.
+
+**Source priority:** ROOL-maintained (HardDisc4/PlingSystem/Bonus binaries/packages)
+beats everything; the 4corn Acorn-FTP archive supplies content/apps ROOL lacks; the
+RPCEmu Easy-Start **bundle is the lowest-priority fallback** — an app comes from it
+only when nothing more authoritative provides it (Browse; and games until each is
+re-pinned to its official download). Nothing Acorn/bundle is committed — every archive
+is pinned by URL+sha256 and downloaded (git-ignored), like HardDisc4.
 
 StrongED and Zap aren't in ROOL's packaging, so they're pinned to their authors'
 sites by sha256. RaFS goes in **`Utilities` and is not auto-booted** — kept off

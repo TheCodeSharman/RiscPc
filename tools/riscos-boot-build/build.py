@@ -141,22 +141,84 @@ def copytree(src, dst):
     shutil.copytree(src, dst, dirs_exist_ok=True)
 
 
+def _ro_leaf(name):
+    """RISC OS leafname: drop a trailing ,xxx host filetype suffix if present."""
+    if len(name) >= 4 and name[-4] == ',' and all(c in '0123456789abcdefABCDEF' for c in name[-3:]):
+        return name[:-4]
+    return name
+
+
+def _ro_clash(path, want_dir):
+    """True if path's parent already holds a *different-kind* object with the same
+    RISC OS leafname (after dropping ,xxx). HostFS shows e.g. '!Help,fff' (file) and
+    '!Help' (dir) both as '!Help', which RISC OS then can't copy to FileCore."""
+    parent = path.parent
+    if not parent.exists():
+        return False
+    want = _ro_leaf(path.name)
+    for sib in parent.iterdir():
+        if sib.name != path.name and _ro_leaf(sib.name) == want and sib.is_dir() != want_dir:
+            return True
+    return False
+
+
 def merge_tree_add_missing(src_root, out_root):
-    """Add every file under src_root into out_root, but only where the target
-    doesn't already exist -- so the existing (HardDisc4/ROOL) tree wins every
-    overlap and this only ADDS what's missing. Acorn 3.7 content is always older
-    than HardDisc4, so 'add-missing' is exactly 'keep the later version on overlap'."""
+    """Add files under src_root into out_root only where the target doesn't already
+    have them -- so the existing (HardDisc4/ROOL) tree wins every overlap and this
+    only ADDS what's missing (Acorn 3.7 content is always older than HardDisc4).
+    Collision-safe: a source item is skipped when it would clash, by RISC OS leafname,
+    with a different-kind target object (e.g. Acorn's '!Help/' dir vs HardDisc4's
+    '!Help,fff' file) -- so overlapping apps keep the target's whole version rather
+    than Frankenstein-merging the two into a copy-breaking duplicate."""
     added = kept = 0
-    for root, _dirs, files in os.walk(src_root):
+    for root, dirs, files in os.walk(src_root):
         rel = os.path.relpath(root, src_root)
+        tgt_dir = out_root if rel == '.' else out_root / rel
+        if rel != '.' and _ro_clash(tgt_dir, want_dir=True):
+            dirs[:] = []          # don't descend a dir that clashes with a target file
+            kept += len(files)
+            continue
         for fn in files:
-            tgt = out_root / (fn if rel == '.' else os.path.join(rel, fn))
-            if tgt.exists():
+            tgt = tgt_dir / fn
+            if tgt.exists() or _ro_clash(tgt, want_dir=False):
                 kept += 1
                 continue
             tgt.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(Path(root) / fn, tgt)
             added += 1
+    return added, kept
+
+
+def _target_has(tgt_dir, name):
+    """True if tgt_dir already holds an object with the same RISC OS leafname
+    (ignoring the ,xxx type suffix) as `name`."""
+    if not tgt_dir.exists():
+        return False
+    want = _ro_leaf(name)
+    return any(_ro_leaf(p.name) == want for p in tgt_dir.iterdir())
+
+
+def place_children_add_missing(src_container, tgt_container):
+    """Place each immediate child of src_container into tgt_container WHOLE (the entire
+    file or app directory), but only where tgt_container lacks that RISC OS leafname.
+    This adds the apps/content the authoritative disc doesn't have WITHOUT ever
+    descending into an existing app to splice files together -- app-merging is what
+    duplicated !Flasher's !Help. The more authoritative target (HardDisc4/ROOL) keeps
+    its whole app on every overlap; only genuinely-missing items are added."""
+    added = kept = 0
+    if not src_container.exists():
+        return added, kept
+    tgt_container.mkdir(parents=True, exist_ok=True)
+    for child in sorted(src_container.iterdir()):
+        if _target_has(tgt_container, child.name):
+            kept += 1
+            continue
+        dst = tgt_container / child.name
+        if child.is_dir():
+            copytree(child, dst)
+        else:
+            shutil.copy2(child, dst)
+        added += 1
     return added, kept
 
 
@@ -203,13 +265,13 @@ def main():
         copytree(src, dst)
         log(f"  {p.get('source', p.get('repo'))}{('/' + p['path']) if 'path' in p else ''} -> {p['to']}")
 
-    log("== 5b. content merges (Acorn 3.7 games/sound/movies/manuals; add-missing, ROOL wins overlaps) ==")
-    for name in cfg.get('content_merges', []):
-        src = STAGE / name
+    log("== 5b. place whole apps/content the authoritative disc lacks (Acorn 3.7 games/sound/movies/manuals; NO app-merging) ==")
+    for m in cfg.get('content_place', []):
+        src = STAGE / m['source'] / m['container']
         if not src.exists():
-            sys.exit(f"content_merge source not extracted: {name}")
-        added, kept = merge_tree_add_missing(src, OUT)
-        log(f"  {name}: +{added} added, {kept} kept (ROOL already had)")
+            sys.exit(f"content_place source missing: {m['source']}/{m['container']}")
+        added, kept = place_children_add_missing(src, OUT / m['container'])
+        log(f"  {m['source']} -> {m['container']}: +{added} placed whole, {kept} kept (authoritative already had)")
 
     log("== 5c. subtree merges (app-bundled !System/!Boot deps, add-missing so ROOL wins overlaps) ==")
     for m in cfg.get('subtree_merges', []):
