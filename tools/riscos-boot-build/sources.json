@@ -119,7 +119,7 @@
       "url": "https://drive.usercontent.google.com/download?id=1HWd67HYNRsIh9wgQZZT06GsANlYd4V4i&export=download&confirm=t",
       "sha256": "79ad2737236f45fc0a1657dfcd17366d39f6fc9bc2cb7b088019f0c5d6facb05",
       "strip": "RPCEmu - 371/hostfs/",
-      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "Images", "Video"],
+      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "Images", "Video", "Diversions/elite", "Diversions/Ixion", "Diversions/Terramex", "Diversions/Cycloids", "Diversions/DinoSaw", "Diversions/ArgoSphere", "Diversions/!revolver", "Diversions/!Star3000"],
       "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; the disc content is identical to the Windows ed. -- only the bundled emulator binary differs). The only pinnable, correctly-typed source for the starter-disc extras that aren't on 4corn/ROOL: !Browse + !WebCache/!WebServe, Images (JPEG samples), Video (Acorn Replay demo movies, ,ae7). extract_only keeps just those out of the 116 MiB bundle."
     },
     {
@@ -129,6 +129,14 @@
       "sha256": "6045f46c363f478a3579c17d89dc7e25e5c56ecb6dbadb659fc508c7871cd50f",
       "strip": "",
       "role": "NetSurf 3.11 -- a real CSS-capable browser that runs on RISC OS 3.7 (its !Run needs only 'RISC OS 3+' and uses CallASWI, so it's the single 26/32-neutral build for all RISC OS; the website's '4.02+' is mislabelled). Verified working on RO 3.7 (32 MB). Becomes the primary browser. !NetSurf -> Apps; its bundled !System (Iconv/Tinct/CryptRand/ARMEABISupport/URI/SharedULib) + !Boot (!Cache/!Unicode) deps are merged add-missing (ROOL keeps overlaps -- newer than NetSurf's minimums)."
+    },
+    {
+      "name": "PlingStore",
+      "file": "pszip.zip",
+      "url": "http://www.plingstore.org.uk/download/pszip.zip",
+      "sha256": "1ae859862b96a9b7747d3a7441bdc5202bb662d1f548b4906a292590553b2697",
+      "strip": "",
+      "role": "PlingStore (!Store) from its official site -- the RISC OS Developments app/software store (browse + buy commercial apps like Heretic). Fresh core (~250 KB) rather than the lived-in 5.9 MB copy in RpcemuBundle. !Store -> Apps."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -153,7 +161,16 @@
     { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebServe",    "to": "!Boot/Resources/!WebServe" },
     { "source": "RpcemuBundle", "path": "Images",                       "to": "Images" },
     { "source": "RpcemuBundle", "path": "Video",                        "to": "Video" },
-    { "source": "NetSurf",      "path": "!NetSurf",                     "to": "Apps/!NetSurf" }
+    { "source": "NetSurf",      "path": "!NetSurf",                     "to": "Apps/!NetSurf" },
+    { "source": "PlingStore",   "path": "!Store",                       "to": "Apps/!Store" },
+    { "source": "RpcemuBundle", "path": "Diversions/elite",             "to": "Apps/Games/elite" },
+    { "source": "RpcemuBundle", "path": "Diversions/Ixion",             "to": "Apps/Games/Ixion" },
+    { "source": "RpcemuBundle", "path": "Diversions/Terramex",          "to": "Apps/Games/Terramex" },
+    { "source": "RpcemuBundle", "path": "Diversions/Cycloids",          "to": "Apps/Games/Cycloids" },
+    { "source": "RpcemuBundle", "path": "Diversions/DinoSaw",           "to": "Apps/Games/DinoSaw" },
+    { "source": "RpcemuBundle", "path": "Diversions/ArgoSphere",        "to": "Apps/Games/ArgoSphere" },
+    { "source": "RpcemuBundle", "path": "Diversions/!revolver",         "to": "Apps/Games/!revolver" },
+    { "source": "RpcemuBundle", "path": "Diversions/!Star3000",         "to": "Apps/Games/!Star3000" }
   ],
   "_subtree_comment": "App-bundled !System/!Boot dependency trees merged add-missing (ROOL wins overlaps). NetSurf ships its module deps this way.",
   "subtree_merges": [

@@ -60,6 +60,15 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
    - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
      — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
      Acorn 0.26.*
+   - **`!Store` (PlingStore)** (plingstore.org.uk) → `$.Apps` — the RISC OS
+     Developments software store (browse/buy commercial apps). Pinned from its own
+     site (fresh ~250 KB core, not the lived-in copy in the bundle).
+   - **8 games → `$.Apps.Games`** (from `RpcemuBundle`): `elite`, `Ixion`,
+     `Terramex`, `Cycloids`, `DinoSaw`, `ArgoSphere`, `!revolver`, `!Star3000` —
+     RiscPC-era, SA110/ARM710-safe. (The bundle's `!HHeretic` is a paid-app stub, so
+     dropped; buy it via PlingStore.) The `Easy-Start` bundle appears to be a real
+     StrongARM machine's disc with commercial apps stubbed out — hence these
+     otherwise-hard-to-find freebies.
    - **Curated Acorn 3.7 apps/utils** (4corn Acorn-FTP archive): `!ARPlayer` →
      `$.Apps`; `!SaveCMOS`/`!Verify`/`!PhotoView` → `Utilities`. (`!HForm`/`!ResetBoot`
      are skipped — HardDisc4 already ships them in `Utilities.Caution`.)
