@@ -12,7 +12,7 @@ pkg http://packages.riscosopen.org/packages/pkg/thirdparty
 # http://packages.riscosopen.org/packages/pkg/rool
 
 # JASPP - source of old games made to run on new hardware
-# http://www.jaspp.org.uk/packages/release
+pkg http://www.jaspp.org.uk/packages/release
 
 # Core system packages for the Raspberry Pi RISC OS distribution.
  
