@@ -60,7 +60,8 @@
     { "source": "ZapExt",   "path": "!Zap/Modules",             "to": "Apps/!Zap/Modules" },
     { "source": "Zap",      "path": "!ZapFonts",                "to": "!Boot/Resources/!ZapFonts" },
     { "source": "Zap",      "path": "!ZapUser",                 "to": "!Boot/Choices/!ZapUser" },
-    { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" }
+    { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" },
+    { "repo": "tools/riscos-boot-build/vendor/PkgDisc/Pkg",     "to": "!Boot/Resources/Pkg" }
   ],
   "_exclude_comment": "Root files dropped from the assembled disc: non-essential docs, and their host '.' becomes a '/' in the RISC OS leaf name (harmless, but tidy to omit).",
   "exclude_root": ["LICENSE", "ReadMe.txt"]
