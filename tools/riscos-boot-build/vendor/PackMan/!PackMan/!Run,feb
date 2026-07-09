@@ -20,17 +20,19 @@ RMENSURE ToolAction 0.16 RMLOAD System:modules.toolbox.ToolAction
 RMENSURE ToolAction 0.16 ERROR PackMan needs version 0.16 or later of the ToolAction module
 
 Set PackMan$Dir <Obey$Dir>
+IconSprites <Obey$Dir>.!Sprites
 
 | --- riscos-boot-build: !Packages on a RaFS volume, mounted on demand ---
 | !Packages lives in a RaFS disc at !Boot.Resources.Pkg (named "Pkg") so its
 | Cache/Info get long filenames. RaFS is loaded + the disc mounted only here, on
 | PackMan launch -- never at boot, so the RaFS filing system stays off the boot
 | path. Falls through to the bundled !Packages below if the disc isn't present.
+| NB: runs AFTER the IconSprites above and uses PackMan$Dir thereafter -- `Run`
+| leaves Obey$Dir pointing at the sub-file's dir, so don't rely on <Obey$Dir> after.
 If "<Packages$Dir>"="" Then IfThere <Boot$Dir>.Resources.Pkg.!Mount Then Run <Boot$Dir>.Resources.Pkg.!Mount
 If "<Packages$Dir>"="" Then IfThere RaFS::Pkg.$.!Packages.!Boot Then Run RaFS::Pkg.$.!Packages.!Boot
 | --- end riscos-boot-build ---
 
-IconSprites <Obey$Dir>.!Sprites
 If "<Packages$Dir>"="" Then IconSprites <PackMan$Dir>.Resources.!Packages.!Sprites
 
 | Use our copy of the Shared Unix Library only if another in not installed
