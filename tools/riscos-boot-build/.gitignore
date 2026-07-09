@@ -2,6 +2,3 @@
 downloads/
 # Assembled output tree (reproducible from the recipe)
 build/
-# Real network config (contains this machine's LAN IPs/hostname; public repo).
-# The committed local/net-config.example/ documents the format with placeholder IPs.
-local/net-config/

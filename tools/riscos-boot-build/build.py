@@ -26,7 +26,7 @@ DL = HERE / 'downloads'
 WORK = HERE / 'build'
 STAGE = WORK / '_stage'
 OUT = WORK / 'disc'
-LOCAL = HERE / 'local'
+RAFS_CONFIG = HERE / 'local' / 'rafs-config'
 
 
 def log(m): print(m, flush=True)
@@ -183,16 +183,12 @@ def main():
         copytree(src, dst)
         log(f"  {p.get('source', p.get('repo'))}{('/' + p['path']) if 'path' in p else ''} -> {p['to']}")
 
-    log("== 6. apply local overlays (local/*/ each mirrors disc paths, e.g. HostFS ,xxx) ==")
-    # `*.example` dirs are committed placeholder templates, never overlaid.
-    overlays = sorted(p for p in LOCAL.glob('*')
-                      if p.is_dir() and not p.name.endswith('.example')) if LOCAL.exists() else []
-    if not overlays:
-        log("  (no local/*/ overlays; e.g. net-config for preconfigured networking, "
-            "rafs-config for the RaFS nested-!Packages -- author in RPCEmu and copy out)")
-    for ov in overlays:
-        copytree(ov, OUT)
-        log(f"  applied overlay from local/{ov.name}/")
+    log("== 6. RaFS nested-!Packages config overlay ==")
+    if RAFS_CONFIG.exists():
+        copytree(RAFS_CONFIG, OUT)
+        log(f"  applied overlay from {RAFS_CONFIG}")
+    else:
+        log("  (local/rafs-config not present yet -> skipped; author it in RPCEmu and copy out)")
 
     log("== 7. prune excluded root files ==")
     for ex in cfg.get('exclude_root', []):
