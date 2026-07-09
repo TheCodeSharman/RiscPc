@@ -42,6 +42,28 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      **`!ZapUser` → `!Boot.Choices`** (`Choices:!ZapUser`; without it Zap errors
      *"Please locate !ZapUser"*)
    - **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`
+   - **`!Browse`** + **`!WebCache`/`!WebServe`** (vendored, Acorn Internet suite) →
+     `$.Apps` / `!Boot.Resources`. Period browser; local-docs/retro only (no modern
+     HTTPS). See `vendor/Browse/README.md`.
+   - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
+     — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
+     Acorn 0.26.*
+   - **Curated Acorn 3.7 apps/utils** (4corn Acorn-FTP archive): `!ARPlayer` →
+     `$.Apps`; `!SaveCMOS`/`!Verify`/`!PhotoView` → `Utilities`. (`!HForm`/`!ResetBoot`
+     are skipped — HardDisc4 already ships them in `Utilities.Caution`.)
+
+4. **Acorn 3.7 disc content** (`content_merges` in `sources.json`) — the Acorn-FTP
+   `diversions`/`sound`/`replay`/`ARMovie`/`manuals` zips, **merged add-missing**:
+   each tree is added only where HardDisc4/ROOL doesn't already have the file. Since
+   ROOL (2026) is unconditionally newer than Acorn (1997), that's exactly the "keep
+   the later version on overlap" rule (e.g. Diversions keeps ROOL's games and *adds*
+   the period Acorn ones). Brings the games, sample sounds, Replay movies + player
+   support, and the RISC OS manuals (incl. `!Bookworm`).
+
+   **Sourcing rule:** ROOL-maintained beats dead sources. Anything ROOL carries
+   (HardDisc4/PlingSystem/Bonus binaries/packages) comes from ROOL; the 4corn Acorn-FTP
+   archive is used only for content/apps ROOL doesn't have. Nothing Acorn is committed
+   — the zips are pinned by URL+sha256 and downloaded (git-ignored), like HardDisc4.
 
 StrongED and Zap aren't in ROOL's packaging, so they're pinned to their authors'
 sites by sha256. RaFS goes in **`Utilities` and is not auto-booted** — kept off

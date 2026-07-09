@@ -141,6 +141,25 @@ def copytree(src, dst):
     shutil.copytree(src, dst, dirs_exist_ok=True)
 
 
+def merge_tree_add_missing(src_root, out_root):
+    """Add every file under src_root into out_root, but only where the target
+    doesn't already exist -- so the existing (HardDisc4/ROOL) tree wins every
+    overlap and this only ADDS what's missing. Acorn 3.7 content is always older
+    than HardDisc4, so 'add-missing' is exactly 'keep the later version on overlap'."""
+    added = kept = 0
+    for root, _dirs, files in os.walk(src_root):
+        rel = os.path.relpath(root, src_root)
+        for fn in files:
+            tgt = out_root / (fn if rel == '.' else os.path.join(rel, fn))
+            if tgt.exists():
+                kept += 1
+                continue
+            tgt.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(root) / fn, tgt)
+            added += 1
+    return added, kept
+
+
 def main():
     cfg = json.load(open(HERE / 'sources.json'))
     sources = cfg['sources']
@@ -182,6 +201,14 @@ def main():
         dst.parent.mkdir(parents=True, exist_ok=True)
         copytree(src, dst)
         log(f"  {p.get('source', p.get('repo'))}{('/' + p['path']) if 'path' in p else ''} -> {p['to']}")
+
+    log("== 5b. content merges (Acorn 3.7 games/sound/movies/manuals; add-missing, ROOL wins overlaps) ==")
+    for name in cfg.get('content_merges', []):
+        src = STAGE / name
+        if not src.exists():
+            sys.exit(f"content_merge source not extracted: {name}")
+        added, kept = merge_tree_add_missing(src, OUT)
+        log(f"  {name}: +{added} added, {kept} kept (ROOL already had)")
 
     log("== 6. RaFS nested-!Packages config overlay ==")
     if RAFS_CONFIG.exists():

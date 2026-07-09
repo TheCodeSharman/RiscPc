@@ -48,6 +48,70 @@
       "sha256": "8b7dccd3fddc851d4c8efce64b155e9d61b66ba758861247b0069dad8fa35f0c",
       "strip": "",
       "role": "Zap 1.45 ALL extension modules (allmods.zip): !Zap/Modules/* -- the full 37-module set incl. !ZapBASIC, which claims the task-window server (Set TaskWindow$Server). Core zap.zip ships none, so without this task windows don't work and most modes are absent. Overlaid onto Apps/!Zap/Modules."
+    },
+    {
+      "name": "MakeModes",
+      "file": "BonusBinDev.zip",
+      "url": "https://www.riscosopen.org/zipfiles/platform/common/BonusBinDev.zip",
+      "sha256": "20d4f21c00a425c58bbf4c71a4ed6b674d1d70cc7262cc32b7b68b26ea642554",
+      "strip": "HardDisc4/",
+      "role": "ROOL 'Bonus binaries' (maintained). Curated placement: !MakeModes (monitor definition files) from Utilities/Developer. ROOL-maintained preferred over the dead Acorn 0.26."
+    },
+    {
+      "name": "AcornApps",
+      "file": "acorn37-apps.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/apps.zip",
+      "sha256": "941a58c976fae52ef24752f8216f962601c1cbf41aa7001a13b29cf2caf1e3be",
+      "strip": "",
+      "role": "Acorn RISC OS 3.7 disc Apps (4corn Acorn-FTP archive, dead source). Curated placement: !ARPlayer only (the rest are already in HardDisc4)."
+    },
+    {
+      "name": "AcornUtils",
+      "file": "acorn37-utilities.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/utilities.zip",
+      "sha256": "aab46ee6662b64d9730e64ed8081b11d3c9a8f2b31614723acbb15eb3acf4ec1",
+      "strip": "",
+      "role": "Acorn 3.7 Utilities (dead source). Curated placements: !SaveCMOS, !Verify, !PhotoView (skipped !CDPlayer/Access+/Patches; !HForm+!ResetBoot already in HardDisc4's Utilities.Caution -- ROOL wins)."
+    },
+    {
+      "name": "AcornDiversions",
+      "file": "acorn37-diversions.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/diversions.zip",
+      "sha256": "9d99b046f00e0964653cd966db25d707b6e356f9b707977819211a091d1eb783",
+      "strip": "",
+      "role": "Acorn 3.7 Diversions (games). content_merge: added where HardDisc4 lacks them (HardDisc4 always newer -> wins overlaps)."
+    },
+    {
+      "name": "AcornSound",
+      "file": "acorn37-sound.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/sound.zip",
+      "sha256": "fff3232af1f5552714cf97491604ec4d783ebd46b321c5c17345a17973719d08",
+      "strip": "",
+      "role": "Acorn 3.7 Sound samples ($.Sound). content_merge."
+    },
+    {
+      "name": "AcornReplay",
+      "file": "acorn37-replay.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/replay.zip",
+      "sha256": "c361310f7f08cf44f4bb220eec2b04fda76a4bb5284325229128bdb51c22861f",
+      "strip": "",
+      "role": "Acorn 3.7 Replay tools ($.Replay: !AREncode/!ARWork). content_merge."
+    },
+    {
+      "name": "AcornARMovie",
+      "file": "acorn37-ARMovie.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/ARMovie.zip",
+      "sha256": "0433e8139fadc7f5330e8028efafe92715ffe911d34333b2c87ca189debb0de5",
+      "strip": "",
+      "role": "Acorn 3.7 ARMovie/Replay playback support (!Boot.Resources.!ARMovie etc.), needed by !ARPlayer. content_merge (add-missing, ROOL keeps its own)."
+    },
+    {
+      "name": "AcornManuals",
+      "file": "acorn37-manuals.zip",
+      "url": "https://www.4corn.co.uk/archive//acornftp/riscos3/37/37DiscArchive/manuals.zip",
+      "sha256": "2d207dc148fea748ee047d6ed75f3ad33cc2449053e9cfea6e9a0d29c53ce91a",
+      "strip": "",
+      "role": "Acorn 3.7 Manuals + !Bookworm reader ($.Manuals). content_merge."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -64,8 +128,15 @@
     { "repo": "tools/riscos-boot-build/vendor/PkgDisc/Pkg",     "to": "!Boot/Resources/Pkg" },
     { "repo": "tools/riscos-boot-build/vendor/Browse/!Browse",   "to": "Apps/!Browse" },
     { "repo": "tools/riscos-boot-build/vendor/Browse/!WebCache", "to": "!Boot/Resources/!WebCache" },
-    { "repo": "tools/riscos-boot-build/vendor/Browse/!WebServe", "to": "!Boot/Resources/!WebServe" }
+    { "repo": "tools/riscos-boot-build/vendor/Browse/!WebServe", "to": "!Boot/Resources/!WebServe" },
+    { "source": "MakeModes",  "path": "Utilities/Developer/!MakeModes", "to": "Utilities/!MakeModes" },
+    { "source": "AcornApps",  "path": "Apps/!ARPlayer",     "to": "Apps/!ARPlayer" },
+    { "source": "AcornUtils", "path": "Utilities/!SaveCMOS", "to": "Utilities/!SaveCMOS" },
+    { "source": "AcornUtils", "path": "Utilities/!Verify",   "to": "Utilities/!Verify" },
+    { "source": "AcornUtils", "path": "Utilities/!PhotoView","to": "Utilities/!PhotoView" }
   ],
+  "_content_comment": "Whole-tree content merges (games/sound/movies/manuals). Each named source's extracted tree is added onto the disc file-by-file, but only where the target doesn't already exist -- i.e. HardDisc4/ROOL (always newer than Acorn 1997) wins every overlap, and these only ADD what ROOL lacks. This is the 'use the later version on overlap' rule, simplified because ROOL is unconditionally newer.",
+  "content_merges": ["AcornDiversions", "AcornSound", "AcornReplay", "AcornARMovie", "AcornManuals"],
   "_exclude_comment": "Root files dropped from the assembled disc: non-essential docs, and their host '.' becomes a '/' in the RISC OS leaf name (harmless, but tidy to omit).",
   "exclude_root": ["LICENSE", "ReadMe.txt"]
 }
