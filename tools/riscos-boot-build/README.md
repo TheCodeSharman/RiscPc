@@ -119,11 +119,34 @@ Copy the contents of `build/disc/` onto a fresh FileCore disc via RPCEmu HostFS
 (HostFS decodes the `,xxx` names back into real filetypes). Then snapshot the
 FileCore image as your known-good baseline.
 
-## `local/rafs-config/` (build input, author once in RPCEmu)
+## `local/*/` overlays (machine-specific build inputs)
 
-The RaFS nested-`!Packages` config is fiddly to author by hand, so create it once
-inside RPCEmu, copy the resulting folder out via HostFS into `local/rafs-config/`,
-and commit it. `build.py` overlays it onto the disc root if present.
+Each directory under `local/` is a **HostFS-shaped overlay** (mirrors disc paths,
+`,xxx`-typed files) copied onto the disc root in step 6. Use these for config
+that's authored once in RPCEmu / lifted off a real card, not derived from the
+official sources. Dirs ending in **`.example`** are committed placeholder
+templates and are **never** overlaid.
+
+- **`local/rafs-config/`** — the RaFS nested-`!Packages` config, fiddly to author
+  by hand: create it once inside RPCEmu, copy the folder out via HostFS, commit it.
+- **`local/net-config/`** — **preconfigured networking**, so the boot never prompts
+  for InetSetup. Lifted from the old card; **git-ignored** because it holds this
+  machine's LAN IPs/hostname and the repo is public. Copy `local/net-config.example/`
+  (placeholder IPs) to `local/net-config/` and edit for your network. It supplies:
+  - `!Boot.Choices.Internet.{Startup,Routes,User}` — the actual config (host name,
+    static IP/mask, resolver, default route, ShareFS/Freeway).
+  - `!Boot.RO370Hook.Boot.PreDesk.SetupNet` = `Run BootResources:!Internet` — the
+    trigger. The stock hook template only starts ShareFS; InetSetup rewrites this
+    (in `Choices:Boot`) when you configure the net, so we ship it pre-rewritten.
+    `SetChoices` copies the hook's `Boot` template into `Choices:Boot` on first
+    boot, so the networking `SetupNet` lands there without a full pre-seeded Choices.
+  - `!Boot.Resources.Configure.!InetSetup.AutoSense.EtherX` — Elesar's EtherX
+    autosense (BSD-3), so InetSetup still detects the card if re-run.
+
+  The EtherX **driver module lives in the NIC's podule ROM**, so it isn't on disc;
+  `RMEnsure EtherX 2.00 …` finds the ROM copy and the RMLoad is skipped. The
+  Internet stack modules (`Internet`, `Resolver`, `Freeway`, `ShareFS`, …) are
+  already in the merged `!System` from the official sources.
 
 ## Re-pinning versions
 
