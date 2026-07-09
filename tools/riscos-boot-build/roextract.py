@@ -53,7 +53,14 @@ def extract(zippath, destdir, strip: str = ''):
         name = info.filename
         if strip and name.startswith(strip):
             name = name[len(strip):]
-        if not name or name.endswith('/'):
+        if not name:
+            continue
+        if name.endswith('/'):
+            # Directory entry. Recreate it even when empty -- RISC OS zips carry
+            # meaningful empty dirs (e.g. the ROxxxHook.Res/.Apps folders that the
+            # boot Filer_Boots, !Boot.Choices, Public), and skipping them would
+            # silently drop those from the tree.
+            os.makedirs(os.path.join(destdir, *name.rstrip('/').split('/')), exist_ok=True)
             continue
         meta = acorn_meta(info.extra)
         parts = name.split('/')

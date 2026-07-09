@@ -50,14 +50,15 @@
       "role": "Zap 1.45 text/hex editor (26-bit-era stable; the newer 1.48.x needed a special 26-bit rebuild). Not in ROOL packaging."
     }
   ],
-  "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed.",
+  "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
   "placements": [
     { "source": "PackMan",  "path": "Apps/Admin/!PackMan",      "to": "Utilities/!PackMan" },
     { "source": "PartMgr",  "path": "Apps/Utilities/!PartMgr",  "to": "Utilities/Caution/!PartMgr" },
     { "source": "StrongED", "path": "!StrongED",                "to": "Apps/!StrongED" },
-    { "source": "StrongED", "path": "!StrED_cfg",               "to": "Apps/!StrED_cfg" },
+    { "source": "StrongED", "path": "!StrED_cfg",               "to": "!Boot/Choices/!StrED_cfg" },
     { "source": "Zap",      "path": "!Zap",                     "to": "Apps/!Zap" },
-    { "source": "Zap",      "path": "!ZapFonts",                "to": "Apps/!ZapFonts" },
+    { "source": "Zap",      "path": "!ZapFonts",                "to": "!Boot/Resources/!ZapFonts" },
+    { "source": "Zap",      "path": "!ZapUser",                 "to": "!Boot/Choices/!ZapUser" },
     { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" }
   ],
   "_exclude_comment": "Root files dropped from the assembled disc: non-essential docs, and their host '.' becomes a '/' in the RISC OS leaf name (harmless, but tidy to omit).",
