@@ -48,29 +48,13 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      all RISC OS (the site's "4.02+" is mislabelled; verified working on RO 3.7 in
      32 MB). Its bundled `!System`/`!Boot` deps merge in via `subtree_merges`
      (add-missing). Search with a no-JS engine (DuckDuckGo HTML/Lite work well;
-     Google needs JS). Acorn `!Browse` stays only as a light local-docs viewer.
-   - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — from the
-     pinned **`RpcemuBundle`** (marutan.net RPCEmu 3.71 Easy-Start). These aren't on
-     4corn/ROOL in usable form (4corn's loose Images/Video carry no filetype, and
-     Browse isn't on the 3.7 disc at all), so the starter-disc bundle is the only
-     pinnable, correctly-typed source. Each is placed **whole**. Browse also needs the
-     URL fetcher modules `FileFetcher`/`FTPFetcher`, which HardDisc4/PlingSystem don't
-     carry — pulled from the bundle's `310/Modules/Network/URL` via the `!System` merge
-     (add-missing, so our newer `URL`/`AcornHTTP`/`AcornSSL` win). Browse = period
-     browser (local-docs/retro, no modern HTTPS); Video = Acorn Replay demo movies
-     (`,ae7`) played by `!ARPlayer` + `!Boot.Resources.!ARMovie`; Images = JPEG samples.
+     Google needs JS). **The sole browser** — Acorn `!Browse` was dropped (see below).
    - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
      — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
      Acorn 0.26.*
    - **`!Store` (PlingStore)** (plingstore.org.uk) → `$.Apps` — the RISC OS
      Developments software store (browse/buy commercial apps). Pinned from its own
-     site (fresh ~250 KB core, not the lived-in copy in the bundle).
-   - **8 games → `$.Apps.Games`** (from `RpcemuBundle`): `elite`, `Ixion`,
-     `Terramex`, `Cycloids`, `DinoSaw`, `ArgoSphere`, `!revolver`, `!Star3000` —
-     RiscPC-era, SA110/ARM710-safe. (The bundle's `!HHeretic` is a paid-app stub, so
-     dropped; buy it via PlingStore.) The `Easy-Start` bundle appears to be a real
-     StrongARM machine's disc with commercial apps stubbed out — hence these
-     otherwise-hard-to-find freebies.
+     site (fresh ~250 KB core).
    - **Curated Acorn 3.7 apps/utils** (4corn Acorn-FTP archive): `!ARPlayer` →
      `$.Apps`; `!SaveCMOS`/`!Verify`/`!PhotoView` → `Utilities`. (`!HForm`/`!ResetBoot`
      are skipped — HardDisc4 already ships them in `Utilities.Caution`.)
@@ -98,16 +82,22 @@ single most-authoritative source**. Two hard rules make that safe:
 
 > **Only `!System` and `!Boot` may merge.** These aren't apps — they're the module
 > sets and boot structure, and merging them *add-missing* (our newer authoritative
-> copy wins every overlap) is the correct, sanctioned pattern. It's how Browse gets
-> its `FileFetcher`/`FTPFetcher` (from the bundle's `!System`) and how NetSurf's and
-> ARMovie's deps land.
+> copy wins every overlap) is the correct, sanctioned pattern. It's how NetSurf's
+> bundled module deps and ARMovie's `!Boot.Resources` support land.
 
 **Source priority:** ROOL-maintained (HardDisc4/PlingSystem/Bonus binaries/packages)
 beats everything; the 4corn Acorn-FTP archive supplies content/apps ROOL lacks; the
-RPCEmu Easy-Start **bundle is the lowest-priority fallback** — an app comes from it
-only when nothing more authoritative provides it (Browse; and games until each is
-re-pinned to its official download). Nothing Acorn/bundle is committed — every archive
-is pinned by URL+sha256 and downloaded (git-ignored), like HardDisc4.
+authors' own sites supply StrongED/Zap/NetSurf/PlingStore. Every archive is pinned by
+URL+sha256 and downloaded (git-ignored), like HardDisc4 — nothing is committed.
+
+The **RPCEmu Easy-Start bundle was dropped** as a source: it was a Google-Drive image
+of a real StrongARM machine (murkiest provenance), and everything worth taking from it
+either has a more authoritative home or wasn't worth the baggage. What went with it:
+`!Browse` (NetSurf is the browser; Browse's dead home page dragged in the ANT dial-up
+stack), the 8 period **games**, and the **Images/Video** sample media. Games and media
+can return later from official sources (4corn serves Images/Video as loose, untyped
+files — each would need individual download + content-sniffed filetype), but that's
+deferred; the disc is cleaner and fully authoritative without them.
 
 StrongED and Zap aren't in ROOL's packaging, so they're pinned to their authors'
 sites by sha256. RaFS goes in **`Utilities` and is not auto-booted** — kept off
@@ -199,9 +189,6 @@ machine-specific inputs (the reproducible build must not *depend* on them):
 
 - **`local/rafs-config/`** — the RaFS nested-`!Packages` config (author once in
   RPCEmu, copy out, commit).
-
-(The Acorn starter-disc extras — Browse, Images, Video — are no longer a local
-overlay: they're pinned from `RpcemuBundle`, so a fresh clone reproduces them.)
 
 ## Re-pinning versions
 

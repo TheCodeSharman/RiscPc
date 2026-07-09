@@ -114,15 +114,6 @@
       "role": "Acorn 3.7 Manuals + !Bookworm reader ($.Manuals). content_merge."
     },
     {
-      "name": "RpcemuBundle",
-      "file": "rpcemu-371-bundle.zip",
-      "url": "https://drive.usercontent.google.com/download?id=1HWd67HYNRsIh9wgQZZT06GsANlYd4V4i&export=download&confirm=t",
-      "sha256": "79ad2737236f45fc0a1657dfcd17366d39f6fc9bc2cb7b088019f0c5d6facb05",
-      "strip": "RPCEmu - 371/hostfs/",
-      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "!Boot/Resources/!System/310/Modules/Network/URL", "Images", "Video", "Diversions/elite", "Diversions/Ixion", "Diversions/Terramex", "Diversions/Cycloids", "Diversions/DinoSaw", "Diversions/ArgoSphere", "Diversions/!revolver", "Diversions/!Star3000"],
-      "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; disc content identical to the Windows ed.). The LOWEST-priority app source: used only where nothing more authoritative provides an app. Supplies !Browse + !WebCache/!WebServe (bundle-only apps -- placed WHOLE, never merged), Images/Video content, and period games in Diversions/ (each being migrated to its official download; bundle is the fallback). It also carries the URL fetcher modules Browse needs (FileFetcher/FTPFetcher in 310/Modules/Network/URL) that HardDisc4/PlingSystem lack -- pulled in via a legitimate !System merge (add-missing, so our newer authoritative URL/AcornHTTP/AcornSSL win). extract_only keeps just those subtrees out of the 116 MiB bundle."
-    },
-    {
       "name": "NetSurf",
       "file": "netsurf-3.11.zip",
       "url": "https://download.netsurf-browser.org/netsurf/releases/pre-built/riscos/netsurf-3.11.zip",
@@ -156,27 +147,13 @@
     { "source": "AcornUtils", "path": "Utilities/!SaveCMOS", "to": "Utilities/!SaveCMOS" },
     { "source": "AcornUtils", "path": "Utilities/!Verify",   "to": "Utilities/!Verify" },
     { "source": "AcornUtils", "path": "Utilities/!PhotoView","to": "Utilities/!PhotoView" },
-    { "source": "RpcemuBundle", "path": "Apps/!Browse",                 "to": "Apps/!Browse" },
-    { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebCache",    "to": "!Boot/Resources/!WebCache" },
-    { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebServe",    "to": "!Boot/Resources/!WebServe" },
-    { "source": "RpcemuBundle", "path": "Images",                       "to": "Images" },
-    { "source": "RpcemuBundle", "path": "Video",                        "to": "Video" },
     { "source": "NetSurf",      "path": "!NetSurf",                     "to": "Apps/!NetSurf" },
-    { "source": "PlingStore",   "path": "!Store",                       "to": "Apps/!Store" },
-    { "source": "RpcemuBundle", "path": "Diversions/elite",             "to": "Apps/Games/elite" },
-    { "source": "RpcemuBundle", "path": "Diversions/Ixion",             "to": "Apps/Games/Ixion" },
-    { "source": "RpcemuBundle", "path": "Diversions/Terramex",          "to": "Apps/Games/Terramex" },
-    { "source": "RpcemuBundle", "path": "Diversions/Cycloids",          "to": "Apps/Games/Cycloids" },
-    { "source": "RpcemuBundle", "path": "Diversions/DinoSaw",           "to": "Apps/Games/DinoSaw" },
-    { "source": "RpcemuBundle", "path": "Diversions/ArgoSphere",        "to": "Apps/Games/ArgoSphere" },
-    { "source": "RpcemuBundle", "path": "Diversions/!revolver",         "to": "Apps/Games/!revolver" },
-    { "source": "RpcemuBundle", "path": "Diversions/!Star3000",         "to": "Apps/Games/!Star3000" }
+    { "source": "PlingStore",   "path": "!Store",                       "to": "Apps/!Store" }
   ],
-  "_subtree_comment": "The ONLY sanctioned merges: !System module sets and !Boot updates (never apps). Each named tree is merged add-missing (our more-authoritative HardDisc4/PlingSystem copy wins every overlap; only genuinely-missing modules/files are added). NetSurf ships its module deps this way; RpcemuBundle supplies Browse's FileFetcher/FTPFetcher; AcornARMovie is a !Boot.Resources update (!ARMovie playback support).",
+  "_subtree_comment": "The ONLY sanctioned merges: !System module sets and !Boot updates (never apps). Each named tree is merged add-missing (our more-authoritative HardDisc4/PlingSystem copy wins every overlap; only genuinely-missing modules/files are added). NetSurf ships its module deps this way; AcornARMovie is a !Boot.Resources update (!ARMovie playback support).",
   "subtree_merges": [
     { "source": "NetSurf",      "from": "!System",                   "to": "!Boot/Resources/!System" },
     { "source": "NetSurf",      "from": "!Boot",                     "to": "!Boot" },
-    { "source": "RpcemuBundle", "from": "!Boot/Resources/!System",   "to": "!Boot/Resources/!System" },
     { "source": "AcornARMovie", "from": "!Boot",                     "to": "!Boot" }
   ],
   "_content_place_comment": "Non-!Boot/!System content (Acorn 3.7 games/sound/manuals). Each immediate child of the source's `container` dir is placed WHOLE onto the disc, but only where the authoritative disc (HardDisc4/ROOL) lacks that leafname. Whole apps only -- NEVER merged file-by-file (that spliced two !Flashers and duplicated !Help). ROOL keeps its whole app on every overlap; only Acorn-only extras are added.",
