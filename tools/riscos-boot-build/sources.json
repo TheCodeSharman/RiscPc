@@ -39,7 +39,15 @@
       "url": "http://zap.tartarus.org/downloads/1.45/latest/zap.zip",
       "sha256": "a0acaf5bfb7cea0a498074f83b16f2d4c3057513c0985d49a220327846aa0bc9",
       "strip": "",
-      "role": "Zap 1.45 text/hex editor (26-bit-era stable; the newer 1.48.x needed a special 26-bit rebuild). Not in ROOL packaging."
+      "role": "Zap 1.45 text/hex editor CORE (26-bit-era stable; the newer 1.48.x needed a special 26-bit rebuild). Not in ROOL packaging. Core-only -- extension modules come from ZapExt below."
+    },
+    {
+      "name": "ZapExt",
+      "file": "Zap_1.45_allmods.zip",
+      "url": "http://zap.tartarus.org/downloads/1.45/latest/allmods.zip",
+      "sha256": "8b7dccd3fddc851d4c8efce64b155e9d61b66ba758861247b0069dad8fa35f0c",
+      "strip": "",
+      "role": "Zap 1.45 ALL extension modules (allmods.zip): !Zap/Modules/* -- the full 37-module set incl. !ZapBASIC, which claims the task-window server (Set TaskWindow$Server). Core zap.zip ships none, so without this task windows don't work and most modes are absent. Overlaid onto Apps/!Zap/Modules."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -49,6 +57,7 @@
     { "source": "StrongED", "path": "!StrongED",                "to": "Apps/!StrongED" },
     { "source": "StrongED", "path": "!StrED_cfg",               "to": "!Boot/Choices/!StrED_cfg" },
     { "source": "Zap",      "path": "!Zap",                     "to": "Apps/!Zap" },
+    { "source": "ZapExt",   "path": "!Zap/Modules",             "to": "Apps/!Zap/Modules" },
     { "source": "Zap",      "path": "!ZapFonts",                "to": "!Boot/Resources/!ZapFonts" },
     { "source": "Zap",      "path": "!ZapUser",                 "to": "!Boot/Choices/!ZapUser" },
     { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" }

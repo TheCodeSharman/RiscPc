@@ -32,7 +32,12 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
    - **PartMgr** 1.05-1 (JASPP) → `Utilities.Caution.!PartMgr` (disc/partition tool)
    - **StrongED** 4.69f14 (stronged.iconbar.com) → `Apps.!StrongED`;
      **`!StrED_cfg` → `!Boot.Choices`** (StrongED reads it from `Choices$Write`)
-   - **Zap** 1.45 (zap.tartarus.org, 26-bit-era stable) → `Apps.!Zap`;
+   - **Zap** 1.45 (zap.tartarus.org, 26-bit-era stable) → `Apps.!Zap`, in two
+     parts: the **core** (`zap.zip`) plus **all extension modules**
+     (`allmods.zip`, the full 37-module set) overlaid onto `Apps.!Zap.Modules`.
+     The core alone ships **no** modules — and `!ZapBASIC` is the one that claims
+     the task-window server (`Set TaskWindow$Server`), so without it *task windows
+     don't work* and most editing modes are missing. Its satellites:
      **`!ZapFonts` → `!Boot.Resources`** (`BootResources:!ZapFonts`) and
      **`!ZapUser` → `!Boot.Choices`** (`Choices:!ZapUser`; without it Zap errors
      *"Please locate !ZapUser"*)
