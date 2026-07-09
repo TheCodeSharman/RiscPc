@@ -112,6 +112,15 @@
       "sha256": "2d207dc148fea748ee047d6ed75f3ad33cc2449053e9cfea6e9a0d29c53ce91a",
       "strip": "",
       "role": "Acorn 3.7 Manuals + !Bookworm reader ($.Manuals). content_merge."
+    },
+    {
+      "name": "RpcemuBundle",
+      "file": "rpcemu-371-bundle.zip",
+      "url": "https://drive.usercontent.google.com/download?id=1HWd67HYNRsIh9wgQZZT06GsANlYd4V4i&export=download&confirm=t",
+      "sha256": "79ad2737236f45fc0a1657dfcd17366d39f6fc9bc2cb7b088019f0c5d6facb05",
+      "strip": "RPCEmu - 371/hostfs/",
+      "extract_only": ["Apps/!Browse", "!Boot/Resources/!WebCache", "!Boot/Resources/!WebServe", "Images", "Video"],
+      "role": "marutan.net RPCEmu 3.71 Easy-Start bundle (Other-Platforms ed.; the disc content is identical to the Windows ed. -- only the bundled emulator binary differs). The only pinnable, correctly-typed source for the starter-disc extras that aren't on 4corn/ROOL: !Browse + !WebCache/!WebServe, Images (JPEG samples), Video (Acorn Replay demo movies, ,ae7). extract_only keeps just those out of the 116 MiB bundle."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -130,7 +139,12 @@
     { "source": "AcornApps",  "path": "Apps/!ARPlayer",     "to": "Apps/!ARPlayer" },
     { "source": "AcornUtils", "path": "Utilities/!SaveCMOS", "to": "Utilities/!SaveCMOS" },
     { "source": "AcornUtils", "path": "Utilities/!Verify",   "to": "Utilities/!Verify" },
-    { "source": "AcornUtils", "path": "Utilities/!PhotoView","to": "Utilities/!PhotoView" }
+    { "source": "AcornUtils", "path": "Utilities/!PhotoView","to": "Utilities/!PhotoView" },
+    { "source": "RpcemuBundle", "path": "Apps/!Browse",                 "to": "Apps/!Browse" },
+    { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebCache",    "to": "!Boot/Resources/!WebCache" },
+    { "source": "RpcemuBundle", "path": "!Boot/Resources/!WebServe",    "to": "!Boot/Resources/!WebServe" },
+    { "source": "RpcemuBundle", "path": "Images",                       "to": "Images" },
+    { "source": "RpcemuBundle", "path": "Video",                        "to": "Video" }
   ],
   "_content_comment": "Whole-tree content merges (games/sound/movies/manuals). Each named source's extracted tree is added onto the disc file-by-file, but only where the target doesn't already exist -- i.e. HardDisc4/ROOL (always newer than Acorn 1997) wins every overlap, and these only ADD what ROOL lacks. This is the 'use the later version on overlap' rule, simplified because ROOL is unconditionally newer.",
   "content_merges": ["AcornDiversions", "AcornSound", "AcornReplay", "AcornARMovie", "AcornManuals"],

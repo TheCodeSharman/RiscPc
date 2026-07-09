@@ -175,7 +175,8 @@ def main():
     log("== 2. extract archives with HostFS ,xxx names ==")
     man = {}
     for s in sources:
-        man[s['name']] = roextract.extract(DL / s['file'], STAGE / s['name'], strip=s.get('strip', ''))
+        man[s['name']] = roextract.extract(DL / s['file'], STAGE / s['name'],
+                                           strip=s.get('strip', ''), only=s.get('extract_only'))
         typed = sum(1 for v in man[s['name']].values() if v and v.get('ftype') is not None)
         log(f"  {s['name']}: {len(man[s['name']])} files ({typed} typed)")
 

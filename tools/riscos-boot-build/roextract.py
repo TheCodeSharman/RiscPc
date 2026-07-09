@@ -41,10 +41,12 @@ def hostfs_basename(basename: str, meta) -> str:
     return basename
 
 
-def extract(zippath, destdir, strip: str = ''):
+def extract(zippath, destdir, strip: str = '', only=None):
     """Extract `zippath` into `destdir` with HostFS ,xxx names.
 
     `strip` is a leading path prefix removed from every entry (e.g. 'HardDisc4/').
+    `only`, if given, is a list of post-strip path prefixes; entries outside them
+    are skipped (so a huge bundle can yield just the few subtrees we want).
     Returns a manifest {output_relative_path_with_xxx: meta}.
     """
     z = zipfile.ZipFile(zippath)
@@ -55,6 +57,10 @@ def extract(zippath, destdir, strip: str = ''):
             name = name[len(strip):]
         if not name:
             continue
+        if only is not None:
+            nm = name.rstrip('/')
+            if not any(nm == p or nm.startswith(p + '/') for p in only):
+                continue
         if name.endswith('/'):
             # Directory entry. Recreate it even when empty -- RISC OS zips carry
             # meaningful empty dirs (e.g. the ROxxxHook.Res/.Apps folders that the

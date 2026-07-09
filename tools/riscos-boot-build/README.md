@@ -42,11 +42,14 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
      **`!ZapUser` → `!Boot.Choices`** (`Choices:!ZapUser`; without it Zap errors
      *"Please locate !ZapUser"*)
    - **`!RaFS`** (this repo, `rafs/rafs116/!raFS`) → `Utilities.!RaFS`
-   - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — Acorn
-     starter-disc content, applied via the git-ignored **`local/acorn/`** overlay
-     (see below), *not* committed. Browse is a period browser (local-docs/retro
-     only, no modern HTTPS); Video holds the Acorn Replay demo movies (`,ae7`)
-     that `!ARPlayer` + `!Boot.Resources.!ARMovie` play; Images is the JPEG samples.
+   - **`!Browse`** + **`!WebCache`/`!WebServe`** + **`Images`/`Video`** — from the
+     pinned **`RpcemuBundle`** (marutan.net RPCEmu 3.71 Easy-Start, `extract_only`
+     pulls just these 5 subtrees out of the 116 MiB bundle). These aren't on
+     4corn/ROOL in usable form (4corn's loose Images/Video carry no filetype, and
+     Browse isn't on the 3.7 disc at all), so the starter-disc bundle is the only
+     pinnable, correctly-typed source. Browse = period browser (local-docs/retro,
+     no modern HTTPS); Video = Acorn Replay demo movies (`,ae7`) played by
+     `!ARPlayer` + `!Boot.Resources.!ARMovie`; Images = JPEG samples.
    - **`!MakeModes`** (ROOL **Bonus binaries** `BonusBinDev.zip`) → `Utilities.!MakeModes`
      — monitor-definition-file editor. *ROOL-maintained is preferred over the dead
      Acorn 0.26.*
@@ -152,18 +155,14 @@ FileCore image as your known-good baseline.
 
 Each directory under `local/` is a **HostFS-shaped overlay** (mirrors disc paths,
 `,xxx`-typed files) copied onto the disc root in step 6. `*.example` dirs are
-committed templates and never applied. Use these for content that isn't cleanly
-pinnable from a maintained source:
+committed templates and never applied. Use these only for genuinely un-pinnable,
+machine-specific inputs (the reproducible build must not *depend* on them):
 
-- **`local/acorn/`** — **git-ignored**. Acorn starter-disc content that has no
-  usable pinnable source: `!Browse` + `!WebCache`/`!WebServe`, and `Images`/`Video`
-  (the 4corn loose files carry no RISC OS filetype; the marutan Easy-Start is a
-  116 MiB Google-Drive bundle). Sourced from your own RPCEmu 3.71 install
-  (`hostfs/{Apps/!Browse,!Boot/Resources/!Web*,Images,Video}`) so ~34 MiB of Acorn
-  media isn't republished in this public repo. Recreate by copying those paths
-  out of your install into `local/acorn/`.
 - **`local/rafs-config/`** — the RaFS nested-`!Packages` config (author once in
   RPCEmu, copy out, commit).
+
+(The Acorn starter-disc extras — Browse, Images, Video — are no longer a local
+overlay: they're pinned from `RpcemuBundle`, so a fresh clone reproduces them.)
 
 ## Re-pinning versions
 

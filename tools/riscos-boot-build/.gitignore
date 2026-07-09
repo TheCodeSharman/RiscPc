@@ -2,5 +2,3 @@
 downloads/
 # Assembled output tree (reproducible from the recipe)
 build/
-# Acorn starter-disc content (Browse + Images/Video) — from your install, not republished here.
-local/acorn/
