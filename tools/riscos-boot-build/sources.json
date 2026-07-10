@@ -142,6 +142,7 @@
     { "source": "Zap",      "path": "!ZapUser",                 "to": "!Boot/Choices/!ZapUser" },
     { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS" },
     { "repo": "tools/riscos-boot-build/vendor/PkgDisc/Pkg",     "to": "!Boot/Resources/Pkg" },
+    { "repo": "tools/riscos-boot-build/vendor/URLFetch/Modules", "to": "!Boot/Resources/!System/310/Modules/Network/URL" },
     { "source": "MakeModes",  "path": "Utilities/Developer/!MakeModes", "to": "Utilities/!MakeModes" },
     { "source": "AcornApps",  "path": "Apps/!ARPlayer",     "to": "Apps/!ARPlayer" },
     { "source": "AcornUtils", "path": "Utilities/!SaveCMOS", "to": "Utilities/!SaveCMOS" },

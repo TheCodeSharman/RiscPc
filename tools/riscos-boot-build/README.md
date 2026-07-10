@@ -99,6 +99,16 @@ can return later from official sources (4corn serves Images/Video as loose, unty
 files — each would need individual download + content-sniffed filetype), but that's
 deferred; the disc is cleaner and fully authoritative without them.
 
+**One exception clawed back:** the bundle was also the *only* carrier of the URL
+**protocol fetchers** (`File`/`FTP`/… under `Network.URL.`) — HardDisc4/PlingSystem
+ship only `URL`, `AcornHTTP`, `AcornSSL`. Dropping the bundle silently removed the
+`FileFetcher` module, which `Manuals.!Bookworm` (the local HTML reader) hard-requires
+— it aborts with *"System:Modules.Network.URL.File not found"*. Rather than re-add the
+whole murky, fragile-URL bundle for a few tiny modules, the five redistributable
+fetchers (`File`/`FTP`/`Finger`/`Gopher`/`WhoIs`; **not** the stale `HTTP`, superseded
+by `AcornHTTP`) are **vendored** under `vendor/URLFetch/` and placed into the 310 set.
+See `vendor/URLFetch/README.md`.
+
 StrongED and Zap aren't in ROOL's packaging, so they're pinned to their authors'
 sites by sha256. RaFS goes in **`Utilities` and is not auto-booted** — kept off
 the boot path deliberately (the ADFFS abort only appeared with RaFS active), so
