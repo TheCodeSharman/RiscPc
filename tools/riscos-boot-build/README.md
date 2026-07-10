@@ -27,7 +27,7 @@ See `docs/handover-disc-vs-hardware.md` and the Dev Diary for the investigation.
 3. **Extra apps**, placed via the `placements` table in `sources.json`. Each
    app's user-visible part goes where you'd expect; its satellite resource/config
    dirs go where that app's own `!Run` looks them up (not just next to it):
-   - **PackMan** 0.9.7-1 (**vendored**, `vendor/PackMan/`) → `Utilities.!PackMan`
+   - **PackMan** 0.9.7-1 (**vendored**, `vendor/PackMan/`) → `Apps.!PackMan`
      — see *26- vs 32-bit compatibility* below for why 0.9.7 and why vendored.
    - **PartMgr** 1.05-1 (JASPP) → `Utilities.Caution.!PartMgr` (disc/partition tool)
    - **StrongED** 4.69f14 (stronged.iconbar.com) → `Apps.!StrongED`;

@@ -132,7 +132,7 @@
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
   "placements": [
-    { "repo": "tools/riscos-boot-build/vendor/PackMan/!PackMan",  "to": "Utilities/!PackMan" },
+    { "repo": "tools/riscos-boot-build/vendor/PackMan/!PackMan",  "to": "Apps/!PackMan" },
     { "source": "PartMgr",  "path": "Apps/Utilities/!PartMgr",  "to": "Utilities/Caution/!PartMgr" },
     { "source": "StrongED", "path": "!StrongED",                "to": "Apps/!StrongED" },
     { "source": "StrongED", "path": "!StrED_cfg",               "to": "!Boot/Choices/!StrED_cfg" },
