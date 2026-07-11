@@ -16,7 +16,10 @@ can't be: the ROOL package repo (`packages.riscosopen.org`) only ever serves the
 ## The 0.9.8 regression
 
 0.9.8-1 (the ROOL-repo latest) **fails to load on 26-bit** with *"No writeable
-memory at this address"*. Both 0.9.7 and 0.9.8 are GCCSDK/UnixLib C++ builds
+memory at this address"* — verified on **both RISC OS 3.7 and 4.02** (both are
+26-bit), so the 0.9.7 pin holds for *any* disc that serves a 26-bit OS, including
+the F-format 4.02/5.30 card. Only a 32-bit-only (RO5-solely) disc could use 0.9.8.
+Both 0.9.7 and 0.9.8 are GCCSDK/UnixLib C++ builds
 carrying an AIF address-mode of 32, so the AIF flag is **not** the discriminator
 — 0.9.7 is 26/32-neutral in practice and 0.9.8 regressed (a newer GCCSDK /
 SharedUnixLibrary that dropped 26-bit neutrality). The package's `Environment:

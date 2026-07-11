@@ -11,12 +11,16 @@ Recipe:
   4. merge PlingSystem's !System into HardDisc4's bundled !System,
      newest-version-wins -- exactly what RISC OS's !SysMerge/Install_Update does
      (only 3 modules actually overlap; everything else is a clean union)
-  5. drop PackMan and !RaFS (from rafs/ in this repo) into Utilities, NOT auto-booted
-  6. overlay local/rafs-config/ if present (the RaFS nested-!Packages config)
+  5. place apps. RaFS-related placements are gated by --format e|f:
+       e (default, RISC OS 3.7, 10-char FileCore): !RaFS + the Pkg RaFS disc, so
+         !Packages gets long names via a RaFS volume the PackMan !Run hook mounts;
+       f (RISC OS 4.02/5.30, native long names): a plain !Packages in
+         !Boot.Resources (Filer_Boot'd at startup) -- no RaFS, hook stays inert.
+  6. overlay local/*/ if present
 
 The output is intentionally NOT committed; the recipe + local inputs are.
 """
-import os, sys, json, shutil, hashlib, subprocess
+import os, sys, json, shutil, hashlib, subprocess, argparse
 from pathlib import Path
 import roextract
 
@@ -223,6 +227,16 @@ def place_children_add_missing(src_container, tgt_container):
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Build the universal RISC OS !Boot tree.")
+    ap.add_argument('--format', choices=['e', 'f'], default='e', dest='fmt',
+                    help="target FileCore format: 'e' = RISC OS 3.7 (10-char names; "
+                         "!Packages via a RaFS volume, RaFS off the boot path) [default]; "
+                         "'f' = RISC OS 4.02/5.30 (native long names; plain !Packages in "
+                         "!Boot.Resources, no RaFS)")
+    fmt = ap.parse_args().fmt
+    log(f"== target FileCore format: {fmt.upper()} "
+        f"({'3.7 -- RaFS-wrapped !Packages' if fmt == 'e' else '4.02/5.30 -- plain !Packages, no RaFS'}) ==")
+
     cfg = json.load(open(HERE / 'sources.json'))
     sources = cfg['sources']
     byname = {s['name']: s for s in sources}
@@ -257,6 +271,9 @@ def main():
 
     log("== 5. place apps (PackMan/PartMgr in Utilities, StrongED/Zap in Apps, RaFS) ==")
     for p in cfg.get('placements', []):
+        if p.get('only_format') and p['only_format'] != fmt:
+            log(f"  (skip {p['to']} -- only_format={p['only_format']}, building {fmt})")
+            continue
         src = REPO / p['repo'] if 'repo' in p else STAGE / p['source'] / p['path']
         dst = OUT / p['to']
         if not src.exists():
