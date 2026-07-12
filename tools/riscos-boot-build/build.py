@@ -229,6 +229,13 @@ def patch_bootrun_per_os_bootcfg(out):
     from the CURRENT CMOS, so the FIRST boot of each OS still inherits the outgoing
     OS's CMOS -- configure each OS once and the snapshot then sticks. TODO: seed a
     new OS from RO<ver>Hook.ResetCMOS (the per-OS factory image) instead.
+
+    Apply-timing: the unplug mask is consumed at ROM module-init, BEFORE !Boot, so
+    this restore is one boot too late -- the modules already inited from the
+    outgoing OS's CMOS. So on a real swap we prompt the user to restart (as
+    MbufManager / Configure "reset them now" do); the restart boots clean because
+    BootOwner now matches (DoSwap=no). TODO: replace the prompt with an automatic
+    reset (reset-vector via an OS_EnterOS stub; 26-bit IOMD vs 32-bit HAL differ).
     """
     br = out / '!Boot' / 'Utils' / 'BootRun,feb'
     # Place the CMOSSwap utility this patch calls (vendored tokenised BASIC).
@@ -263,6 +270,16 @@ def patch_bootrun_per_os_bootcfg(out):
         "Unset CMOSSwap$Save\n"
         "Unset CMOSSwap$Load\n"
         'If "<Boot$DoSwap>" = "yes" Then Echo Set Boot$BootOwner <Boot$OSTag> { > <Boot$CfgDir>.BootOwner }\n'
+        '| A real ROM swap changed the unplug mask, but modules were already inited\n'
+        '| from the OUTGOING OS CMOS -> prompt to restart to apply it (like MbufManager\n'
+        '| and Configure "reset them now"). Skip on the first-ever boot (owner=none),\n'
+        '| where nothing was restored. BootOwner is already written, so the restart\n'
+        '| boots clean (DoSwap=no). Replace with an auto reset-vector call later.\n'
+        'Set Boot$DoPrompt <Boot$DoSwap>\n'
+        'If "<Boot$BootOwner>" = "none" Then Set Boot$DoPrompt no\n'
+        'If "<Boot$DoPrompt>" = "yes" Then Echo\n'
+        'If "<Boot$DoPrompt>" = "yes" Then Error 0 RISC OS version changed: CMOS updated for this OS. Please restart the machine now (press Reset) so the correct modules load.\n'
+        'Unset Boot$DoPrompt\n'
         "Unset Boot$DoSwap\n"
         "Unset Boot$OSTag\n"
         "Unset Boot$BootOwner\n"
