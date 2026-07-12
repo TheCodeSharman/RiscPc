@@ -3,6 +3,3 @@
 # Tokenised RISC OS BASIC: show detokenised text in diffs (see
 # tools/riscos-basic-detokenise/ — needs the local textconv driver enabled).
 *,ffb diff=riscosbasic
-
-# RISC OS CMOS images (type &FF2): binary, never line-ending normalised.
-*,ff2 binary

@@ -41,8 +41,6 @@ WORK = HERE / 'build'
 STAGE = WORK / '_stage'
 OUT = WORK / 'disc'
 LOCAL = HERE / 'local'
-VENDOR_FACTORY_CMOS = HERE / 'vendor' / 'FactoryCMOS'  # our reconstructed RO370 ResetCMOS
-CMOS_LEN = 240                              # CMOS logical locations 0..239 (SaveCMOS image)
 
 
 def log(m): print(m, flush=True)
@@ -227,11 +225,10 @@ def patch_bootrun_per_os_bootcfg(out):
     shared CMOS breaks networking on a swap. On an owner change we save the live
     CMOS -> Choices.CMOS-<prev> and restore Choices.CMOS-<this> via the CMOSSwap
     utility (OS_Byte 161/162 over CMOS locs 0..239 -- the RTC clock isn't in that
-    range, so the time is untouched). The per-OS snapshot Choices.CMOS-<tag> is
-    pre-seeded from each OS's FACTORY image by place_factory_cmos() below, so a
-    new OS is restored from its own reset defaults (all module-unplug bits clear)
-    rather than inheriting the outgoing OS's mis-keyed live CMOS. CMOSSwap's
-    seed-from-current fallback then only fires for an OS with no known factory.
+    range, so the time is untouched). Note: a missing per-OS snapshot is seeded
+    from the CURRENT CMOS, so the FIRST boot of each OS still inherits the outgoing
+    OS's CMOS -- configure each OS once and the snapshot then sticks. TODO: seed a
+    new OS from RO<ver>Hook.ResetCMOS (the per-OS factory image) instead.
 
     Apply-timing: the unplug mask is consumed at ROM module-init, BEFORE !Boot, so
     this restore is one boot too late -- the modules already inited from the
@@ -295,60 +292,6 @@ def patch_bootrun_per_os_bootcfg(out):
     if 'Per-OS Choices.Boot' in text:
         sys.exit(f"patch_bootrun_per_os_bootcfg: already patched in {br}")
     br.write_text(text.replace(anchor, inject + anchor, 1))
-
-
-# tag -> the hook whose ResetCMOS is this OS's factory image, and where it lives:
-#   'disc'   -- the OS ships it in the assembled disc (!Boot.<hook>.ResetCMOS)
-#   'vendor' -- we supply it (RISC OS 3.x has none), from vendor/FactoryCMOS/<hook>
-# Both are the identical ResetCMOS format: a 240-byte SaveCMOS image + a 4-byte
-# LE OS-version trailer (244 bytes); we seed from the leading 240 bytes.
-FACTORY_CMOS_PLAN = {
-    'RO370': ('vendor', 'RO370Hook'),  # reconstructed from source -- see vendor/FactoryCMOS
-    'RO400': ('disc',   'RO400Hook'),  # RISC OS 4.02 (Boot$OSVersion 400)
-    'RO500': ('disc',   'RO500Hook'),  # RISC OS 5.0x ...
-    'RO510': ('disc',   'RO500Hook'),
-    'RO520': ('disc',   'RO500Hook'),
-    'RO530': ('disc',   'RO500Hook'),  # RO5.3 inherits RO500Hook's ResetCMOS
-}
-
-
-def place_factory_cmos(out):
-    """Pre-place a per-OS *factory* CMOS seed (Choices.CMOS-<tag>) so the first
-    boot of a new OS is seeded from its own reset defaults -- NOT from the
-    outgoing OS's (mis-keyed) live CMOS (the bootstrap bug this fixes).
-
-    With the seed present, the BootRun swap restores Choices.CMOS-<tag> to live
-    CMOS on a version change; CMOSSwap's seed-from-current fallback then only
-    ever runs for an OS with no known factory image (bounded, not the common case).
-
-    Every OS's factory image is its hook's ResetCMOS -- a 244-byte file = a
-    240-byte SaveCMOS image (locs 0..239, all module-unplug locations clear) + a
-    4-byte LE OS-version trailer (&172=370, &190=400, &1F4=500). RISC OS 4/5 ship
-    theirs in the disc; RISC OS 3.7 ships none, so we vendor a reconstructed one
-    (vendor/FactoryCMOS/RO370Hook/ResetCMOS -- see factory_cmos.py there). We seed
-    from the leading 240 bytes. All-unplug-clear is the whole point: each OS owns
-    its unplug mask from a clean base, so 4.02's Freeway/ShareFS bits can't land
-    on 3.7's Net/BootNet.
-    """
-    choices = out / '!Boot' / 'Choices'
-    if not choices.is_dir():
-        log("  (no !Boot.Choices -- skipping factory CMOS seeds)")
-        return
-    placed = []
-    for tag, (where, hook) in FACTORY_CMOS_PLAN.items():
-        root = out / '!Boot' if where == 'disc' else VENDOR_FACTORY_CMOS
-        reset = root / hook / 'ResetCMOS,ff2'
-        if not reset.exists():
-            continue  # OS/source not in this build -- CMOSSwap falls back to seed-from-current
-        img = reset.read_bytes()[:CMOS_LEN]
-        if len(img) != CMOS_LEN:
-            log(f"  (skip {tag} -- {hook}.ResetCMOS only {len(img)} bytes)")
-            continue
-        (choices / f'CMOS-{tag},ff2').write_bytes(img)
-        placed.append(tag)
-    if placed:
-        log(f"  factory CMOS seeds: {', '.join(placed)} "
-            "(new OS restored from its reset defaults, not the outgoing CMOS)")
 
 
 def copytree(src, dst):
@@ -513,7 +456,6 @@ def main():
     if multi_rom_safe:
         patch_bootrun_per_os_bootcfg(OUT)
         log("  BootRun -> caches Choices.Boot per OS (shared disc switches RISC OS versions)")
-        place_factory_cmos(OUT)
     if not (ro4_support or multi_rom_safe):
         log("  (none enabled -- vanilla ROOL boot)")
 
