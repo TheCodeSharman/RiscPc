@@ -1715,3 +1715,55 @@ Morning verdict on the Jul 8 plan, then a memory upgrade and a proper RAM soak.
     A truly transparent universal boot must **version-gate** its executable payload (cf. the bundle's
     `RO350/360/370/400Hook` dirs, and *no* `RO500Hook`). TODO if ever chased: bisect our merged `!Boot`
     on RO5 to name the offending 26-bit component.
+
+### Jul 12 — Multi-ROM networking: the switcher is necessary but not sufficient (3-vector cross-contamination)
+
+Set out to answer one question — *is the per-OS `Choices.Boot` cache (`build.py --multi-rom-safe`) strictly
+needed for a shared multi-ROM disc?* — and ended up fully characterising why **one shared disc + one CMOS
+cannot cleanly multi-boot networking**. Rig: `installs/riscos-multi` (RPCSA, one HostFS disc + one `cmos.ram`,
+ROM 3.70/4.02/5.30 via `swap-rom`). Discipline throughout: controlled single-variable A/B, never guess (the
+earlier 4.02-net hunt cost ~5 wrong diagnoses).
+
+- **Switcher IS needed.** Without it, 3.7 stamps the shared `Choices.Boot`; 4.02 then reuses 3.7's
+  `PreDesk` (with 3.7's `!!ROMPatch`) instead of its own patched `RO400Hook` → the sweep aborts → no
+  networking. The `--multi-rom-safe` cache gives each OS its own `Choices.Boot` (stashing `Boot-RO370`,
+  rebuilding `Boot` for RO400) — confirmed via the `BootOwner` marker. Good.
+- **But it's NOT sufficient — 4.02 data-aborted anyway** (`Route unknown`, `@&03AF95A4`). Isolated the
+  cause by elimination: standalone `riscos-402` boots clean on RPC710 **and** on RPCSA (base RO4 boot +
+  StrongARM both exonerated); injecting the multi's 3.7-written `cmos.ram` into that known-good 402
+  **reproduced the abort exactly**. So: **CMOS**.
+- **Decoded the byte.** Only one config byte differs (rest is RTC clock + the derived checksum at file
+  `&3F`): **`Unplug11CMOS` = RISC OS CMOS `&13` = `cmos.ram` file offset `&53`** (mapping file = ROloc +
+  0x40, per RPCEmu `src/cmos.c`). It's a **module-unplug mask**, not a network setting (network config
+  lives on *disc*, in `Choices.Internet` — CMOS only holds unplugs). 4.02 needs `&13` bit 1 set to unplug
+  **Freeway** (ROMModules pos 90); with it clear (3.7's CMOS) Freeway loads and aborts routing at boot.
+- **The position-keyed misfire — the headline.** `*ROMModules` on each OS: 3.7 has **141** modules, 4.02
+  has **132**, and the orderings don't line up. The very bits that unplug **Freeway (90) + ShareFS/Access
+  (91)** on 4.02 land on **Net (90) + BootNet (91)** on 3.7 — the *core network stack*. So the working-4.02
+  CMOS booted on 3.7 would unplug 3.7's entire networking. (Only `SaveAs`+`Scale` share positions.)
+- **A third vector too.** After fixing CMOS the abort went but it was loopback-only; clicking **"Enable
+  TCP/IP suite"** on 4.02 wrote `SetUpNet` + `Internet/Startup` to disc (network up) *and* set `&13` bit 2
+  (unplugged Access). But `Choices.Internet` is a **shared** HostFS dir the switcher doesn't cache — so
+  swapping back to 3.7 then threw **`Network is unreachable`**: 3.7 was running 4.02's freshly-written
+  `Startup` (`192.168.88.12` / route `192.168.88.254`).
+
+**Verdict — three stores hold per-OS network state, only one is isolatable:**
+
+| Store | Holds | Shared? | Cross-ROM safe? |
+|---|---|---|---|
+| `Choices.Boot` | SetUpNet, `!!ROMPatch` | per-OS (switcher) | ✅ |
+| CMOS unplug mask | which modules unplugged | one chip, position-keyed | ❌ |
+| `Choices.Internet` | IP / route | shared HostFS dir | ❌ |
+
+So: **the CMOS unplug mask must become per-OS**, and even then `Choices.Internet` needs per-OS isolation.
+Boot-config caching alone was never going to be enough.
+
+**The real-hardware-friendly fix (credit: MS):** don't juggle `cmos.ram` in `swap-rom` — instead store a
+**per-OS CMOS snapshot on disc and restore it at boot**. RISC OS already ships **`!SaveCMOS`** ("save and
+restore your CMOS RAM"; `!RunImage` is BASIC over `OS_Byte 161/162`, CMOS locations 0–239 — which *excludes*
+the RTC clock, so a restore doesn't reset the time). Fold it into the *same* per-OS-cache logic as
+`Choices.Boot`: on a `BootOwner` change, save the outgoing OS's CMOS → `cmos-RO<prev>`, restore
+`cmos-RO<this>`. That works on a **real RiscPC** (the one physical chip is rewritten from disc each boot) —
+so my earlier "real hardware can't" was wrong. (Full write-up in memory
+`riscpc-multiboot-network-cross-contamination`. Corrected en route: the 4.02 "MbufManager unplug" note was a
+**false reading** — MbufManager is 0.22 and never unplugged; the real actors are Freeway/ShareFS.)

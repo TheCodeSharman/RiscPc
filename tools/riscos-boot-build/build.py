@@ -209,7 +209,7 @@ def drop_ro4_rompatch(out):
 
 
 def patch_bootrun_per_os_bootcfg(out):
-    """Cache Choices.Boot per OS so one disc can switch RISC OS versions.
+    """Cache Choices.Boot AND CMOS per OS so one disc can switch RISC OS versions.
 
     RO<ver>Hook selects version-correct boot files, but SetChoices only copies
     them into the writable Choices.Boot when it's absent -- so on a shared disc
@@ -218,13 +218,31 @@ def patch_bootrun_per_os_bootcfg(out):
     SetChoices) that stashes the live Boot under its owner's OS tag and restores
     this OS's copy; BootOwner records the owner. Leaves Choices$Write untouched so
     app configs stay shared.
+
+    The SAME swap also caches CMOS per OS, because the CMOS module-unplug mask is
+    position-keyed to ROM-module order and misfires across ROMs (4.02's Freeway/
+    ShareFS unplug bits land on 3.7's Net/BootNet -- the core network stack), so a
+    shared CMOS breaks networking on a swap. On an owner change we save the live
+    CMOS -> Choices.CMOS-<prev> and restore Choices.CMOS-<this> via the CMOSSwap
+    utility (OS_Byte 161/162 over CMOS locs 0..239 -- the RTC clock isn't in that
+    range, so the time is untouched). Note: a missing per-OS snapshot is seeded
+    from the CURRENT CMOS, so the FIRST boot of each OS still inherits the outgoing
+    OS's CMOS -- configure each OS once and the snapshot then sticks. TODO: seed a
+    new OS from RO<ver>Hook.ResetCMOS (the per-OS factory image) instead.
     """
     br = out / '!Boot' / 'Utils' / 'BootRun,feb'
+    # Place the CMOSSwap utility this patch calls (vendored tokenised BASIC).
+    cmosswap = REPO / 'tools' / 'riscos-boot-build' / 'vendor' / 'CMOSSwap' / 'CMOSSwap,ffb'
+    if not cmosswap.exists():
+        sys.exit(f"patch_bootrun_per_os_bootcfg: {cmosswap} missing -- tokenise "
+                 "vendor/CMOSSwap/Source,fff inside RISC OS (see its README) first")
+    shutil.copy2(cmosswap, br.parent / 'CMOSSwap,ffb')
     anchor = '/<Boot$Dir>.Utils.SetChoices'
     inject = (
-        "| --- Per-OS Choices.Boot cache ------------------------------------------\n"
+        "| --- Per-OS Choices.Boot + CMOS cache -----------------------------------\n"
         "| Stash the live Boot under its owner's OS tag, restore this OS's copy;\n"
-        "| BootOwner records the owner. Keeps the rest of Choices shared.\n"
+        "| BootOwner records the owner. Same swap caches CMOS per OS (the unplug\n"
+        "| mask is position-keyed -> misfires across ROMs). Rest of Choices shared.\n"
         "IfThere <Boot$Dir>.^.!Choices Then Set Boot$CfgDir <Boot$Dir>.^.!Choices Else Set Boot$CfgDir <Boot$Dir>.Choices\n"
         "Set Boot$OSTag RO<Boot$OSVersion>\n"
         "Set Boot$BootOwner none\n"
@@ -233,6 +251,17 @@ def patch_bootrun_per_os_bootcfg(out):
         'If "<Boot$BootOwner>" = "<Boot$OSTag>" Then Set Boot$DoSwap no\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot Then Rename <Boot$CfgDir>.Boot <Boot$CfgDir>.Boot-<Boot$BootOwner>\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot-<Boot$OSTag> Then Rename <Boot$CfgDir>.Boot-<Boot$OSTag> <Boot$CfgDir>.Boot\n'
+        '| Internet config is OS-specific too (route/interface names, !InetSetup rewrites\n'
+        '| the shared Startup) -> cache it per OS the same way as Boot.\n'
+        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet Then Rename <Boot$CfgDir>.Internet <Boot$CfgDir>.Internet-<Boot$BootOwner>\n'
+        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet-<Boot$OSTag> Then Rename <Boot$CfgDir>.Internet-<Boot$OSTag> <Boot$CfgDir>.Internet\n'
+        '| CMOS swap: save outgoing OS -> CMOS-<owner>, restore this OS -> CMOS-<tag>\n'
+        'If "<Boot$DoSwap>" = "yes" Then Set CMOSSwap$Save <Boot$CfgDir>.CMOS-<Boot$BootOwner>\n'
+        'If "<Boot$BootOwner>" = "none" Then Unset CMOSSwap$Save\n'
+        'If "<Boot$DoSwap>" = "yes" Then Set CMOSSwap$Load <Boot$CfgDir>.CMOS-<Boot$OSTag>\n'
+        'If "<Boot$DoSwap>" = "yes" Then /<Boot$Dir>.Utils.CMOSSwap\n'
+        "Unset CMOSSwap$Save\n"
+        "Unset CMOSSwap$Load\n"
         'If "<Boot$DoSwap>" = "yes" Then Echo Set Boot$BootOwner <Boot$OSTag> { > <Boot$CfgDir>.BootOwner }\n'
         "Unset Boot$DoSwap\n"
         "Unset Boot$OSTag\n"
@@ -243,7 +272,7 @@ def patch_bootrun_per_os_bootcfg(out):
     text = br.read_text()
     if anchor not in text:
         sys.exit(f"patch_bootrun_per_os_bootcfg: SetChoices call not found in {br}")
-    if 'Per-OS Choices.Boot cache' in text:
+    if 'Per-OS Choices.Boot' in text:
         sys.exit(f"patch_bootrun_per_os_bootcfg: already patched in {br}")
     br.write_text(text.replace(anchor, inject + anchor, 1))
 
