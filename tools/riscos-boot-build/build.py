@@ -209,17 +209,18 @@ def drop_ro4_rompatch(out):
 
 
 def patch_bootrun_per_os_bootcfg(out):
-    """Per-OS Choices.Boot/Internet cache + unplug-mask reset, so one disc can
-    switch RISC OS versions.
+    """Per-OS Choices.Boot cache + unplug-mask snapshot, so one disc can switch
+    RISC OS versions.
 
     RO<ver>Hook selects version-correct boot files, but SetChoices only copies
     them into the writable Choices.Boot when it's absent -- so on a shared disc
     the first OS to boot stamps Choices.Boot and the rest reuse it (wrong
     BootResources chain -> broken Configure). Inject a swap into BootRun (before
     SetChoices) that stashes the live Boot under its owner's OS tag and restores
-    this OS's copy; BootOwner records the owner. Choices.Internet is OS-specific
-    too (route/interface, !InetSetup rewrites the shared Startup) so it's cached
-    the same way. Leaves Choices$Write untouched so app configs stay shared.
+    this OS's copy; BootOwner records the owner. Leaves Choices$Write untouched so
+    app configs stay shared. (Choices.Internet is NOT cached per OS -- with one NIC
+    and the shared disc-based !Internet, every ROM writes an identical Startup, so
+    the config is the same across OSes; only the CMOS unplug mask below differs.)
 
     The same swap also SNAPSHOTS THE CMOS MODULE-UNPLUG MASK PER OS (via
     UnplugSwap), which is the one piece of CMOS that misfires across ROMs. *Unplug
@@ -251,10 +252,11 @@ def patch_bootrun_per_os_bootcfg(out):
     shutil.copy2(unplugswap, br.parent / 'UnplugSwap,ffb')
     anchor = '/<Boot$Dir>.Utils.SetChoices'
     inject = (
-        "| --- Per-OS Choices.Boot/Internet + unplug-mask reset -------------------\n"
+        "| --- Per-OS Choices.Boot + unplug-mask snapshot -------------------------\n"
         "| Stash the live Boot under its owner's OS tag, restore this OS's copy;\n"
-        "| BootOwner records the owner. On a swap also clear the position-keyed CMOS\n"
-        "| unplug mask (misfires across ROMs). Rest of Choices/CMOS stays shared.\n"
+        "| BootOwner records the owner. On a swap also snapshot the position-keyed\n"
+        "| CMOS unplug mask per OS (misfires across ROMs). Rest of Choices/CMOS shared\n"
+        "| (incl Choices.Internet -- identical across ROMs with one NIC).\n"
         "IfThere <Boot$Dir>.^.!Choices Then Set Boot$CfgDir <Boot$Dir>.^.!Choices Else Set Boot$CfgDir <Boot$Dir>.Choices\n"
         "Set Boot$OSTag RO<Boot$OSVersion>\n"
         "Set Boot$BootOwner none\n"
@@ -263,10 +265,6 @@ def patch_bootrun_per_os_bootcfg(out):
         'If "<Boot$BootOwner>" = "<Boot$OSTag>" Then Set Boot$DoSwap no\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot Then Rename <Boot$CfgDir>.Boot <Boot$CfgDir>.Boot-<Boot$BootOwner>\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot-<Boot$OSTag> Then Rename <Boot$CfgDir>.Boot-<Boot$OSTag> <Boot$CfgDir>.Boot\n'
-        '| Internet config is OS-specific too (route/interface names, !InetSetup rewrites\n'
-        '| the shared Startup) -> cache it per OS the same way as Boot.\n'
-        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet Then Rename <Boot$CfgDir>.Internet <Boot$CfgDir>.Internet-<Boot$BootOwner>\n'
-        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet-<Boot$OSTag> Then Rename <Boot$CfgDir>.Internet-<Boot$OSTag> <Boot$CfgDir>.Internet\n'
         '| Per-OS unplug mask: save outgoing OS -> Unplug-<owner>, restore this OS\n'
         '| <- Unplug-<tag> (clear if never seen). Position-keyed, so each OS keeps\n'
         '| its own; clearing is not enough (3.7 sets its mask via interactive Config).\n'
