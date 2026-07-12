@@ -87,6 +87,35 @@ git submodule update --init
 ```
 Then reload VS Code. See `tools/vscode-aasm/README.md` for details.
 
+## Repo tools (`tools/`) — check here before building anything
+
+Before writing a new script, look here — these already exist. Don't reimplement them.
+
+- **`tools/riscos-basic-detokenise/`** — reads **tokenised BBC BASIC** (`,ffb` files, e.g.
+  `!Boot/Utils/SetChoices,ffb`, RaFS `raFSsource,ffb`), which are binary. The detokeniser is
+  **`bastotxt`** from [gerph/riscos-basic-detokenise](https://github.com/gerph/riscos-basic-detokenise)
+  (Justin Fletcher, MIT) — decodes BASIC V including inline `[ OPT ]` assembler.
+  - Build (binary is gitignored): `nix-shell -p gcc gnumake --run ./setup.sh` → produces `./bastotxt`.
+  - Read a file: `tools/riscos-basic-detokenise/bastotxt -i path/to/File,ffb`.
+  - It is also wired as a git **textconv** driver (`*,ffb diff=riscosbasic` in `.gitattributes`,
+    driver in `.git/config`) so `git diff`/`git show` render `,ffb` files as readable BASIC —
+    committed bytes stay the real tokenised module. See its `README.md`.
+  - **No tokeniser** (text→`,ffb`) here — it's detokenise-only, for reading/diffing. To *edit* a
+    `,ffb`, do it inside RISC OS (or write it back through a real BBC BASIC), not with this tool.
+
+- **`tools/riscos-boot-build/build.py`** — the authoritative **universal RISC OS `!Boot` builder**
+  (bundle-free; downloads + sha256-verifies official sources per `sources.json`, then assembles a
+  disc tree that boots on RISC OS 3.7 / 4.02 / 5.x). Helpers: `roextract.py` (archive→HostFS
+  `,xxx`-typed extraction), `rozip.py`. Boot patches are **on by default** (opt out with `--no-*`):
+  `--[no-]risc-os-4-support` (RO400 native Configure + drop ROOL's `!!ROMPatch`; inert on 3.7/5.x) and
+  `--[no-]multi-rom-safe` (per-OS `Choices.Boot` cache, for a disc shared across ROMs). Other flags:
+  `--minimal` (boot structure only — no apps/content/overlays; compose with the patch flags) and
+  `--[no-]packages-in-rafs` (RaFS-wrap `!Packages` for a real 10-char E-format FileCore; RISC OS < 4.00, off by default).
+  Consumed by the rpcemu repo's `tools/setup-install.sh` to produce `installs/<name>/`.
+
+- **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
+- **`acorn-post/decoders/`** — sigrok POST decoders (see above).
+
 ## Workflow: feature branches + self-review PRs
 
 This branch-and-PR discipline applies to the **code subprojects** —

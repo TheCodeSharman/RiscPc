@@ -1671,3 +1671,47 @@ Morning verdict on the Jul 8 plan, then a memory upgrade and a proper RAM soak.
   identical module deps 1.1↔1.2 so it's a binary/redraw regression, not a dependency. Workaround: run
   ≤ 640×480 (PackMan opens links in NetSurf, so it bites there too). RO4 is the real fix but not worth
   the migration yet.
+
+### Jul 10 (later) — RAMtestA overnight soak: 173 passes, zero failures
+
+- **Result: RAM sound in the current config.** `RAMtestA.bas` ran overnight and logged **173
+  consecutive passes, zero failures** — totally clean. One pass could be luck; 173 back-to-back is a
+  real result. Whatever the intermittency was, it is **not the DRAM under these conditions** — consistent
+  with the Jul 10 conclusion that the fault is *contact* (DRAM/VRAM socket), not silicon.
+- **Power LED went dark — cosmetic, not a fault.** The machine clearly ran the whole soak (173 passes
+  logged), so the board is powered and executing fine. The dark front-panel power light is the **LED
+  connector knocked loose** during last night's disassembly/reassembly — a front-panel wire to the
+  motherboard LED header, purely cosmetic. Reseat next time the box is open; nothing to chase.
+
+### Jul 10 (later still) — NetSurf hang confirmed RO-3.7-specific across a 3-way OS comparison
+
+- **The test:** spun up two more RPCEmu installs sharing the same disc/hostfs where possible, to
+  A/B NetSurf against the earlier Jul 10 "≥1.2 hangs on 3.7" note. Result matrix —
+  **RO 3.70 = hang** (Acorn, final) · **RO 4.02 = clean** (RISCOS Ltd) · **RO 5.27 = works really
+  well** (Castle / RO Direct). Confirms the standing hypothesis and **validates the "RO4 is the real
+  fix" call** — and RO5 clears it too.
+- **Reading:** the hang is a **code-level bug specific to the RO 3.7 release**, *not* "old OS" —
+  it disappears the moment you step onto **either** successor branch (RISCOS Ltd *and* Castle both
+  clean), so it's not NetSurf itself, the disc, or hostfs. Consistent with the earlier bisect
+  (1.1-good / 1.2-bad, identical module deps → binary/redraw regression tripping something 3.7-only).
+  Not worth chasing further; migration path is proven if the ≤640×480 workaround ever stops paying.
+- **Infra notes for future-me (RO4/RO5 under RPCEmu):**
+  - **RO 4.02** = local `roms/1. Major/ROM402`; boots the shared 3.71 disc + universal `!Boot` fine
+    (RISCOS Ltd line is 26/32-neutral). Install: `installs/riscos-402/`.
+  - **RO 5** is a *different beast*. No Castle RO5 ROM in the local dumps — pulled **IOMD 5.30
+    stable** from ROOL (`roms/5. RISC OS Open (ROOL)/`), but a bare IOMD ROM **data-aborts** if you
+    boot it against a 3.7/4 disc: RO5 is **32-bit-only** and can't use the old `!Boot`. Fix = the
+    **ROO L "RPCEmu Easy-Start" RISC OS Direct 5.27 bundle** (`installs/riscos-direct/`), which ships
+    a matching 32-bit HostFS `!Boot` + `ROM527` + StrongARM `rpc.cfg`.
+  - **RPCEmu keeps IDE *disabled* under RO5** (deliberate — a data-loss bug in its IDE emulation),
+    so RO Direct is **HostFS-only**; a symlinked `hd5.hdf` won't appear. NB this is an *emulator*
+    limit — **RISC OS 5 supports IDE fine on real RiscPC hardware** (the ROM has the driver).
+  - **Getting IDE-disc apps in front of RO5:** can't extract host-side (Linux FileCore read loses
+    RISC OS filetypes → broken `!Apps`). Bridge instead — a shared host dir exposed as `$.Xfer` in
+    **both** `riscos-371` and `riscos-direct` HostFS (`installs/shared-xfer/`); copy `!ADFFS`/`!PackMan`
+    across *inside* RO 3.71 (RPCEmu writes `,xxx` filetypes) and they appear in RO5.
+  - **Why the universal `!Boot` won't boot RO5:** it runs **26-bit executables** at boot time
+    (un-gated `PreDesk` tasks / a `!System` module with no 32-bit sibling) that abort on 32-bit RO5.
+    A truly transparent universal boot must **version-gate** its executable payload (cf. the bundle's
+    `RO350/360/370/400Hook` dirs, and *no* `RO500Hook`). TODO if ever chased: bisect our merged `!Boot`
+    on RO5 to name the offending 26-bit component.
