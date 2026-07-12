@@ -1767,3 +1767,33 @@ the RTC clock, so a restore doesn't reset the time). Fold it into the *same* per
 so my earlier "real hardware can't" was wrong. (Full write-up in memory
 `riscpc-multiboot-network-cross-contamination`. Corrected en route: the 4.02 "MbufManager unplug" note was a
 **false reading** — MbufManager is 0.22 and never unplugged; the real actors are Freeway/ShareFS.)
+
+### Jul 12 (later) — CMOSSwap: per-OS CMOS on-disk, and the ROM-init timing wall
+
+Built the real-hardware per-OS CMOS mechanism (`vendor/CMOSSwap/`, wired into
+`patch_bootrun_per_os_bootcfg`) + extended the switcher to cache `Choices.Internet`
+per OS too. Committed + pushed. Full detail in the handover
+`~/riscpc-handover-2026-07-12-cmosswap-multiboot.md`. Highlights:
+
+- **CMOSSwap works** — a standalone ~30-line BASIC (tokenised in RISC OS since we
+  have no host tokeniser) saving/restoring CMOS locs 0..239 as a 240-byte &FF2
+  image (`OS_Byte 161/162`, same as `!SaveCMOS`). Proven: per-OS `CMOS-RO370/RO400`
+  snapshots created and round-trip correctly; on swap-back, 3.7 got its own CMOS back.
+- **The wall** — the CMOS **unplug mask is consumed at ROM module-init, before !Boot**,
+  so the restore in BootRun is one boot too late (modules already inited from the
+  outgoing OS's mask → position-keyed misfire). RISC OS has no clean software reset
+  SWI. So we follow RISC OS's own idiom (MbufManager / Configure "reset them now"):
+  a **restart prompt** on a real swap — **validated on-screen** (message + halt at
+  the `*` prompt, no wedge; 2nd boot is `DoSwap=no`).
+- **Bootstrap bug (MS spotted)** — first boot of a *new* OS seeds its snapshot from
+  the *outgoing* (misfired) CMOS, and the 2nd boot never restores a correct one → new
+  OS runs wrong. Fix: seed from the OS's **factory CMOS** and restore it to live.
+- **Factory CMOS is reconstructable from the Kernel source** — `s/NewReset`
+  `DefaultCMOSTable` (all-zeros + byte pairs, offsets via `Hdr:CMOS`, + checksum).
+  Gives 3.7 exactly, 3.6/3.5 from their tags, 5.30 from the ROOL Kernel; 4.02
+  (no source) → decode `RO400Hook.ResetCMOS` against a reconstructed reference.
+- Also checked out `external/Kernel @ RO_3_70` — `CONT_Break` is the 26-bit IOMD
+  soft-reset reference for a future *automatic* reset (vs the manual prompt).
+
+Open, in priority: (1) factory-CMOS reconstruction + CMOSSwap seed-from-factory,
+(2) auto reset-vector stub, (3) decode ResetCMOS / cross-check.
