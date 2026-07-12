@@ -209,47 +209,52 @@ def drop_ro4_rompatch(out):
 
 
 def patch_bootrun_per_os_bootcfg(out):
-    """Cache Choices.Boot AND CMOS per OS so one disc can switch RISC OS versions.
+    """Per-OS Choices.Boot/Internet cache + unplug-mask reset, so one disc can
+    switch RISC OS versions.
 
     RO<ver>Hook selects version-correct boot files, but SetChoices only copies
     them into the writable Choices.Boot when it's absent -- so on a shared disc
     the first OS to boot stamps Choices.Boot and the rest reuse it (wrong
     BootResources chain -> broken Configure). Inject a swap into BootRun (before
     SetChoices) that stashes the live Boot under its owner's OS tag and restores
-    this OS's copy; BootOwner records the owner. Leaves Choices$Write untouched so
-    app configs stay shared.
+    this OS's copy; BootOwner records the owner. Choices.Internet is OS-specific
+    too (route/interface, !InetSetup rewrites the shared Startup) so it's cached
+    the same way. Leaves Choices$Write untouched so app configs stay shared.
 
-    The SAME swap also caches CMOS per OS, because the CMOS module-unplug mask is
-    position-keyed to ROM-module order and misfires across ROMs (4.02's Freeway/
-    ShareFS unplug bits land on 3.7's Net/BootNet -- the core network stack), so a
-    shared CMOS breaks networking on a swap. On an owner change we save the live
-    CMOS -> Choices.CMOS-<prev> and restore Choices.CMOS-<this> via the CMOSSwap
-    utility (OS_Byte 161/162 over CMOS locs 0..239 -- the RTC clock isn't in that
-    range, so the time is untouched). Note: a missing per-OS snapshot is seeded
-    from the CURRENT CMOS, so the FIRST boot of each OS still inherits the outgoing
-    OS's CMOS -- configure each OS once and the snapshot then sticks. TODO: seed a
-    new OS from RO<ver>Hook.ResetCMOS (the per-OS factory image) instead.
+    The same swap also SNAPSHOTS THE CMOS MODULE-UNPLUG MASK PER OS (via
+    UnplugSwap), which is the one piece of CMOS that misfires across ROMs. *Unplug
+    <name> (used by !Boot.Resources.!Internet.!Run and by interactive Configure to
+    unplug the obsolete ROM Internet stack) sets the bit for that name's slot in
+    the CURRENT ROM; the same name lands on a different bit per ROM (InternetA is
+    &13 bit1 on 4.02 but bit3 on 3.7), so 4.02's bit would unplug one of 3.7's core
+    network modules. Each OS must keep its OWN mask: on a swap we save the outgoing
+    OS's 13 unplug bytes and restore the incoming OS's (clear if never seen).
+    Clearing alone is NOT enough -- an OS doesn't necessarily re-assert its unplugs
+    by name each boot (3.7 sets them via interactive Configure), so a cleared mask
+    stays lost and its networking breaks. Only the 13 unplug locations are written
+    -- filesystem/drive/monitor config is machine state shared across OSes and must
+    NOT change (a full-CMOS swap clobbers it -> "Disc drive not known").
 
     Apply-timing: the unplug mask is consumed at ROM module-init, BEFORE !Boot, so
-    this restore is one boot too late -- the modules already inited from the
-    outgoing OS's CMOS. So on a real swap we prompt the user to restart (as
-    MbufManager / Configure "reset them now" do); the restart boots clean because
-    BootOwner now matches (DoSwap=no). TODO: replace the prompt with an automatic
-    reset (reset-vector via an OS_EnterOS stub; 26-bit IOMD vs 32-bit HAL differ).
+    the restore lands one boot too late (modules already inited from the outgoing
+    mask). So on a real swap we prompt the user to restart (as MbufManager /
+    Configure "reset them now" do); the restart boots clean because BootOwner now
+    matches (DoSwap=no) and ROM-init reads the restored mask. TODO: replace the
+    prompt with an automatic reset (reset-vector via OS_EnterOS; IOMD vs HAL differ).
     """
     br = out / '!Boot' / 'Utils' / 'BootRun,feb'
-    # Place the CMOSSwap utility this patch calls (vendored tokenised BASIC).
-    cmosswap = REPO / 'tools' / 'riscos-boot-build' / 'vendor' / 'CMOSSwap' / 'CMOSSwap,ffb'
-    if not cmosswap.exists():
-        sys.exit(f"patch_bootrun_per_os_bootcfg: {cmosswap} missing -- tokenise "
-                 "vendor/CMOSSwap/Source,fff inside RISC OS (see its README) first")
-    shutil.copy2(cmosswap, br.parent / 'CMOSSwap,ffb')
+    # Place the UnplugSwap utility this patch calls (vendored tokenised BASIC).
+    unplugswap = REPO / 'tools' / 'riscos-boot-build' / 'vendor' / 'UnplugSwap' / 'UnplugSwap,ffb'
+    if not unplugswap.exists():
+        sys.exit(f"patch_bootrun_per_os_bootcfg: {unplugswap} missing -- tokenise "
+                 "vendor/UnplugSwap/Source,fff inside RISC OS (see its README) first")
+    shutil.copy2(unplugswap, br.parent / 'UnplugSwap,ffb')
     anchor = '/<Boot$Dir>.Utils.SetChoices'
     inject = (
-        "| --- Per-OS Choices.Boot + CMOS cache -----------------------------------\n"
+        "| --- Per-OS Choices.Boot/Internet + unplug-mask reset -------------------\n"
         "| Stash the live Boot under its owner's OS tag, restore this OS's copy;\n"
-        "| BootOwner records the owner. Same swap caches CMOS per OS (the unplug\n"
-        "| mask is position-keyed -> misfires across ROMs). Rest of Choices shared.\n"
+        "| BootOwner records the owner. On a swap also clear the position-keyed CMOS\n"
+        "| unplug mask (misfires across ROMs). Rest of Choices/CMOS stays shared.\n"
         "IfThere <Boot$Dir>.^.!Choices Then Set Boot$CfgDir <Boot$Dir>.^.!Choices Else Set Boot$CfgDir <Boot$Dir>.Choices\n"
         "Set Boot$OSTag RO<Boot$OSVersion>\n"
         "Set Boot$BootOwner none\n"
@@ -262,23 +267,32 @@ def patch_bootrun_per_os_bootcfg(out):
         '| the shared Startup) -> cache it per OS the same way as Boot.\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet Then Rename <Boot$CfgDir>.Internet <Boot$CfgDir>.Internet-<Boot$BootOwner>\n'
         'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Internet-<Boot$OSTag> Then Rename <Boot$CfgDir>.Internet-<Boot$OSTag> <Boot$CfgDir>.Internet\n'
-        '| CMOS swap: save outgoing OS -> CMOS-<owner>, restore this OS -> CMOS-<tag>\n'
-        'If "<Boot$DoSwap>" = "yes" Then Set CMOSSwap$Save <Boot$CfgDir>.CMOS-<Boot$BootOwner>\n'
-        'If "<Boot$BootOwner>" = "none" Then Unset CMOSSwap$Save\n'
-        'If "<Boot$DoSwap>" = "yes" Then Set CMOSSwap$Load <Boot$CfgDir>.CMOS-<Boot$OSTag>\n'
-        'If "<Boot$DoSwap>" = "yes" Then /<Boot$Dir>.Utils.CMOSSwap\n'
-        "Unset CMOSSwap$Save\n"
-        "Unset CMOSSwap$Load\n"
-        'If "<Boot$DoSwap>" = "yes" Then Echo Set Boot$BootOwner <Boot$OSTag> { > <Boot$CfgDir>.BootOwner }\n'
-        '| A real ROM swap changed the unplug mask, but modules were already inited\n'
-        '| from the OUTGOING OS CMOS -> prompt to restart to apply it (like MbufManager\n'
-        '| and Configure "reset them now"). Skip on the first-ever boot (owner=none),\n'
-        '| where nothing was restored. BootOwner is already written, so the restart\n'
-        '| boots clean (DoSwap=no). Replace with an auto reset-vector call later.\n'
+        '| Per-OS unplug mask: save outgoing OS -> Unplug-<owner>, restore this OS\n'
+        '| <- Unplug-<tag> (clear if never seen). Position-keyed, so each OS keeps\n'
+        '| its own; clearing is not enough (3.7 sets its mask via interactive Config).\n'
+        'If "<Boot$DoSwap>" = "yes" Then Set Unplug$Save <Boot$CfgDir>.Unplug-<Boot$BootOwner>\n'
+        'If "<Boot$BootOwner>" = "none" Then Unset Unplug$Save\n'
+        'If "<Boot$DoSwap>" = "yes" Then Set Unplug$Load <Boot$CfgDir>.Unplug-<Boot$OSTag>\n'
+        'If "<Boot$DoSwap>" = "yes" Then /<Boot$Dir>.Utils.UnplugSwap\n'
+        'Unset Unplug$Save\n'
+        'Unset Unplug$Load\n'
+        '| Record this OS as the owner. Two RISC OS gotchas here:\n'
+        '|  1. Write UNCONDITIONALLY (not "If DoSwap.. Then Echo .. { > f }"): a\n'
+        '|     redirect on a Then-command still OPENS+TRUNCATES the file when the If\n'
+        '|     is false, so a guarded write would blank BootOwner on same-OS reboots.\n'
+        '|     Writing every boot is correct anyway -- the owner is always this OS.\n'
+        '|  2. No space before "{" -- "<tag> { >" echoes a trailing space, so\n'
+        '|     BootOwner would read back "RO370 " and never match "RO370".\n'
+        'Echo Set Boot$BootOwner <Boot$OSTag>{ > <Boot$CfgDir>.BootOwner }\n'
+        '| The unplug mask is read at ROM module-init (before !Boot), so the restore\n'
+        '| lands one boot too late -> prompt to restart (like MbufManager / Configure\n'
+        '| "reset them now"). Skip the first-ever boot (owner=none, nothing swapped).\n'
+        '| BootOwner is already written, so the restart boots clean (DoSwap=no) and\n'
+        '| ROM-init reads the restored mask. Replace with an auto reset-vector later.\n'
         'Set Boot$DoPrompt <Boot$DoSwap>\n'
         'If "<Boot$BootOwner>" = "none" Then Set Boot$DoPrompt no\n'
         'If "<Boot$DoPrompt>" = "yes" Then Echo\n'
-        'If "<Boot$DoPrompt>" = "yes" Then Error 0 RISC OS version changed: CMOS updated for this OS. Please restart the machine now (press Reset) so the correct modules load.\n'
+        'If "<Boot$DoPrompt>" = "yes" Then Error 0 RISC OS version changed: module-unplug mask restored for this OS. Please restart the machine now (press Reset) so the correct modules load.\n'
         'Unset Boot$DoPrompt\n'
         "Unset Boot$DoSwap\n"
         "Unset Boot$OSTag\n"
@@ -289,7 +303,7 @@ def patch_bootrun_per_os_bootcfg(out):
     text = br.read_text()
     if anchor not in text:
         sys.exit(f"patch_bootrun_per_os_bootcfg: SetChoices call not found in {br}")
-    if 'Per-OS Choices.Boot' in text:
+    if 'unplug-mask reset' in text:
         sys.exit(f"patch_bootrun_per_os_bootcfg: already patched in {br}")
     br.write_text(text.replace(anchor, inject + anchor, 1))
 
