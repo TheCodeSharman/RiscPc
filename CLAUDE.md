@@ -9,7 +9,7 @@ This repository documents the repair and diagnostics of a vintage Acorn RISC PC 
 - **ROM analysis scripts** for comparing and validating ROM dumps
 - **Logic analyzer captures** (DSLogic `.dsl` format) of various boot scenarios
 - **KiCAD PCB design** for a repair board (`RiscPcPcbRepair/`)
-- **RISC OS ROM source** as a git submodule (`external/Kernel/` — RISC OS 3.6.0)
+- **RISC OS ROM source** as a git submodule (`external/Kernel/` — RISC OS 3.70, matching the RiscPC's real ROM)
 - **RISC OS shared headers** as a git submodule (`external/HdrSrc/` — master; the RO_3_60 tag is missing `hdr/CMOS` and other registry headers, added publicly in 2008)
 - **Technical documentation** in `docs/` (CPU datasheets, RISC OS programmer manuals)
 - **VS Code aasm syntax extension** (`tools/vscode-aasm/`) for browsing the RISC OS assembly sources
@@ -71,7 +71,7 @@ alphabetically; a single 4MB file is a valid ROM on its own).
 
 Two submodules pulled from gitlab.riscosopen.org:
 
-- `external/Kernel/` — RISC OS 3.6.0 kernel source (tag `RO_3_60`). The `TestSrc/` subdirectory contains the POST test code relevant to decoding POST sequences.
+- `external/Kernel/` — RISC OS 3.70 kernel source (tag `RO_3_70`, matching the RiscPC's real ROM). The `TestSrc/` subdirectory contains the POST test code relevant to decoding POST sequences; `s/NewReset` (`CONT_Break`) is the 26-bit IOMD soft-reset path, useful for the multi-ROM auto-reset work.
 - `external/HdrSrc/` — Shared `Hdr:*` headers (`master` branch). The Kernel references `Hdr:CMOS`, `Hdr:Services`, `Hdr:FSNumbers`, etc. via the `Hdr:` search path; these registry headers weren't in the public HdrSrc release at the `RO_3_60` tag (added 2008 in commit `403c6dd`), so we track `master` instead — the CMOS allocation layout has been stable for decades.
 
 Initialize both with:
