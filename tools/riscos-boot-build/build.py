@@ -1,24 +1,34 @@
 #!/usr/bin/env python3
 """Build a universal RISC OS !Boot tree from official sources.
 
-Produces a HostFS-shaped directory tree (files carry ,xxx filetype suffixes) that
-can be copied straight onto a FileCore disc via RPCEmu's HostFS with types intact.
+Downloads the sources listed in sources.json and composes them into a !Boot +
+default hard-disc structure that boots on RISC OS 3.7 / 4.02 / 5.x.
 
-Recipe:
-  1. download + sha256-verify HardDisc4, PlingSystem, PackMan (sources.json)
-  2. extract each with correct HostFS ,xxx names (roextract)
-  3. lay HardDisc4 down as the disc root
-  4. merge PlingSystem's !System into HardDisc4's bundled !System,
-     newest-version-wins -- exactly what RISC OS's !SysMerge/Install_Update does
-     (only 3 modules actually overlap; everything else is a clean union)
-  5. place apps. RaFS-related placements are gated by --format e|f:
-       e (default, RISC OS 3.7, 10-char FileCore): !RaFS + the Pkg RaFS disc, so
-         !Packages gets long names via a RaFS volume the PackMan !Run hook mounts;
-       f (RISC OS 4.02/5.30, native long names): a plain !Packages in
-         !Boot.Resources (Filer_Boot'd at startup) -- no RaFS, hook stays inert.
-  6. overlay local/*/ if present
+Sources:
+  The sources are listed in sources.json, which also records how each is placed:
+    sources[]        name, file, url, sha256, strip, role -- what to fetch/extract
+    placements[]     copy a subtree onto the disc: source+path (or repo) -> to
+                     (a packages_in_rafs flag gates the RaFS vs plain !Packages ones)
+    subtree_merges[] merge a tree add-missing (our copy wins overlaps): source+from -> to
+    content_place[]  place each child of a container whole, where the disc lacks it
+    exclude_root[]   root files to drop from the assembled disc
 
-The output is intentionally NOT committed; the recipe + local inputs are.
+Switches:
+  --[no-]risc-os-4-support      
+        
+        Patch the RO400 hook for RISC OS 4.02.
+
+  --[no-]multi-rom-safe         
+  
+        Switch Choices.Boot per OS.
+
+  --[no-]packages-in-rafs       
+  
+        RaFS-wrap !Packages for long names.
+
+  --minimal             
+  
+        Boot structure only -- skip apps, content, and overlays.
 """
 import os, sys, json, shutil, hashlib, subprocess, argparse
 from pathlib import Path
@@ -141,6 +151,103 @@ def write_basic64_fallback(out):
     (lib / 'BASIC64,feb').write_text(body)  # type &FEB = Obey
 
 
+def patch_ro400_configure(out):
+    """Give RISC OS 4.02 its native Configure (ROOL's HardDisc4 only stubs RO4).
+
+    ROOL leaves RO400Hook.Res empty and its PreDesktop BootResources path doesn't
+    descend to the shared 3.x resources, so on 4.02 !Configure never resolves
+    ("You cannot reconfigure this machine"). Replicate RISCOS-Ltd's own RO4 boot:
+    rewrite the path to descend RO400->RO370->...->base, and drop the genuine
+    4.02 !Configure (from the RO439Boot download) into RO400Hook.Res.
+    """
+    pd = out / '!Boot' / 'RO400Hook' / 'Boot' / 'PreDesktop,feb'
+    old = 'Path BootResources Boot:RO400Hook.Res.,<BootResources$Dir>.'
+    new = ('Path BootResources Boot:RO400Hook.Res.,Boot:RO370Hook.Res.,'
+           'Boot:RO360Hook.Res.,Boot:RO350Hook.Res.,Boot:RO310Hook.Res.,'
+           '<BootResources$Dir>.')
+    text = pd.read_text()
+    if old not in text:
+        sys.exit(f"patch_ro400_configure: expected path line not found in {pd}")
+    pd.write_text(text.replace(old, new, 1))
+    # The genuine RISC OS 4 Configure comes from the RISCOS-Ltd 4.39 recovery
+    # boot (RO439Boot -- proprietary, downloaded, never committed).
+    src_res = STAGE / 'RO439Boot' / '!Boot' / 'RO400Hook' / 'Res'
+    res = out / '!Boot' / 'RO400Hook' / 'Res'
+    res.mkdir(parents=True, exist_ok=True)
+    for item in ('!Configure', 'Configure'):
+        src = src_res / item
+        if not src.exists():
+            sys.exit(f"patch_ro400_configure: {item} missing at {src} "
+                     "(RO439Boot download/extract failed?)")
+        copytree(src, res / item)
+    # RO439Boot's Configure.!InetSetup is a recovery stub (no !RunImage) that
+    # would shadow our complete !InetSetup at !Boot.Resources.Configure and break
+    # Configure->Internet. Drop it so the full one is used. Every other plugin is
+    # complete and kept.
+    stub_inet = res / 'Configure' / '!InetSetup'
+    if stub_inet.exists() and not any(p.name.startswith('!RunImage')
+                                      for p in stub_inet.iterdir()):
+        shutil.rmtree(stub_inet)
+
+
+def drop_ro4_rompatch(out):
+    """Remove ROOL's !!ROMPatch from the RISC OS 4 (RO400Hook) PreDesk sweep.
+
+    On the RISCOS-Ltd RO4 ROM, ROOL's ROM-bug patcher is inapplicable and exits
+    with a code large enough that BootRun's `Repeat` aborts the whole PreDesk
+    sweep ("Repeat: Return code too large"). Since !!ROMPatch sorts first,
+    nothing else runs -- networking never auto-starts. 3.7/5.x ROMs need it and
+    exit cleanly. Diagnosed by spool-tracing the PreDesk sweep on 4.02; see Dev Diary.
+    """
+    predesk = out / '!Boot' / 'RO400Hook' / 'Boot' / 'PreDesk'
+    run = predesk / '!!ROMPatch,feb'
+    payload = predesk / 'ROMPatch'
+    if run.exists():
+        run.unlink()
+    if payload.exists():
+        shutil.rmtree(payload)
+
+
+def patch_bootrun_per_os_bootcfg(out):
+    """Cache Choices.Boot per OS so one disc can switch RISC OS versions.
+
+    RO<ver>Hook selects version-correct boot files, but SetChoices only copies
+    them into the writable Choices.Boot when it's absent -- so on a shared disc
+    the first OS to boot stamps Choices.Boot and the rest reuse it (wrong
+    BootResources chain -> broken Configure). Inject a swap into BootRun (before
+    SetChoices) that stashes the live Boot under its owner's OS tag and restores
+    this OS's copy; BootOwner records the owner. Leaves Choices$Write untouched so
+    app configs stay shared.
+    """
+    br = out / '!Boot' / 'Utils' / 'BootRun,feb'
+    anchor = '/<Boot$Dir>.Utils.SetChoices'
+    inject = (
+        "| --- Per-OS Choices.Boot cache ------------------------------------------\n"
+        "| Stash the live Boot under its owner's OS tag, restore this OS's copy;\n"
+        "| BootOwner records the owner. Keeps the rest of Choices shared.\n"
+        "IfThere <Boot$Dir>.^.!Choices Then Set Boot$CfgDir <Boot$Dir>.^.!Choices Else Set Boot$CfgDir <Boot$Dir>.Choices\n"
+        "Set Boot$OSTag RO<Boot$OSVersion>\n"
+        "Set Boot$BootOwner none\n"
+        "IfThere <Boot$CfgDir>.BootOwner Then Obey <Boot$CfgDir>.BootOwner\n"
+        "Set Boot$DoSwap yes\n"
+        'If "<Boot$BootOwner>" = "<Boot$OSTag>" Then Set Boot$DoSwap no\n'
+        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot Then Rename <Boot$CfgDir>.Boot <Boot$CfgDir>.Boot-<Boot$BootOwner>\n'
+        'If "<Boot$DoSwap>" = "yes" Then IfThere <Boot$CfgDir>.Boot-<Boot$OSTag> Then Rename <Boot$CfgDir>.Boot-<Boot$OSTag> <Boot$CfgDir>.Boot\n'
+        'If "<Boot$DoSwap>" = "yes" Then Echo Set Boot$BootOwner <Boot$OSTag> { > <Boot$CfgDir>.BootOwner }\n'
+        "Unset Boot$DoSwap\n"
+        "Unset Boot$OSTag\n"
+        "Unset Boot$BootOwner\n"
+        "Unset Boot$CfgDir\n"
+        "| ------------------------------------------------------------------------\n"
+    )
+    text = br.read_text()
+    if anchor not in text:
+        sys.exit(f"patch_bootrun_per_os_bootcfg: SetChoices call not found in {br}")
+    if 'Per-OS Choices.Boot cache' in text:
+        sys.exit(f"patch_bootrun_per_os_bootcfg: already patched in {br}")
+    br.write_text(text.replace(anchor, inject + anchor, 1))
+
+
 def copytree(src, dst):
     shutil.copytree(src, dst, dirs_exist_ok=True)
 
@@ -228,14 +335,39 @@ def place_children_add_missing(src_container, tgt_container):
 
 def main():
     ap = argparse.ArgumentParser(description="Build the universal RISC OS !Boot tree.")
-    ap.add_argument('--format', choices=['e', 'f'], default='e', dest='fmt',
-                    help="target FileCore format: 'e' = RISC OS 3.7 (10-char names; "
-                         "!Packages via a RaFS volume, RaFS off the boot path) [default]; "
-                         "'f' = RISC OS 4.02/5.30 (native long names; plain !Packages in "
-                         "!Boot.Resources, no RaFS)")
-    fmt = ap.parse_args().fmt
-    log(f"== target FileCore format: {fmt.upper()} "
-        f"({'3.7 -- RaFS-wrapped !Packages' if fmt == 'e' else '4.02/5.30 -- plain !Packages, no RaFS'}) ==")
+    ap.add_argument('--packages-in-rafs', action=argparse.BooleanOptionalAction,
+                    default=False, dest='packages_in_rafs',
+                    help="wrap !Packages in a RaFS volume so it gets long names on a "
+                         "10-char (E-format) FileCore. Needed for RISC OS < 4.00. Off by "
+                         "default (--no-packages-in-rafs); a plain !Packages is placed.")
+    ap.add_argument('--risc-os-4-support', action=argparse.BooleanOptionalAction,
+                    default=True, dest='ro4_support',
+                    help="patch the RO400 hook so RISC OS 4.02 gets its native Configure "
+                         "(BootResources descent + real 4.02 !Configure from RO439Boot) and "
+                         "drop ROOL's !!ROMPatch, which aborts the RO4 PreDesk sweep. Touches "
+                         "only RO400Hook, so it's inert on 3.7/5.x. On by default; "
+                         "--no-risc-os-4-support for a vanilla ROOL boot.")
+    ap.add_argument('--multi-rom-safe', action=argparse.BooleanOptionalAction,
+                    default=True, dest='multi_rom_safe',
+                    help="cache Choices.Boot per OS so one disc can be shared across RISC OS "
+                         "versions without the first-booted OS stamping everyone's boot. On by "
+                         "default; --no-multi-rom-safe to leave Choices.Boot shared.")
+    ap.add_argument('--minimal', action='store_true',
+                    help="boot structure only -- skip apps, content, and local overlays. "
+                         "Compose with the patch flags to isolate a boot/OS/emulator problem "
+                         "from the app payload.")
+    args = ap.parse_args()
+    packages_in_rafs = args.packages_in_rafs
+    ro4_support = args.ro4_support
+    multi_rom_safe = args.multi_rom_safe
+    minimal = args.minimal
+    log("== !Packages mode: "
+        f"{'RaFS-wrapped (real 10-char E-format FileCore)' if packages_in_rafs else 'plain (native long names -- HostFS or F-format FileCore)'} ==")
+    enabled = [n for n, on in (('risc-os-4-support', ro4_support),
+                               ('multi-rom-safe', multi_rom_safe)) if on]
+    log(f"== boot patches: {', '.join(enabled) if enabled else 'none (vanilla ROOL boot)'} ==")
+    if minimal:
+        log("== MINIMAL build: boot structure only (no apps/content/overlays) ==")
 
     cfg = json.load(open(HERE / 'sources.json'))
     sources = cfg['sources']
@@ -269,10 +401,23 @@ def main():
     )
     write_basic64_fallback(OUT)
 
+    log("== 4b. boot-structure patches ==")
+    if ro4_support:
+        patch_ro400_configure(OUT)
+        log("  RO400Hook -> full BootResources descent + real 4.02 !Configure (from RO439Boot)")
+        drop_ro4_rompatch(OUT)
+        log("  RO400Hook -> dropped ROOL !!ROMPatch from PreDesk (aborts the RO4 sweep)")
+    if multi_rom_safe:
+        patch_bootrun_per_os_bootcfg(OUT)
+        log("  BootRun -> caches Choices.Boot per OS (shared disc switches RISC OS versions)")
+    if not (ro4_support or multi_rom_safe):
+        log("  (none enabled -- vanilla ROOL boot)")
+
     log("== 5. place apps (PackMan/PartMgr in Utilities, StrongED/Zap in Apps, RaFS) ==")
-    for p in cfg.get('placements', []):
-        if p.get('only_format') and p['only_format'] != fmt:
-            log(f"  (skip {p['to']} -- only_format={p['only_format']}, building {fmt})")
+    for p in ([] if minimal else cfg.get('placements', [])):
+        if 'packages_in_rafs' in p and p['packages_in_rafs'] != packages_in_rafs:
+            log(f"  (skip {p['to']} -- needs packages_in_rafs={p['packages_in_rafs']}, "
+                f"building packages_in_rafs={packages_in_rafs})")
             continue
         src = REPO / p['repo'] if 'repo' in p else STAGE / p['source'] / p['path']
         dst = OUT / p['to']
@@ -283,7 +428,7 @@ def main():
         log(f"  {p.get('source', p.get('repo'))}{('/' + p['path']) if 'path' in p else ''} -> {p['to']}")
 
     log("== 5b. place whole apps/content the authoritative disc lacks (Acorn 3.7 games/sound/movies/manuals; NO app-merging) ==")
-    for m in cfg.get('content_place', []):
+    for m in ([] if minimal else cfg.get('content_place', [])):
         src = STAGE / m['source'] / m['container']
         if not src.exists():
             sys.exit(f"content_place source missing: {m['source']}/{m['container']}")
@@ -291,7 +436,7 @@ def main():
         log(f"  {m['source']} -> {m['container']}: +{added} placed whole, {kept} kept (authoritative already had)")
 
     log("== 5c. subtree merges (app-bundled !System/!Boot deps, add-missing so ROOL wins overlaps) ==")
-    for m in cfg.get('subtree_merges', []):
+    for m in ([] if minimal else cfg.get('subtree_merges', [])):
         src = STAGE / m['source'] / m['from']
         if not src.exists():
             sys.exit(f"subtree_merge source missing: {m['source']}/{m['from']}")
@@ -300,8 +445,8 @@ def main():
 
     log("== 6. apply local overlays (local/*/ each mirrors disc paths; e.g. acorn = Browse+media, rafs-config) ==")
     # `*.example` dirs are committed placeholder templates, never overlaid.
-    overlays = sorted(p for p in LOCAL.glob('*')
-                      if p.is_dir() and not p.name.endswith('.example')) if LOCAL.exists() else []
+    overlays = [] if minimal else (sorted(p for p in LOCAL.glob('*')
+                      if p.is_dir() and not p.name.endswith('.example')) if LOCAL.exists() else [])
     if not overlays:
         log("  (no local/*/ overlays present)")
     for ov in overlays:

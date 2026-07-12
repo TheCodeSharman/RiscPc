@@ -120,6 +120,14 @@
       "sha256": "1ae859862b96a9b7747d3a7441bdc5202bb662d1f548b4906a292590553b2697",
       "strip": "",
       "role": "PlingStore (!Store) from its official site -- the RISC OS Developments app/software store (browse + buy commercial apps like Heretic). Fresh core (~250 KB) rather than the lived-in 5.9 MB copy in RpcemuBundle. !Store -> Apps."
+    },
+    {
+      "name": "RO439Boot",
+      "file": "439boot.zip",
+      "url": "http://www.riscos.com/ftp_space/439/files/439boot.zip",
+      "sha256": "b7178476e25a7ec5b901adef1a1a902e40d123dda4b26e824861b56bc28a02fc",
+      "strip": "",
+      "role": "RISC OS 4.39 (Adjust) recovery !Boot from 3QD Developments / RISCOS-Ltd (riscos.com FTP). PROPRIETARY, personal-use licence -- the zip is downloaded (git-ignored) and unpacked, NEVER committed; only this recipe is. A plain Acorn zip (roextract reads it natively, unlike 4.02's XFIL0 ro4install.zip which needs !RO4INSTAL run in RISC OS). Used as the source of the GENUINE RISCOS-Ltd Configure that ROOL's HardDisc4 stubs out for RISC OS 4: build.py (patch_ro400_configure) lifts its RO400Hook.Res.{!Configure,Configure} into our RO400Hook.Res. Also carries RO420Hook/RO430Hook + !System/420, i.e. everything needed to add full Adjust support later."
     }
   ],
   "_placements_comment": "After HardDisc4 is laid down and !System merged, copy each app subtree from an extracted source (or from this repo) onto the disc. Paths are relative to each extracted source's root (post-strip). RaFS comes from this repo, already ,xxx-typed. The user-visible editors (!StrongED, !Zap) go in $.Apps; their satellite resource/config dirs go where each app's own !Run looks them up: !ZapFonts -> BootResources (!Boot.Resources), !ZapUser + !StrED_cfg -> Choices$Write (!Boot.Choices). See each app's Install doc / StartUp.SetupCfg.",
@@ -131,9 +139,9 @@
     { "source": "Zap",      "path": "!Zap",                     "to": "Apps/!Zap" },
     { "source": "Zap",      "path": "!ZapFonts",                "to": "!Boot/Resources/!ZapFonts" },
     { "source": "Zap",      "path": "!ZapUser",                 "to": "!Boot/Choices/!ZapUser" },
-    { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS",           "only_format": "e", "_note": "E-format only: RaFS gives !Packages long names on 10-char FileCore" },
-    { "repo": "tools/riscos-boot-build/vendor/PkgDisc/Pkg",     "to": "!Boot/Resources/Pkg",       "only_format": "e", "_note": "E-format only: the RaFS-wrapped !Packages the PackMan !Run hook mounts on launch" },
-    { "repo": "tools/riscos-boot-build/vendor/PackMan/!PackMan/Resources/!Packages", "to": "!Boot/Resources/!Packages", "only_format": "f", "_note": "F-format only: plain !Packages the boot Filer_Boots -- native long names, no RaFS" },
+    { "repo": "rafs/rafs116/!raFS",                             "to": "Utilities/!RaFS",           "packages_in_rafs": true,  "_note": "RaFS mode only: RaFS gives !Packages long names on a real 10-char (E-format) FileCore" },
+    { "repo": "tools/riscos-boot-build/vendor/PkgDisc/Pkg",     "to": "!Boot/Resources/Pkg",       "packages_in_rafs": true,  "_note": "RaFS mode only: the RaFS-wrapped !Packages the PackMan !Run hook mounts on launch" },
+    { "repo": "tools/riscos-boot-build/vendor/PackMan/!PackMan/Resources/!Packages", "to": "!Boot/Resources/!Packages", "packages_in_rafs": false, "_note": "plain mode (default): plain !Packages the boot Filer_Boots -- native long names (HostFS, or F-format FileCore), no RaFS" },
     { "repo": "tools/riscos-boot-build/vendor/URLFetch/Modules", "to": "!Boot/Resources/!System/310/Modules/Network/URL" },
     { "source": "MakeModes",  "path": "Utilities/Developer/!MakeModes", "to": "Utilities/!MakeModes" },
     { "source": "AcornApps",  "path": "Apps/!ARPlayer",     "to": "Apps/!ARPlayer" },

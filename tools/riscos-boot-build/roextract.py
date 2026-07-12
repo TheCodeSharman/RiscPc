@@ -15,6 +15,19 @@ so filetype = (load>>8)&0xFFF and the 40-bit datestamp = ((load&0xFF)<<32)|exec
 """
 import zipfile, struct, os
 
+# Python 3.13's zipfile validates extra-fields strictly at open time and rejects
+# some older RISC OS zips (e.g. the RISCOS-Ltd 1999 ro4install.zip) with
+# "Corrupt extra field". We recover the Acorn filetype from the raw extra-field
+# bytes ourselves (acorn_meta below) and never rely on the stdlib's decode, so
+# make it lenient rather than fatal -- otherwise the archive can't even be opened.
+_zi_decodeExtra = zipfile.ZipInfo._decodeExtra
+def _lenient_decodeExtra(self, *a, **k):
+    try:
+        return _zi_decodeExtra(self, *a, **k)
+    except Exception:
+        pass
+zipfile.ZipInfo._decodeExtra = _lenient_decodeExtra
+
 
 def acorn_meta(extra: bytes):
     """Return {load, exec, ftype, stamp} from the Acorn extra-field, or None."""
