@@ -1797,3 +1797,74 @@ per OS too. Committed + pushed. Full detail in the handover
 
 Open, in priority: (1) factory-CMOS reconstruction + CMOSSwap seed-from-factory,
 (2) auto reset-vector stub, (3) decode ResetCMOS / cross-check.
+
+### Jul 12 (later still) — ROM switching *resolved*: only the unplug mask is per-OS (`UnplugSwap`)
+
+Took the factory-CMOS plan above, hit a wall on-screen, and the failure walked us
+to the correct — and much smaller — fix. End-to-end validated on `installs/riscos-multi`
+across **3.7 ↔ 4.02 ↔ 5.30**. The journey, because each dead-end taught the shape of
+the answer:
+
+1. **Factory CMOS (built it, reverted it).** Reconstructed the 3.7 factory image
+   from `s/NewReset` `DefaultCMOSTable` + `Hdr:CMOS` (parser evaluates the ObjAsm
+   `:SHL:`/`:OR:`, `2_` binary, `&` hex, `[ ]` conditionals; checksum per
+   `ValChecksum`) — **validated byte-exact** against a real `cmos.ram` (25 static
+   table locations match; the 7 diffs are all dynamic: RTC year, configured FS,
+   RMA size, `CMOSResetBit`). Then discovered the 4.02/5.x `RO400Hook`/`RO500Hook`
+   `ResetCMOS` files *are* SaveCMOS images (240 bytes + a 4-byte LE OS-version
+   trailer, `&172`/`&190`/`&1F4`), so no blob-decode needed. **But** seeding a new
+   OS from *any* full CMOS image resets the boot device / filing system to ROM
+   defaults (ADFS) → **"Disc drive not known"** on the next boot. The `!Boot` tree
+   boots HostFS; machine config is shared, not per-OS. Reverted.
+
+2. **Clear-on-swap (built it, reverted it).** MS's insight: the factory masks are
+   all-clear, so the unplugs must come from `!Boot`, not CMOS — and indeed
+   `!Boot.Resources.!Internet.!Run` does `*Unplug InternetA/Netmsgs/Accmsgs` (kill
+   the obsolete ROM Internet stack so the disc stack loads). So the mask is a cache
+   of *name-based* unplugs; on a swap, clear it and let the OS re-assert its own by
+   name. Clean in theory — **failed in practice**: 3.7 doesn't re-assert its mask
+   every boot (it's set once, by interactive Configure, not by a boot script), so a
+   cleared mask stays lost → **"Route: C70: Network is unreachable"**. Confirmed the
+   diagnosis by poking `&13=&08` back by hand (`OS_Byte 162`) and resetting — 3.7
+   networking returned.
+
+3. **Per-OS unplug snapshot (`UnplugSwap`) — the fix.** Save the outgoing OS's
+   **13 unplug bytes** (Kernel `UnplugCMOSTable` `Unplug7..17` + `ExtnUnplug1/2` —
+   found via `s/ModHand`) to `Choices.Unplug-<owner>`, restore the incoming OS's
+   from `Unplug-<tag>` (clear if never seen). **Only** those 13 bytes — machine
+   config is never touched, so no "Disc drive not known". The position-keying made
+   flesh: the *same* `*Unplug InternetA` lands on `&13` **bit 3** under 3.7 but
+   **bit 1** under 4.02 (`&08` vs `&02`), which is exactly why a shared mask hits
+   3.7's core `Net`/`BootNet`. Round-trip proven: `RO370:&13=&08`, `RO400:&13=&02`,
+   `RO530: clear`, each saved and restored independently; `FileLang` stayed `&99`
+   (HostFS) the whole time.
+
+**Two latent `BootRun` bugs** surfaced once the trailing-space one stopped masking
+the other (both pre-existing in the per-OS `Choices` patch):
+
+- **Trailing space.** `Echo Set X <tag> { > file }` echoes the space before `{`, so
+  `BootOwner` stored `"RO370 "` and never matched `"RO370"` → a spurious swap +
+  restart prompt on every reboot. Fix: drop the space (`<tag>{ >`). Verified with a
+  live `Echo AAA{ > z1 }` vs `Echo BBB { > z2 }` diff in RISC OS.
+- **Conditional-redirect truncation.** `If <cond> Then Echo .. { > file }` *opens
+  and truncates* the file even when the `If` is false — so on a same-OS reboot the
+  guarded write **blanked** `BootOwner` (which then re-triggered a swap). Fix: write
+  `BootOwner` unconditionally — the owner is always this OS after a boot completes.
+
+**Checksum red herring (MS made me verify).** I'd assumed RO5 computes the CMOS
+checksum differently (its `RO500Hook.ResetCMOS` stores `&65` where the RO3 algorithm
+says `&3D`). Wrong: `diff`ing RO3.70 vs the ROOL-5 `s/PMF/i2cutils` shows
+`ValChecksum` is **byte-identical** — same seed, mangle, loop. The `&65` is just a
+build artifact of the reset image (RO5's `NewReset` calls `MakeChecksum` to recompute
+after applying it). Live `cmos.ram` validates `&D8==&D8`. So there's no RO3↔RO5
+checksum incompatibility — which is why swapping 5.30→3.7 threw no beeps or warnings.
+
+Also learned RPCEmu's CMOS is faithful: `cmos_init()` loads `cmos.ram` once at
+startup, `resetrpc()` does **not** re-read it (in-memory `cmosram[]` persists across
+a soft reset, like the real PCF8583), and `savecmos()` fires whenever RISC OS writes
+the checksum byte — so the file tracks live state, and Reset behaves like hardware.
+
+Net: `vendor/CMOSSwap/` → `vendor/UnplugSwap/`; the switcher now caches
+`Choices.Boot`/`Choices.Internet` and the 13-byte unplug mask per OS, with the
+apply-timing restart prompt unchanged. ROM switching works. Still open: the
+*automatic* reset-vector stub to replace the manual restart prompt (nice-to-have).
