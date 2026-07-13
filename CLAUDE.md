@@ -103,15 +103,16 @@ Before writing a new script, look here — these already exist. Don't reimplemen
   - **No tokeniser** (text→`,ffb`) here — it's detokenise-only, for reading/diffing. To *edit* a
     `,ffb`, do it inside RISC OS (or write it back through a real BBC BASIC), not with this tool.
 
-- **`tools/riscos-boot-build/build.py`** — the authoritative **universal RISC OS `!Boot` builder**
-  (bundle-free; downloads + sha256-verifies official sources per `sources.json`, then assembles a
-  disc tree that boots on RISC OS 3.7 / 4.02 / 5.x). Helpers: `roextract.py` (archive→HostFS
-  `,xxx`-typed extraction), `rozip.py`. Boot patches are **on by default** (opt out with `--no-*`):
-  `--[no-]risc-os-4-support` (RO400 native Configure + drop ROOL's `!!ROMPatch`; inert on 3.7/5.x) and
-  `--[no-]multi-rom-safe` (per-OS `Choices.Boot` cache, for a disc shared across ROMs). Other flags:
-  `--minimal` (boot structure only — no apps/content/overlays; compose with the patch flags) and
-  `--[no-]packages-in-rafs` (RaFS-wrap `!Packages` for a real 10-char E-format FileCore; RISC OS < 4.00, off by default).
-  Consumed by the rpcemu repo's `tools/setup-install.sh` to produce `installs/<name>/`.
+- **RISC OS `!Boot` builder (`build.py`) — MOVED to the rpcemu repo.** The
+  authoritative **universal RISC OS `!Boot` builder** now lives at
+  `../rpcemu/tools/riscos-boot-build/` (relocated 2026-07-13 so the emulator's
+  `setup-install.sh`, its only consumer, is self-contained rather than cross-repo).
+  It is bundle-free: downloads + sha256-verifies official sources per `sources.json`,
+  then assembles a disc tree that boots on RISC OS 3.7 / 4.02 / 5.x. Helpers:
+  `roextract.py` (archive→HostFS `,xxx`-typed extraction), `rozip.py`. Boot patches
+  on by default (`--[no-]risc-os-4-support`, `--[no-]multi-rom-safe`); other flags
+  `--minimal`, `--[no-]packages-in-rafs`. Consumed by the rpcemu repo's
+  `tools/setup-install.sh` to produce `installs/<name>/`. See that repo for details.
 
 - **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
 - **`acorn-post/decoders/`** — sigrok POST decoders (see above).
