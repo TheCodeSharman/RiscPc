@@ -20,6 +20,10 @@
           "ARM Assembler (Acorn)"
         ],
         "extensions": [],
+        "filenamePatterns": [
+          "**/s/*",
+          "**/hdr/*"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
