@@ -8,3 +8,9 @@
 [submodule "external/FileCore"]
 	path = external/FileCore
 	url = https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/FileCore.git
+[submodule "external/ADFS"]
+	path = external/ADFS
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/ADFS/ADFS.git
+[submodule "external/ADFS4"]
+	path = external/ADFS4
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/ADFS/ADFS4.git
