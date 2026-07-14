@@ -40,13 +40,40 @@ FileCore that can store `A really long filename.txt` in a directory with
 thousands of entries. One machine, one ROM set, one disc — RO 3.71 with modern
 filenames.
 
+**Worked example — a 16 GB SD/CF card as the IDE disc:**
+
+- *Stock RO 3.71:* the card must be split into **4× ≤4 GB** ADFS discs
+  (FileCore 2.98's disc size is a 32-bit **byte** field → 4 GB cap), each with
+  **10-char** filenames. Big-directory / big-disc formats don't exist in
+  FileCore 2.98 at all.
+- *RO 3.71 + FileCore 3.78:* **one 16 GB disc, long filenames, efficient
+  allocation, no ROM swap** — format it F+ (big-disc `BigMap` for >4 GB +
+  `BigDir` for long names). 16 GB is well within the driver's reach: RO 3.70
+  ADFS already does **28-bit LBA = 128 GB** (`ADFS/s/ConstIDE`: LBA0-7/8-15/
+  16-23/24-27). E-based formats would also be space-inefficient at that size
+  (coarser allocation unit / fewer map zones), so F+ is both the capable and
+  the efficient choice.
+
+The addressing/format limit hierarchy on a RiscPC, for reference:
+| Layer | Limit | Notes |
+|---|---|---|
+| ADFS driver (LBA disc) | **128 GB** | 28-bit LBA, already in RO 3.70 ADFS |
+| ADFS driver (CHS disc) | CHS geometry | the `ide-real-geometry` concern |
+| FileCore E/F format | **4 GB / disc** | 32-bit byte `DiscRecord_DiscSize` |
+| FileCore F+/BigMap | 64-bit size | `BigMap_DiscSize2`; needs FileCore 3.78 |
+
 ## The plan
 
 1. Build **FileCore 3.78** for the **IOMD / non-HAL** target (and, if needed,
    `No32bitCode {TRUE}` for a 26-bit kernel — see feasibility below), with
    `BigDir` (+ `BigDisc`/`BigMaps`/`FullAtts`) enabled.
 2. Pair it with **RO 3.70/3.71 ADFS** as the low-level disc driver (the ROM
-   ADFS, unchanged — see interface note below).
+   ADFS, unchanged — see interface note below). Note: **`external/ADFS4` is NOT
+   the driver to use here** — despite the name it's a modern **C rewrite** of
+   ADFS (v4.07, CDDL) that splits the hardware driver into a separate module and
+   currently only has an **AHCI SATA** backend; it has **no PATA/IDE driver**,
+   so it can't talk to the RiscPC's IDE at all. The original asm ADFS is what
+   has the IDE driver (and 28-bit LBA).
 3. Get it into the running system either by **RMLoading it over the ROM
    FileCore** (fiddly — FileCore is foundational and instantiated early) or by
    **rebuilding a 3.7 ROM image** with the newer FileCore module.
@@ -160,5 +187,9 @@ raw sectors would need to be big-dir-aware.
   `hdr/FileCore`.
 - `external/ADFS` @ `RO_3_70` — `s/Adfs50` (FileCore_Create), `s/Adfs12`
   (WinLowLevel entry conventions), `hdr/ADFS`.
-- RISC OS PRM, ADFS chapter (LBA/format background); ROOL shared-source vs
-  Apache licensing (ADFS/FileCore are Apache/anon).
+- `external/ADFS4` — a *separate* modern C rewrite of ADFS (v4.07, AHCI-only, no
+  IDE driver), for comparison only; not part of the backport path.
+- Licensing: **FileCore and the original ADFS are Apache-2.0**; **ADFS4 is
+  CDDL** (RISCOS-Ltd lineage). All three clone anonymously. (Corrects the
+  submodule-add commit, which wrongly called ADFS4 Apache.)
+- RISC OS PRM, ADFS chapter (LBA / disc-format background).
