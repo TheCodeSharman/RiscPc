@@ -5,3 +5,6 @@
 	path = external/HdrSrc
 	url = https://gitlab.riscosopen.org/RiscOS/Sources/Programmer/HdrSrc.git
 	branch = master
+[submodule "external/FileCore"]
+	path = external/FileCore
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/FileCore.git
