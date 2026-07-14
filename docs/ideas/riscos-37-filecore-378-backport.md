@@ -21,10 +21,13 @@ API and never parses the on-disc format. So if you can drop a newer FileCore
 into a 3.7 system, the *whole* system gets the new format for free, without a
 RO4/RO5 ROM.
 
-> Terminology note: the user's shorthand "L format" here means **long filenames
-> + large directories** — technically the RISC OS 4 **big-directory** format
-> (E+/F+), which FileCore provides via its `BigDir` (and `BigDisc`/`BigMaps`)
-> build switches. (Not the old 640 KB "L" *floppy* format.)
+> The format: RISC OS 4's **big-directory format** (a.k.a. "new directory"
+> format). Long filenames and large directories are one and the same feature —
+> the big-directory structure stores names up to **255 chars** (vs the old
+> 10-char limit) and thousands of entries per directory. Discs using it are
+> formatted **E+** or **F+**; FileCore provides it via its **`BigDir`** build
+> switch (with `BigDisc`/`BigMaps`/`BigSectors` for the related large-disc /
+> large-map / large-sector formats).
 
 ## Why it matters
 
