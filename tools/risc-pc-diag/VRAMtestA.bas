@@ -8,11 +8,12 @@
    80 REM already force every LDR/STR past the cache. This is why, unlike RAMtestA
    90 REM (DRAM, needs *Cache Off), this variant does no cache/CP15 poking at all.
   100 REM
-  110 REM COVERAGE: to test ALL 2MB, reserve all VRAM as screen first:
-  120 REM   *Configure ScreenSize 2048K   then REBOOT.
-  130 REM We read ScreenStart (VduVar 148) + TotalScreenSize (VduVar 150) at run
-  140 REM time and March exactly that region ONCE (the doubly-mapped second copy
-  150 REM sits after it - do NOT march 2x). Display mode is irrelevant to coverage.
+  110 REM COVERAGE: we grow the SCREEN dynamic area (area 2) to its max (= the VRAM
+  120 REM size, 1MB or 2MB) at startup with OS_ChangeDynamicArea - so all VRAM is
+  125 REM reserved as screen with NO *Configure ScreenSize / reboot. We then read
+  130 REM ScreenStart (VduVar 148) + TotalScreenSize (VduVar 150) at run time and
+  140 REM March exactly that region ONCE (the doubly-mapped second copy sits after
+  150 REM it - do NOT march 2x). Display mode is irrelevant to coverage.
   160 REM
   170 REM WIGGLE TEST: runs continuously (ESC to stop). BEEPS (VDU7) and logs on
   180 REM any fault, so an error correlates audibly with the instant you wiggle
@@ -143,6 +144,11 @@
  1430 IF logh% = 0 THEN PRINT "WARNING: cannot open log '";logfile$;"'"
  1440 firstA% = -1 : errs% = 0
  1450 :
+ 1452 REM grow the screen dynamic area (area 2) to its max (= VRAM size) so ALL VRAM
+ 1454 REM is reserved as screen - no *Configure ScreenSize / reboot needed.
+ 1456 SYS "OS_ReadDynamicArea", (2 OR &80) TO ,,scrmax%
+ 1458 SYS "OS_ReadDynamicArea", 2 TO ,scrcur%
+ 1459 IF scrcur% < scrmax% THEN SYS "XOS_ChangeDynamicArea", 2, scrmax% - scrcur%
  1460 REM ScreenStart (VduVar 148) + TotalScreenSize (VduVar 150) - see hdr/VduExt.
  1470 DIM v% 12, r% 12
  1480 v%!0 = 148 : v%!4 = 150 : v%!8 = -1
@@ -154,8 +160,8 @@
  1540 DIM pb% 31
  1550 pb%!0 = base% : pb%!4 = top%
  1560 PROClog("=== VRAMtestA (ARM March-U over VRAM/screen, no cache-off) ===")
- 1570 PROClog("region base &"+STR$~base%+" top &"+STR$~top%+"  size "+STR$(size%/&100000)+"MB ("+STR$size%+" bytes)")
- 1580 IF size% < &200000 THEN PROClog("WARNING: <2MB reserved - *Configure ScreenSize 2048K and reboot to cover all VRAM")
+ 1570 PROClog("VRAM "+STR$(scrmax%/&100000)+"MB (all reserved as screen); marching base &"+STR$~base%+" top &"+STR$~top%+" = "+STR$(size%/&100000)+"MB ("+STR$size%+" bytes)")
+ 1580 IF size% < scrmax% THEN PROClog("WARNING: screen "+STR$(size%/&100000)+"MB < VRAM max "+STR$(scrmax%/&100000)+"MB - auto-grow fell short (some VRAM in use?)")
  1590 PROClog("continuous - wiggle the VRAM; beep+log on fault. ESC to stop.")
  1600 PRINT "Any key to start (screen WILL corrupt - that's the RAM under test)..."; : g% = GET : PRINT
  1610 :
