@@ -100,38 +100,26 @@ Both run the **March-U** algorithm (13N: `M0(w0) M1⇑(r0,w1,r1,w0) M2⇑(r0,w1)
 M3⇓(r1,w0,r0,w1) M4⇓(r1,w0)`), detecting stuck-at, transition, address-decoder
 and coupling faults, over two backgrounds (0/FF, AA/55). Both use a **hand-written
 ARM-code inner loop** (orders of magnitude faster than interpreted BASIC — the
-interpreted originals `RAMtest.bas` / `MarchU.bas` are removed as obsolete). Both
-report the failing **data bit(s)** (expected EOR got) → cross-map to the D-line
-table above: a bit matching a **known-bad bus line** means the **bus**, not a
-SIMM/VRAM chip; a lone failing address means a **cell** (or, for `VRAMtestA`, a
-socket contact).
+interpreted originals `RAMtest.bas` / `MarchU.bas`, and the DIM-based `RAMtestA.bas`
+it superseded, are removed as obsolete). Both report the failing **data bit(s)**
+(expected EOR got) → cross-map to the D-line table above: a bit matching a
+**known-bad bus line** means the **bus**, not a SIMM/VRAM chip; a lone failing
+address means a **cell** (or, for `VRAMtestA`, a socket contact).
 
 > **Why a March test needs the cache bypassed.** March relies on ordered accesses
 > that actually reach the cells; a CPU data cache returns just-written values from
-> cache and *masks* the faults March hunts. So the read path must bypass cache —
-> either globally via `*Cache Off` (`RAMtestA`, for cacheable DRAM), or by using
-> inherently non-cacheable RAM: screen/VRAM (`VRAMtestA`) or a purpose-made
-> **non-cacheable dynamic area** (`RAMtestD`) — both need no cache-off at all.
-
-### `RAMtestA.bas` — DRAM / system bus: fast ARM core, cache OFF
-Marches a big DIM'd block of **DRAM**. Disables cache + write buffer via
-**`*Cache Off`** (RISC OS 3.5+) — the OS command, so the clean/invalidate is
-CPU-correct and **safe on both the ARM710 and the StrongARM** (no CP15 poking);
-the ARM March core is then plain user-mode LDR/STR reaching DRAM because the cache
-is already off. Restores `*Cache On` on completion and on any error/ESC. Give BASIC
-the biggest slot you can so the block spans more physical RAM; it can't test RAM
-the OS itself holds. Logging is **per-CALL** (per background) — coarser than the
-old per-element `RAMlog`, but each CALL is quick. **Logs** to `RAMlogA`, flushed
-per line (`OS_Args 255`), so a crash/reset still leaves a valid log — run it from a
-writable dir on the (now-reliable) SD.
+> cache and *masks* the faults March hunts. So the read path must bypass cache — by
+> using inherently non-cacheable RAM: screen/VRAM (`VRAMtestA`) or a purpose-made
+> **non-cacheable dynamic area** (`RAMtestD`) — both need no `*Cache Off` at all.
 
 ### `RAMtestD.bas` — DRAM beyond the Wimp slot + physical coverage / stick ID
-Like `RAMtestA` but allocates a **non-cacheable + non-bufferable dynamic area**
-(`OS_DynamicArea`, flags `&30` = AP0 user r/w `| NotBufferable | NotCacheable`)
-instead of a `DIM`, and grows it to swallow most of the **free pool** — so it tests
-**far more than the ~28MB app-space cap**, with **no `*Cache Off`** (only this area
+Allocates a **non-cacheable + non-bufferable dynamic area**
+(`OS_DynamicArea`, flags `&30` = AP0 user r/w `| NotBufferable | NotCacheable`),
+and grows it to swallow most of the **free pool** — so it tests
+**far more than the ~28MB app-space cap** a `DIM` is limited to, with **no
+`*Cache Off`** (only this area
 is uncached; the rest of RISC OS stays cached and responsive). Two things the
-DIM-based tester can't do:
+a plain `DIM`-based tester can't do:
 
 - **Physical-coverage log.** Logical≠physical — a DA is backed by scattered free
   pages — so it translates every page **LA→PA** (`OS_Memory 0`, flags `&2200`) and
