@@ -4,6 +4,9 @@
 # direnv / nix dev shell (local cache)
 .direnv/
 
+# MCP server config — machine-specific absolute paths (copy from rpcemu's mcp.json.example)
+.mcp.json
+
 # KiCad
 **/*-backups/
 **/fp-info-cache
