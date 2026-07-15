@@ -104,7 +104,16 @@ the disc yet.
 
 Both run the **March-U** algorithm (13N: `M0(w0) M1⇑(r0,w1,r1,w0) M2⇑(r0,w1)
 M3⇓(r1,w0,r0,w1) M4⇓(r1,w0)`), detecting stuck-at, transition, address-decoder
-and coupling faults, over two backgrounds (0/FF, AA/55). Both use a **hand-written
+and coupling faults, over two backgrounds (0/FF, AA/55). March U is from
+van de Goor & Gaydadjiev, *"March U: a test for unlinked memory faults,"* IEE
+Proc. Circuits, Devices and Systems, **144**(3):155–160, 1997 — **not** the
+earlier `docs/Van de Goor - Using March Tests to Test SRAMs (IEEE 1993).pdf`
+(that paper is the march-test *framework* and covers MATS/March C−/B/G/IFA-13,
+but not March U itself). The IET paper is paywalled; the algorithm and its
+fault-coverage derivation are laid out in full in the co-author's open-access
+PhD thesis, in-repo at `docs/Gaydadjiev - Testing of Modern Semiconductor Memory
+Structures (PhD thesis 2007, defines March U).pdf` (see its March U / U− / UD
+coverage table). Both use a **hand-written
 ARM-code inner loop** (orders of magnitude faster than interpreted BASIC — the
 interpreted originals `RAMtest.bas` / `MarchU.bas`, and the DIM-based `RAMtestA.bas`
 it superseded, are removed as obsolete). Both report the failing **data bit(s)**
