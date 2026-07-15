@@ -110,14 +110,33 @@ Upside: doing this cleanly yields a **reusable StrongARM bare-metal bring-up**
 (cache/MMU/IOMD init) that the retention test and any future bare-metal work
 (e.g. the bus-analyzer validation) can share.
 
-## Reporting — we already decode it
+## Reporting — POST wire (ground truth) + best-effort on-screen
 
+**Primary — POST LCD wire (always available, needs no working display/disc).**
 TestSrc emits the **Acorn POST LCD protocol**, which this repo already reverse-
 engineers and decodes (`ACORN_POST.md`, `acorn-post/decoders/`). So a diag ROM
 can report pass/fail + fault address/bits **over the POST wire we already read
-with the DSLogic** — no display or disc needed. Optionally add a serial dump once
-minimal init is done. This closes a nice loop: the POST decoder we built to
-*understand* the machine becomes the *output channel* for testing it.
+with the DSLogic** — the ground-truth channel, works even on a machine too sick
+to light a screen. Optionally add a **serial dump** once minimal init is done.
+This closes a nice loop: the POST decoder we built to *understand* the machine
+becomes the *output channel* for testing it.
+
+**Nice-to-have — on-screen video summary (when the video path is healthy enough).**
+The POST wire needs a DSLogic + the decoders — gear most people don't have. So,
+*best-effort*, once DRAM/VIDC/VRAM have passed enough to trust them, bring up a
+minimal VIDC20 mode + a tiny text blitter and **print the results on screen** —
+a human-readable pass/fail + fault list anyone can read with just a monitor.
+Caveats that make this secondary, not primary:
+
+- **Chicken-and-egg:** video output *is* the VRAM/VIDC that's partly under test.
+  So run the DRAM line-test + VRAM March **first**, gate display bring-up on them
+  passing, and never let an on-screen "PASS" override a POST/serial fault about
+  the video path itself — a VRAM fault can corrupt or blank the very message
+  reporting it. On-screen is for the common case (RAM suspect, video fine).
+- **Mirror, don't replace:** always emit on the POST wire too, so a capture rig
+  still gets ground truth when the screen can't be trusted (or is the fault).
+- Bounded work: VIDC20 init + a small font blitter into VRAM; the StrongARM
+  bring-up already sets up enough machine state to reach it.
 
 ## Delivery — three paths
 
@@ -163,7 +182,8 @@ minimal init is done. This closes a nice loop: the POST decoder we built to
   stages standalone.
 - **Scope creep:** keep phase 1 to "StrongARM bring-up → boot, line-test,
   March-U all DRAM, report via POST." VRAM March is phase 1b (shares the
-  bring-up). Retention is phase 2.
+  bring-up). On-screen video summary is phase 1c (nice-to-have, gated on the
+  video path passing). Retention is phase 2.
 
 ## Status / trigger
 
