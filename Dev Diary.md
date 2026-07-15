@@ -1900,3 +1900,45 @@ VRAM/other bucket → the emulator scatter *was* an RPCEmu artefact, not real IO
 sticks: **PASS, zero faults** — both replaced DRAM sockets make good contact
 full-stick. The untested ~3 MB is the OS-resident set (kernel/RMA/page tables/the
 program); reaching those cells would need the bare-metal POST tests.
+
+### Jul 15 — Greaseweazle set up; RISC OS 3.70 Install floppies archived
+Got the **Greaseweazle V4** (fw 1.6) onto the bench and used it to preserve the
+4-disc **RISC OS 3.70 Install** set. Install went into `nix-config` declaratively
+(`modules/nixos/electronics.nix`): the `greaseweazle` package gives `gw`, but
+nixpkgs ships **no udev rules**, so I ported upstream `49-greaseweazle.rules`
+(ModemManager/MTP ignore, `uaccess` + `dialout`/`0660` for headless, `/dev/greaseweazle`
+symlink). Same commit batch also added baseline diagnostics (ddrescue, smartmontools,
+pciutils/usbutils, lsof, tcpdump, …) and the MCP Python SDK. Two focused commits,
+pushed. First `gw info` failed with **`Seek: Track 0 not found`** — pure
+drive-select: the drive sits on the pre-twist/middle cable connector = unit 1, so
+**`--drive=1`** is mandatory here.
+
+**Archive method: SCP flux masters, decode to `.adf` offline.** Read once, never
+touch the physical disc again; `.scp` is lossless so any format can be re-derived.
+Verify = `gw convert --format acorn.adfs.1600` and read the sector map — a good HD
+disc is **1600/1600**.
+
+The head-0 saga (a proper fault-find):
+- **Disc 1, first read → 50%.** Head 1 flawless (10/10 × 80 tracks), head 0 a
+  uniform **0/80** — *but flux was present* (~85% of head 1's density). Flux-present
+  yet zero-decode across a whole side = a **read fault, not the disc/format**.
+  (MS guessed 800K discs; disproved empirically — as `.800` it decodes 0/800, as
+  `.1600` one side gives 10 sectors/track = HD geometry, DD would be 5.)
+- **Cleaning the heads (100% IPA, lint-free swab) changed nothing** → rules out
+  dirt; head 0 itself is bad. DeoxIT explicitly *not* used on heads (leaves a film;
+  it's for contacts).
+- **Disc 2 on the same drive → 68%, head 0 = 17/80.** A head that fails *differently
+  per disc* is a marginal drive head, not damaged media (head 1 always 80/80).
+  Conclusive: swap the FDD.
+- **Second FDD → disc 1 at 94%** (head 0 68/80; failures clustered on the
+  high-density **inner** tracks 64–77, flux present) = still-marginal head 0.
+  **Clean that drive's head 0 + re-read at `--revs=5 --retries=8` → 100%.**
+
+All four then read clean: **1600/1600, both heads 80/80**, every `.adf` exactly
+1,638,400 bytes. Wrote `SHA256SUMS` for the `.scp` masters + `.adf`s. Standing
+recipe: `gw read --drive=1 --revs=5 --retries=8` → `gw convert --format
+acorn.adfs.1600`. Lessons banked: *flux-present-but-0-sectors = drive/head, never
+media*; a bad head fails differently per disc while bad media is consistent; clean
+**every** drive before use; `--revs=5` matters for inner tracks. Archive lives in
+`~/riscpc-archive/floppy-images/`. Open/nice-to-have: back the masters off-bench;
+smoke-test an `.adf` under RPCEmu.
