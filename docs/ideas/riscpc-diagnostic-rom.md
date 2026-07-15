@@ -134,6 +134,15 @@ still display fine:
   Where the tests found a good region, **place the framebuffer there** (pick a
   passing page range for the visible screen) so the summary survives faults
   elsewhere.
+- **Two independent framebuffer sources — fall back across memory types.** The
+  RISC PC can source the display from **DRAM as well as VRAM** — VIDC20's fetch
+  path is configurable via IOMD, and VRAM-less machines already run a DRAM
+  framebuffer by default. So if **VRAM is bad, show the summary from a good DRAM
+  region — and vice versa**; the diag picks whichever memory tested good to hold
+  the visible framebuffer, and can display even with an *entire* memory type dead.
+  It also **doubles as a localiser**: which source successfully displays tells you
+  which path is healthy — e.g. VRAM screen garbled but DRAM screen clean ⇒ the
+  fault is in the VRAM / VIDC-serial (SAM) path, not the CPU/DRAM/IOMD side.
 - **Partial / stuck-line faults often stay legible.** A stuck data line corrupts
   colour/intensity but not glyph *shape*, so high-contrast text reads through it.
   Render for that: choose foreground/background that stay visibly distinct under
@@ -186,6 +195,11 @@ still display fine:
 - **IOMD refresh gating:** exact register, minimum safe refresh-off window, and
   guaranteed re-enable before returning to anything that needs RAM. Primary
   unknown; everything else is a port.
+- **DRAM-sourced display with VRAM fitted:** confirm IOMD/VIDC20 can be forced to
+  DMA the framebuffer from DRAM *even when VRAM is present* (VRAM-less machines do
+  it by default; the open bit is whether a VRAM-fitted board allows it), plus the
+  mode/bandwidth limits of DRAM-source (no dual-port SAM) — a low-res text summary
+  should fit comfortably either way.
 - **StrongARM port (prerequisite):** TestSrc has no SA-110 support, and the
   target is a StrongARM — so the port (clock-independent timing + SA-110
   cache/CP15 bring-up, see above) gates even phase 1. It's the largest genuinely
