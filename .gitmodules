@@ -14,3 +14,12 @@
 [submodule "external/ADFS4"]
 	path = external/ADFS4
 	url = https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/ADFS/ADFS4.git
+[submodule "external/BASIC"]
+	path = external/BASIC
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/Programmer/BASIC.git
+[submodule "external/Desktop"]
+	path = external/Desktop
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/Desktop/Desktop.git
+[submodule "external/Wimp"]
+	path = external/Wimp
+	url = https://gitlab.riscosopen.org/RiscOS/Sources/Desktop/Wimp.git
