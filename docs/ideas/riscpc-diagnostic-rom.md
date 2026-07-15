@@ -121,22 +121,35 @@ to light a screen. Optionally add a **serial dump** once minimal init is done.
 This closes a nice loop: the POST decoder we built to *understand* the machine
 becomes the *output channel* for testing it.
 
-**Nice-to-have — on-screen video summary (when the video path is healthy enough).**
-The POST wire needs a DSLogic + the decoders — gear most people don't have. So,
-*best-effort*, once DRAM/VIDC/VRAM have passed enough to trust them, bring up a
-minimal VIDC20 mode + a tiny text blitter and **print the results on screen** —
-a human-readable pass/fail + fault list anyone can read with just a monitor.
-Caveats that make this secondary, not primary:
+**Nice-to-have — on-screen video summary (always attempt, best-effort).**
+The POST wire needs a DSLogic + the decoders — gear most people don't have. So
+*always try* to also print a human-readable pass/fail + fault list on screen, via
+a minimal VIDC20 mode + a tiny text blitter, so anyone with just a monitor gets
+something. Crucially, **attempt it even when the VRAM/video tests found faults** —
+a partial or garbled screen is itself a useful signal, and the common real cases
+still display fine:
 
-- **Chicken-and-egg:** video output *is* the VRAM/VIDC that's partly under test.
-  So run the DRAM line-test + VRAM March **first**, gate display bring-up on them
-  passing, and never let an on-screen "PASS" override a POST/serial fault about
-  the video path itself — a VRAM fault can corrupt or blank the very message
-  reporting it. On-screen is for the common case (RAM suspect, video fine).
-- **Mirror, don't replace:** always emit on the POST wire too, so a capture rig
-  still gets ground truth when the screen can't be trusted (or is the fault).
+- **Visible ≠ all VRAM.** A low-res text mode scans out only ~150 KB of the 2 MB
+  VRAM, so the displayed region can be perfectly good while *hidden* VRAM is dead.
+  Where the tests found a good region, **place the framebuffer there** (pick a
+  passing page range for the visible screen) so the summary survives faults
+  elsewhere.
+- **Partial / stuck-line faults often stay legible.** A stuck data line corrupts
+  colour/intensity but not glyph *shape*, so high-contrast text reads through it.
+  Render for that: choose foreground/background that stay visibly distinct under
+  any single stuck bit, use big high-contrast glyphs, and **repeat the summary at
+  several screen positions** so a localised corruption can't wipe every copy. A
+  crude **visual fault map** (a grid of bank/region cells, faulty ones flagged)
+  stays readable even when text is marginal.
+- **Don't trust a clean-looking screen; always mirror to POST.** An on-screen
+  "PASS" must not override a POST/serial fault about the video path — a VRAM fault
+  can corrupt the very message reporting it. The POST wire stays the authority and
+  always gets the full result; the screen is a *convenience copy* allowed to be
+  imperfect. (So the change from "gate the display off unless video passes" to
+  "always show, never over-trust": a degraded display still helps, and often the
+  visible path is the healthy part.)
 - Bounded work: VIDC20 init + a small font blitter into VRAM; the StrongARM
-  bring-up already sets up enough machine state to reach it.
+  bring-up already reaches enough machine state.
 
 ## Delivery — three paths
 
@@ -182,8 +195,8 @@ Caveats that make this secondary, not primary:
   stages standalone.
 - **Scope creep:** keep phase 1 to "StrongARM bring-up → boot, line-test,
   March-U all DRAM, report via POST." VRAM March is phase 1b (shares the
-  bring-up). On-screen video summary is phase 1c (nice-to-have, gated on the
-  video path passing). Retention is phase 2.
+  bring-up). On-screen video summary is phase 1c (nice-to-have, always
+  attempted / best-effort, POST stays authoritative). Retention is phase 2.
 
 ## Status / trigger
 
