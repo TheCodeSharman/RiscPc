@@ -92,12 +92,35 @@ with the DSLogic** — no display or disc needed. Optionally add a serial dump o
 minimal init is done. This closes a nice loop: the POST decoder we built to
 *understand* the machine becomes the *output channel* for testing it.
 
-## Delivery
+## Delivery — three paths
 
-Iterate via the **ROM emulator** ([RISC-PC-ROM-EMULATOR.md](RISC-PC-ROM-EMULATOR.md))
-— rebuild the image, reload, no EPROM burns — then optionally blow a real pair of
-27C800s for a permanent bench diag cartridge. ROMCR timing + 5V bus notes are in
-that doc.
+1. **Softload (no extra hardware) — preferred when the machine still boots.**
+   Boot RISC OS normally, then run a loader that copies the diag image into RAM
+   and **enters it via the same mechanism RISC OS 4 (RISCOS Ltd Select/Adjust)
+   and RISC OS 5 use to softload an OS ROM image**. Those softloaders already
+   solve the exact hard problem a bare-metal diag faces: transition from a
+   *running* OS to a *fresh image in RAM*, entered cleanly with the environment
+   torn down (MMU/cache off, IOMD taken over, entered as if from reset) so the
+   image's bring-up code runs against bare hardware. We piggyback on that: once
+   entered, the previous OS is gone and the diag **owns the machine** — so
+   refresh-gating and the retention test still work, with **zero extra hardware**.
+   - *Cost:* can't test the RAM region holding the loader/image (park it in a
+     known bank and test that bank last / from a second softload placed
+     elsewhere), and it needs a machine healthy enough to boot and softload —
+     so it *complements* rather than replaces the ROM path.
+   - *Reuse:* the controlled re-entry overlaps the repo's existing soft-reset
+     study — `external/Kernel/s/NewReset` (`CONT_Break`, the 26-bit IOMD
+     soft-reset path) looked at for the multi-ROM auto-reset work.
+   - *Research:* pin down the RO4/RO5 RiscPC softload entry precisely (image
+     load address, the teardown/re-entry sequence, any signature the reset path
+     checks) and replicate just that for the diag image.
+2. **ROM emulator (iteration).** Serve the image via the emulator
+   ([RISC-PC-ROM-EMULATOR.md](RISC-PC-ROM-EMULATOR.md)) — rebuild, reload, no
+   EPROM burns. Best while developing, and the fallback when the machine **won't
+   boot far enough to softload**.
+3. **Real EPROM (permanent).** Blow a pair of 27C800s for a bench diag cartridge.
+   ROMCR timing + 5V bus notes are in the emulator doc. The only path when the
+   machine is too dead to boot *or* run the emulator's host handshake.
 
 ## Open questions / risks
 
