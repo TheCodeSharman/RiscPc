@@ -29,7 +29,6 @@
   280 logfile$    = "VRAMlog"
   290 hb%         = 8      : REM heartbeat: log an "ok" line every hb% passes
   300 stoponfault%= FALSE  : REM TRUE = stop at first fault; FALSE = keep counting
-  305 verbose%    = FALSE  : REM FALSE = log to file only; TRUE = also echo to screen (which IS the VRAM under test - causes false faults!)
   310 :
   320 REM ---- assemble the March-U routine (identical core to RAMtestA) ----
   330   REM entry R0 = block: +0 base +4 top +8 z +12 o +16 count(out) +20 addr +24 exp +28 got
@@ -164,6 +163,7 @@
  1570 PROClog("VRAM "+STR$(scrmax%/&100000)+"MB (all reserved as screen); marching base &"+STR$~base%+" top &"+STR$~top%+" = "+STR$(size%/&100000)+"MB ("+STR$size%+" bytes)")
  1580 IF size% < scrmax% THEN PROClog("WARNING: screen "+STR$(size%/&100000)+"MB < VRAM max "+STR$(scrmax%/&100000)+"MB - auto-grow fell short (some VRAM in use?)")
  1590 PROClog("continuous - wiggle the VRAM; beep+log on fault. ESC to stop.")
+ 1595 PRINT "VRAMtestA: marching ";size%/&100000;"MB VRAM. Beep=fault; results in ";logfile$;". ESC stops."
  1600 PRINT "Any key to start (screen WILL corrupt - that's the RAM under test)..."; : g% = GET : PRINT
  1605 VDU 23,1,0 : REM text cursor OFF - its async blink writes to the screen under test => false faults
  1610 :
@@ -196,7 +196,8 @@
  1880 ENDPROC
  1890 :
  1900 DEF PROClog(a$)
- 1910   IF verbose% THEN PRINT a$
+ 1910   REM file ONLY - never PRINT: the screen IS the VRAM under test, so echoing
+ 1915   REM here (or a flashing cursor) is read back as a false fault. Read the log.
  1920   IF logh% <> 0 THEN BPUT#logh%, a$ : SYS "OS_Args", 255, logh%
  1930 ENDPROC
  1940 :
