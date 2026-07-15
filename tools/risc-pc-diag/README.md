@@ -13,14 +13,20 @@ Two consequences:
 - **VRAM is out of the DRAM / data-abort path, but has its own failure surface.**
   Nothing but video data is ever stored in VRAM — no application RAM, dynamic areas
   or heap — so a **data abort or memory fault is a DRAM / system-bus problem, never
-  VRAM**. But VRAM is *not* categorically ruled out: it sits in a **socket with two
-  battery-corrosion-damaged pins**, and a bad VRAM contact shows up as **display /
-  video-data corruption** (not data aborts). That class of fault is directly
-  testable — RISC OS screen memory *is* this VRAM (kernel maps it non-cacheable at
+  VRAM**. But VRAM is *not* categorically ruled out: **two socket contact pins were
+  physically snapped off** — bent too far while attaching probes to the video-bus
+  pins (a sharp reminder how brittle these old sockets are), *not* battery/corrosion
+  damage. The repair was to bend the **remaining ~50% of each contact outward** until
+  it meets the VRAM card; a marginal contact shows up as **display / video-data
+  corruption** (not data aborts). That class of fault is directly testable — RISC OS
+  screen memory *is* this VRAM (kernel maps it non-cacheable at
   `&01E00000..&01FFFFFF`), so `VRAMtestA` (below) Marches the real VRAM cells. Used
   as a **socket wiggle test** it catches an intermittent pin in the act.
-  *(Earlier revisions of this note declared VRAM "100% stable, never a suspect" —
-  that predates finding the damaged socket pins; corrected.)*
+  *(Finding: the repaired pins make solid contact under normal seating — errors
+  appear only when the board is physically flexed while running, which isn't a normal
+  operating condition and may not even be specific to this card. Treated as largely
+  theoretical; no hold-down clip fitted. Earlier revisions declared VRAM "100%
+  stable, never a suspect" — that predates the socket damage; corrected.)*
 - **The bus-fault story narrows to palette writes.** The CPU still programs the VIDC
   **palette/registers over the buffered system bus**, so a faulty bus line still
   corrupts palette writes (e.g. grey desktop reads green) — that path is unchanged
@@ -150,7 +156,7 @@ Marches that region **once** (the doubly-mapped copy sits after it — don't Mar
 - **First:** `*Configure ScreenSize 2048K` then **reboot**, so the reserved screen
   DA is the full 2 MB; the tool prints the size it sees and warns if under 2 MB.
 - Runs **continuously** (ESC to stop). **Beeps (`VDU 7`) + logs on any fault**, with
-  a **monotonic timestamp per pass** — so as you **wiggle the two corrosion-damaged
+  a **monotonic timestamp per pass** — so as you **wiggle the two repaired (bent-out)
   VRAM socket pins**, an intermittent dropout is caught *audibly* and correlated in
   time. A lone failing address with no consistent bit pattern is the signature of a
   bad **address-line** contact; consistent `diff bits` point at a **data-line** pin.
