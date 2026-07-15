@@ -4,6 +4,10 @@
 
 The goal is to replace the two 27C800 ROM chips in a RISC PC with an emulator that can serve RISC OS ROM images, enabling easy ROM switching and experimentation.
 
+**Related:** [riscpc-diagnostic-rom.md](riscpc-diagnostic-rom.md) — a concrete use
+case for this emulator: iterating a **bare-metal memory/video diagnostic ROM**
+(POST TestSrc + March-U + refresh-gated retention testing) without burning EPROMs.
+
 ---
 
 ## RISC PC ROM Architecture
