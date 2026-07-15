@@ -183,8 +183,9 @@
  1870 DEF FNbits(x%)
  1880   LOCAL s$, i%, m%
  1890   s$ = "" : m% = 1
- 1900   FOR i% = 0 TO 31
+ 1900   FOR i% = 0 TO 30
  1910     IF (x% AND m%) <> 0 THEN s$ += STR$(i%) + " "
- 1920     m% = m% * 2
+ 1920     IF i% < 30 THEN m% = m% * 2
  1930   NEXT
+ 1935   IF x% < 0 THEN s$ += "31 " : REM bit 31 = sign bit; m%*2 to 2^31 overflows (err 20)
  1940 = s$

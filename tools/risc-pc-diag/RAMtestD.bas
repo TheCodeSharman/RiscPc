@@ -258,10 +258,11 @@
  2580 DEF FNbits(x%)
  2590   LOCAL s$, i%, m%
  2600   s$ = "" : m% = 1
- 2610   FOR i% = 0 TO 31
+ 2610   FOR i% = 0 TO 30
  2620     IF (x% AND m%) <> 0 THEN s$ += STR$(i%) + " "
- 2630     m% = m% * 2
+ 2630     IF i% < 30 THEN m% = m% * 2
  2640   NEXT
+ 2645   IF x% < 0 THEN s$ += "31 " : REM bit 31 = sign bit; m%*2 to 2^31 overflows (err 20)
  2650 = s$
  2660 :
  2670 REM PA -> IOMD bank index: 0 VRAM, 1-4 SIMM banks (64MB stride), 5 other

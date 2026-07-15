@@ -199,8 +199,9 @@
  1990 DEF FNbits(x%)
  2000   LOCAL s$, i%, m%
  2010   s$ = "" : m% = 1
- 2020   FOR i% = 0 TO 31
+ 2020   FOR i% = 0 TO 30
  2030     IF (x% AND m%) <> 0 THEN s$ += STR$(i%) + " "
- 2040     m% = m% * 2
+ 2040     IF i% < 30 THEN m% = m% * 2
  2050   NEXT
+ 2055   IF x% < 0 THEN s$ += "31 " : REM bit 31 = sign bit; m%*2 to 2^31 overflows (err 20)
  2060 = s$
