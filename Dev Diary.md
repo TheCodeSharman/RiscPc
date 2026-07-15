@@ -1868,3 +1868,35 @@ Net: `vendor/CMOSSwap/` → `vendor/UnplugSwap/`; the switcher now caches
 `Choices.Boot`/`Choices.Internet` and the 13-byte unplug mask per OS, with the
 apply-timing restart prompt unchanged. ROM switching works. Still open: the
 *automatic* reset-vector stub to replace the manual restart prompt (nice-to-have).
+
+### Jul 15 — DRAM/VRAM March-U diagnostics, validated on the real machine
+Built two fast ARM-coded March-U tools in `tools/risc-pc-diag/` and retired the
+slow interpreted originals (`RAMtest`/`MarchU`):
+- **`RAMtestD`** — Marches DRAM via a **non-cacheable + non-bufferable
+  `OS_DynamicArea`** (flags `&30`) grabbed from the free pool, so it tests the
+  whole ~29 MB (past the 28 MB Wimp-slot cap) with **no `*Cache Off`**. Translates
+  every page LA→PA (`OS_Memory`) and buckets by **IOMD bank window** (VRAM /
+  SIMM0-1 banks / other, bases cross-checked against RPCEmu `cp15.c`) → per-SIMM
+  coverage, faults reported by raw physical address + bank.
+- **`VRAMtestA`** — March-U over screen memory (= the 2 MB VRAM), non-cacheable so
+  no cache-off; continuous loop + beep-on-fault for a **socket wiggle test**.
+
+Smoke-tested `RAMtestD` through the new **RPCEmu HostCmd MCP** (drive RISC OS from
+the host). Two bugs the smoke test caught — *both* would have shipped to the bench:
+- Hard-coded `drambase% = &10000000` **silently dropped** any page below it →
+  replaced with the bank-window bucketing above.
+- `pa% = (expr)!8` indirection — RISC OS BASIC rejects a bracketed expression as
+  the left operand of `!` (Syntax error) → rewrote as `base!(offset)`.
+
+Emulator quirk: some DRAM pages translated into the `&02xxxxxx` (VRAM) window —
+**suspected an RPCEmu `OS_Memory` artefact**, flagged for real-hardware check.
+
+**Real RiscPC run** (log to `Share::RiscPC.$.Diag.RAMlogD`, pulled back over
+ShareFS): 34 MB total (32 DRAM + 2 VRAM), 29 MB free pool grabbed, split cleanly
+across **two SIMMs — SIMM0/bank0 `&10000000` (15.1 MB) + SIMM1/bank0 `&18000000`
+(13.8 MB)** → the machine is **2×16 MB, one stick per slot**. **Zero** pages in the
+VRAM/other bucket → the emulator scatter *was* an RPCEmu artefact, not real IOMD
+(MS's instinct to verify on hardware was right). March-U (0/FF + AA/55) over both
+sticks: **PASS, zero faults** — both replaced DRAM sockets make good contact
+full-stick. The untested ~3 MB is the OS-resident set (kernel/RMA/page tables/the
+program); reaching those cells would need the bare-metal POST tests.
