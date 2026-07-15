@@ -83,6 +83,33 @@ sizes/inits IOMD+MEMC, already reports via the LCD POST protocol we decode:
 4. **Per-bank/stick attribution** — reuse RAMtestD's PA→bank bucketing against
    TestMain's map, so a fault names its SIMM/bank.
 
+## Port TestSrc to StrongARM (a first-class task, not a footnote)
+
+TestSrc is **ARM3/ARM600-era and has no StrongARM (SA-110) support** — grep finds
+zero SA-110/StrongARM references, and the code that *is* there assumes the older
+CPUs. Since the target machine is a **StrongARM** RISC PC (cf.
+[sa110-cache-analyzer.md](sa110-cache-analyzer.md)), porting is part of the work:
+
+- **Processor-clock-timed loops** — `Vidc` explicitly contains loops "affected by
+  gross changes in processor speed" and notes they're only valid without an ARM3
+  cache. At StrongARM clocks these under/overflow. Fix: make them
+  **clock-independent** by timing against the **IOC timer** (several tests already
+  reference it) rather than instruction-count delays.
+- **Cache / CP15 model** — `Mem2` uses a combined I+D flush (`CR_IDCFlush`) and
+  `A600tlb` encodes ARM600 TLB/cache behaviour. StrongARM has **split Harvard
+  I/D caches, a write buffer, and write-back regions**, with different CP15
+  clean/invalidate/drain semantics. The port needs correct SA-110 sequences —
+  and this directly serves the March/retention tests: to guarantee a read reaches
+  DRAM you must **clean+invalidate the D-cache and drain the write buffer** (or
+  map the region non-cacheable, as the hosted tools do), which is CPU-specific.
+- **CPU detection/branch** — read the CP15 ID register and branch to a StrongARM
+  path, keeping the ARM6/7 paths for older boards (mirrors how TestSrc already
+  forks Medusa vs A-series).
+
+Upside: doing this cleanly yields a **reusable StrongARM bare-metal bring-up**
+(cache/MMU/IOMD init) that the retention test and any future bare-metal work
+(e.g. the bus-analyzer validation) can share.
+
 ## Reporting — we already decode it
 
 TestSrc emits the **Acorn POST LCD protocol**, which this repo already reverse-
@@ -127,11 +154,16 @@ minimal init is done. This closes a nice loop: the POST decoder we built to
 - **IOMD refresh gating:** exact register, minimum safe refresh-off window, and
   guaranteed re-enable before returning to anything that needs RAM. Primary
   unknown; everything else is a port.
+- **StrongARM port (prerequisite):** TestSrc has no SA-110 support, and the
+  target is a StrongARM — so the port (clock-independent timing + SA-110
+  cache/CP15 bring-up, see above) gates even phase 1. It's the largest genuinely
+  *new* piece; the March/VRAM logic is mostly existing work.
 - **Assembler/build:** TestSrc is Norcroft/objasm-era Acorn assembler; decide
   whether to build it with the RISC OS toolchain or reimplement the needed
   stages standalone.
-- **Scope creep:** the March/VRAM port is mostly done work; keep phase 1 to
-  "boot, line-test, March-U all DRAM, report via POST." Retention is phase 2.
+- **Scope creep:** keep phase 1 to "StrongARM bring-up → boot, line-test,
+  March-U all DRAM, report via POST." VRAM March is phase 1b (shares the
+  bring-up). Retention is phase 2.
 
 ## Status / trigger
 
