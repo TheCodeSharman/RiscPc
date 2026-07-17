@@ -26,3 +26,6 @@
 [submodule "external/Internet6"]
 	path = external/Internet6
 	url = https://gitlab.riscosdev.co.uk/johnballance/internet6.git
+[submodule "external/NetworkManager"]
+	path = external/NetworkManager
+	url = https://gitlab.riscosdev.co.uk/gitlab-instance-22c13a02/networkmanager.git
