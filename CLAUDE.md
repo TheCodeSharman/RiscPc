@@ -69,12 +69,23 @@ alphabetically; a single 4MB file is a valid ROM on its own).
 
 ## External Submodules
 
-Two submodules pulled from gitlab.riscosopen.org:
+Most are pulled from gitlab.riscosopen.org (`Kernel`, `HdrSrc`, `FileCore`, `ADFS`, `ADFS4`, `BASIC`, `Desktop`, `Wimp`); `Internet6` comes from RISC OS Developments' own GitLab. The two most-used:
 
 - `external/Kernel/` — RISC OS 3.70 kernel source (tag `RO_3_70`, matching the RiscPC's real ROM). The `TestSrc/` subdirectory contains the POST test code relevant to decoding POST sequences; `s/NewReset` (`CONT_Break`) is the 26-bit IOMD soft-reset path, useful for the multi-ROM auto-reset work.
 - `external/HdrSrc/` — Shared `Hdr:*` headers (`master` branch). The Kernel references `Hdr:CMOS`, `Hdr:Services`, `Hdr:FSNumbers`, etc. via the `Hdr:` search path; these registry headers weren't in the public HdrSrc release at the `RO_3_60` tag (added 2008 in commit `403c6dd`), so we track `master` instead — the CMOS allocation layout has been stable for decades.
 
-Initialize both with:
+And the networking one:
+
+- `external/Internet6/` — RISC OS Developments' Internet6 stack (`main`, ~46MB, still actively developed — Andy Vawer & John Ballance, **CDDL** licensed). Cloned from `gitlab.riscosdev.co.uk/johnballance/internet6`. This is where the **C MbufManager** lives, in `MMC4/`: `cmhg/MbufManager` declares `title-string: MbufManager` on the genuine SWI chunk `0x4A580` (`Mbuf_OpenSession`/`CloseSession`/`Memory`/`Statistic`/`Control`), with C sources `c/module`, `c/pool`, `c/sessions`, `c/stats`, `c/old_mbufs`, plus an assembler compat shim `s/old_mbuf_veneers`.
+
+  Note the mbuf code is **split across two places**, which is easy to trip over:
+  - `MMC4/` builds the standalone `MbufManager` module. Its `c/pool` is only the *legacy* fixed two-bucket allocator (256 small / 128 large, one `OS_DynamicArea` named `MbufManager4`) backing the old `old_alloc`/`old_free`-style API.
+  - The *modern* NetBSD-style pool (`pool_init`/`pool_get`/`pool_put`, `PR_MAPADDR` physical-address mapping) is **not** in `MMC4` — it's `build/c/mbuf_pool` + `RiscOS/kern/c/uipc_mbuf`, compiled into the **Internet** module and exported to clients as function pointers in the `mbctl` vector table (see `MMC4/h/public_structs`).
+  - `MMC4/Doc/PhysicalAddrs` documents that modern pool API, *not* `MMC4/c/pool` — it's a copy of `deploy/Doc/MMU` and describes code in `build/`.
+
+  Reading tip: gitlab.riscosdev.co.uk's `/-/blob/` and `/-/tree/` web viewers are JS shells that return "Loading" to any fetcher. Use `/-/raw/<path>` or the REST API (`/api/v4/projects/johnballance%2Finternet6/repository/tree?path=MMC4&recursive=true`) instead — both work unauthenticated.
+
+Initialize all with:
 ```bash
 git submodule update --init
 ```

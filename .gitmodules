@@ -23,3 +23,6 @@
 [submodule "external/Wimp"]
 	path = external/Wimp
 	url = https://gitlab.riscosopen.org/RiscOS/Sources/Desktop/Wimp.git
+[submodule "external/Internet6"]
+	path = external/Internet6
+	url = https://gitlab.riscosdev.co.uk/johnballance/internet6.git
