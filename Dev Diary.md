@@ -1942,3 +1942,54 @@ media*; a bad head fails differently per disc while bad media is consistent; cle
 **every** drive before use; `--revs=5` matters for inner tracks. Archive lives in
 `~/riscpc-archive/floppy-images/`. Open/nice-to-have: back the masters off-bench;
 smoke-test an `.adf` under RPCEmu.
+
+### Jul 19 — sound RESOLVED: stereo headphone amp working (two more faults)
+- Both headphone channels now play cleanly. Two *separate* faults were hiding
+  behind one "weak left channel" symptom; found them by re-tracing the whole
+  driver stage. Full reverse-engineered netlist now in
+  `repair/riscpc-sound-repair/README.md`.
+- **Fault 1 — left driver +in reference (pin 10) had a corroded 15 kΩ-to-ground
+  connection.** Both driver +inputs (TL074 #1 pin 10 = left, pin 12 = right) are
+  biased to 0 V through a **15 kΩ to ground** — *not* a hard ground (the ohmmeter
+  "not grounded" reading was the first clue). The left one was high-R/soft, so
+  pin 10 **floated** instead of pinning at 0 V → the op-amp servoed the whole
+  stage to the drifting reference: **emitter idled at 2.7 V (should be 0 V) +
+  noise + apparent weakness.** Tell-tale: a solid ground is silent when
+  scope-probed; pin 10 **clicked loudly into the left ear** (high-Z node in the
+  live path). Rebuilt the ground → pin 10 = stable 0 V (0.2 mV), silent, emitter
+  back to 0 V, noise gone.
+- **Fault 2 — Q4 (right output transistor) internally damaged: a *load-only*
+  fault.** After the reference fix the right channel still misbehaved. Q4's base
+  sat **1.8 V above its 0 V emitter** — impossible for a healthy junction.
+  - **The trap:** a **diode test passed** (0.6 V) because it runs at ~1 mA. At
+    the **35 mA** standing current the B-E read **1.8 → 2.2 V** — a
+    *current-dependent* voltage = **~34 Ω of series resistance that only appears
+    under load**. Reflowing the joints made it **worse** (1.8 → 2.2 V), proving
+    it was **internal silicon**, not a joint. History fits: the base had been
+    overdriven / running hot → thermal degradation of the die.
+  - **Fix:** replaced Q4. A tacked-on **BC549C** (TO-92, the leaded low-noise
+    equivalent) dropped B-E to ~0.7 V under load and restored the channel —
+    proof of diagnosis. Proper **BC849C** (SOT-23, spare grade **BC850C**) on
+    order.
+- **Netlist correction:** Q1/Q4 **collector = +5 V** (the middle SOT-23 pin
+  measured 5 V), not the +12 V the Jun 30 notes assumed. Emitter-follower
+  confirmed — output *and* feedback both taken at the emitter, collector to the
+  +5 V rail. (Re-verify when the SMD part goes in.)
+- **Diagnostic lessons banked (each cost real time):**
+  1. **A diode test only proves a junction at ~1 mA** — a high-current fault is
+     invisible. Measure Vbe at the *operating* current.
+  2. **A reflow that makes a reading *worse* = internal damage, not a joint.**
+  3. **Ohmmeter across op-amp pins lies** — internal ESD/junction diodes +
+     cap-charging give polarity-dependent, drifting readings (chased a phantom
+     "280 kΩ pin 8→9 leakage" that turned out to be shared by both channels).
+  4. **Composite amp** (BJT inside the op-amp loop): feedback is off the
+     *emitter*, so **op-amp-out ↔ −in reads OPEN** — normal, not a fault.
+  5. **A floating/high-Z reference clicks when scope-probed**; a solid ground is
+     silent → fast test for a corroded reference.
+  6. **`*Stereo` can fake a channel imbalance** — rule out config first
+     (`*Stereo <ch> -127 / 0 / 127`).
+- **RISC OS sustained test tone** (the default beep voice decays; use a flat
+  envelope): `ENVELOPE 1,1,0,0,0,0,0,0,126,0,0,-1,126,126` then
+  `SOUND 1,1,120,-1` (stop: `SOUND 1,0,0,1`; pan: `*Stereo 1 -127`).
+- **Remaining:** swap the temp BC549C → SMD **BC849C**; optionally fit a matched
+  BC849C at Q1 for a balanced pair.
