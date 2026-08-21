@@ -72,9 +72,6 @@ taking the server down with it.
 
 ## Known-unproven
 
-- **`FNbind` tries two `sockaddr_in` layouts** and prints which one bound.
-  4.4BSD puts `sin_len` at byte 0 and the family at byte 1; older stacks put a
-  16-bit family at byte 0. Delete the losing branch once the machine has said.
 - **`PROCmodes` reports `OS_ScreenMode 2`'s exit registers** on a `#` line,
   because the convention is unconfirmed here. Delete that line once the counts
   are known to be right.

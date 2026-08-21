@@ -70,20 +70,14 @@
   690 :
   700 DEF FNbind(s%,port%)
   710 LOCAL f%
-  720 REM 4.4BSD puts sin_len at byte 0 and the family at byte 1; older stacks put a
-  730 REM 16-bit family at byte 0 instead. Byte 0 is 16 under one and 2 under the
-  740 REM other, so a wrong guess simply fails to bind. Try both and say which took.
+  720 REM This Internet module wants the 4.4BSD sockaddr_in: sin_len at byte 0 and
+  730 REM the family at byte 1. The older layout, a 16-bit family at byte 0, was
+  740 REM tried on the machine and does not bind.
   750 PROCzero(sa%,16)
   760 sa%?0=16:sa%?1=AF_INET%
   770 sa%?2=port% DIV 256:sa%?3=port% AND 255
   780 SYS "XSocket_Bind",s%,sa%,16 TO ;f%
-  790 IF (f% AND 1)=0 THEN PRINT "sockaddr_in: 4.4BSD layout":=TRUE
-  800 PROCzero(sa%,16)
-  810 sa%!0=AF_INET%
-  820 sa%?2=port% DIV 256:sa%?3=port% AND 255
-  830 SYS "XSocket_Bind",s%,sa%,16 TO ;f%
-  840 IF (f% AND 1)=0 THEN PRINT "sockaddr_in: 4.3BSD layout":=TRUE
-  850 =FALSE
+  790 =(f% AND 1)=0
   860 :
   870 DEF PROCzero(p%,n%)
   880 LOCAL i%
