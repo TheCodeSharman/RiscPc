@@ -1,0 +1,11 @@
+| Build - tokenise the BASIC sources in src, next to this file.
+|
+| Copy to RISC OS as an Obey file (type &FEB) and double-click it. The sources
+| are plain text; LIBRARY and LOAD both need tokenised files, so they have to be
+| converted once on this side. *BASIC -load tokenises a textual program on the
+| way in and stops in immediate mode, which is what lets BuildIn drive it.
+|
+| -load rather than -quit: -quit runs a CRUNCH %1111 over the program, which
+| strips the spaces and REMs these sources are largely made of.
+Set Build$Dir <Obey$Dir>
+Exec <Obey$Dir>.BuildIn

@@ -133,6 +133,15 @@ Before writing a new script, look here — these already exist. Don't reimplemen
   `--minimal`, `--[no-]packages-in-rafs`. Consumed by the rpcemu repo's
   `tools/setup-install.sh` to produce `installs/<name>/`. See that repo for details.
 
+- **`tools/video-source/`** — RISC OS BASIC that makes this machine a *controllable*
+  video source for testing an external scaler: `ModeServ` sets the screen mode over
+  TCP 6502, `PatLib`/`TestPat` draw the capture-geometry and PM5544 cards,
+  `ModeSweep` cycles the stock AKF50 modes on a timer. Sources are plain text and
+  need tokenising on the RISC OS side (`Build`); `ModeTest`'s parsing checks run
+  under Matrix Brandy on Linux, but **no `SYS` here is proven except on hardware** —
+  RISC OS BASIC parses `SYS` argument lists at execution and Brandy is more lenient.
+  See its `README.md`.
+
 - **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
 - **`acorn-post/decoders/`** — sigrok POST decoders (see above).
 
