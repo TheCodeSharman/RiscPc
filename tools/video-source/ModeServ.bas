@@ -204,9 +204,8 @@
  2070 REPEAT
  2080  SYS "XOS_ScreenMode",2,0,skip%,0,0,0,enum%,4096 TO e0%,r1%,r2%;f%
  2082  IF f% AND 1 THEN PROCsend(c%,"FAIL "+FNstr(e0%+4)):ENDPROC
- 2084  REM The exit convention is unconfirmed on this machine, so the first run
- 2086  REM reports it. Delete this line once the counts are known to be right.
- 2088  PROCsend(c%,"# skip="+STR$skip%+" r1="+STR$r1%+" r2="+STR$r2%)
+ 2084  REM R2 comes back as minus the number of blocks written, and R1 is zero
+ 2086  REM only while more remain -- so a full buffer is refilled, not truncated.
  2090  n%=-r2%
  2100  p%=enum%
  2110  FOR e%=1 TO n%

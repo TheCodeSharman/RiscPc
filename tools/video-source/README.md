@@ -24,7 +24,9 @@ The sources here are plain text. `LIBRARY` and `LOAD` both need **tokenised**
 files, so they have to be converted on a RISC OS machine once:
 
 1. Copy this directory over as `src/`, with `Build.obey` as an Obey file
-   (type `&FEB`) and `BuildIn.exec` as `&FFF`, beside it.
+   (type `&FEB`) and `BuildIn.exec` as `&FFF`, beside it. ShareFS serves files
+   while the machine is **single-tasking**, so sources can be replaced without
+   leaving BASIC or stopping a running server.
 2. Double-click `Build`. It tokenises each source and saves it under its real
    name in the parent directory.
 3. `LOAD "ModeServ"` then `RUN`.
@@ -69,12 +71,6 @@ parameters and trailing blanks in a `TO` list pass under Brandy and throw
 `Syntax error` on the machine. So every `SYS` here is only proven by running it
 on real hardware, which is why a failing command replies `FAIL` instead of
 taking the server down with it.
-
-## Known-unproven
-
-- **`PROCmodes` reports `OS_ScreenMode 2`'s exit registers** on a `#` line,
-  because the convention is unconfirmed here. Delete that line once the counts
-  are known to be right.
 
 ## ModeSweep
 
