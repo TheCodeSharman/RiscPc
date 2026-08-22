@@ -24,9 +24,16 @@ The sources here are plain text. `LIBRARY` and `LOAD` both need **tokenised**
 files, so they have to be converted on a RISC OS machine once:
 
 1. Copy this directory over as `src/`, with `Build.obey` as an Obey file
-   (type `&FEB`) and `BuildIn.exec` as `&FFF`, beside it. ShareFS serves files
-   while the machine is **single-tasking**, so sources can be replaced without
-   leaving BASIC or stopping a running server.
+   (type `&FEB`) and `BuildIn.exec` as `&FFF`, beside it. ShareFS **serves**
+   files while the machine is single-tasking, so sources can be replaced
+   without leaving BASIC or stopping a running server.
+
+   **Serving and advertising are not the same thing.** Freeway discovery needs
+   the desktop, so a share is only found while the serving machine is in it.
+   A machine sitting single-tasking on a running server advertises nothing and
+   `*Shares` on the other end lists nothing — which looks like a network fault
+   and is not one. Mount the share from the desktop first; it keeps serving
+   afterwards.
 2. Double-click `Build`. It tokenises each source and saves it under its real
    name in the parent directory.
 3. `LOAD "ModeServ"` then `RUN`.
