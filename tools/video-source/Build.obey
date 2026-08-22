@@ -1,11 +1,31 @@
 | Build - tokenise the BASIC sources in src, next to this file.
 |
-| Copy to RISC OS as an Obey file (type &FEB) and double-click it. The sources
-| are plain text; LIBRARY and LOAD both need tokenised files, so they have to be
-| converted once on this side. *BASIC -load tokenises a textual program on the
-| way in and stops in immediate mode, which is what lets BuildIn drive it.
+| Copy to RISC OS as an Obey file (type &FEB), with BuildIn.exec as &FFF beside
+| it, and double-click it. The sources are plain text; LIBRARY and LOAD both
+| need tokenised files, so they have to be converted once on this side.
+| *BASIC -load tokenises a textual program on the way in and stops in immediate
+| mode, which is what lets BuildIn drive it.
 |
 | -load rather than -quit: -quit runs a CRUNCH %1111 over the program, which
 | strips the spaces and REMs these sources are largely made of.
+|
+| The SAVE and QUIT reach BASIC through { < ... }, which redirects the input of
+| ONE command. *Exec would set the input stream globally and is not consumed at
+| all when the command arrives over a HostCmd socket, so an Exec-driven build
+| silently does nothing headless -- it needs a real keyboard. Redirection works
+| both ways round, so this builds from a double-click and from a script.
+|
+| BuildIn is shared by all five, with the destination in Build$Target: FileSwitch
+| expands <Build$Target> when BASIC resolves the path SAVE hands it.
 Set Build$Dir <Obey$Dir>
-Exec <Obey$Dir>.BuildIn
+Set Build$Target PatLib
+BASIC -load <Build$Dir>.src.PatLib { < <Build$Dir>.BuildIn }
+Set Build$Target TestPat
+BASIC -load <Build$Dir>.src.TestPat { < <Build$Dir>.BuildIn }
+Set Build$Target ModeServ
+BASIC -load <Build$Dir>.src.ModeServ { < <Build$Dir>.BuildIn }
+Set Build$Target ModeTest
+BASIC -load <Build$Dir>.src.ModeTest { < <Build$Dir>.BuildIn }
+Set Build$Target ModeSweep
+BASIC -load <Build$Dir>.src.ModeSweep { < <Build$Dir>.BuildIn }
+Unset Build$Target

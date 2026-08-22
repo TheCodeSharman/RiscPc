@@ -1,17 +1,2 @@
-| Fed to the command line by Build, one line at a time. Each pair enters BASIC
-| with a source tokenised, saves it under its real name, and leaves again.
-BASIC -load <Build$Dir>.src.PatLib
-SAVE "<Build$Dir>.PatLib"
-QUIT
-BASIC -load <Build$Dir>.src.TestPat
-SAVE "<Build$Dir>.TestPat"
-QUIT
-BASIC -load <Build$Dir>.src.ModeServ
-SAVE "<Build$Dir>.ModeServ"
-QUIT
-BASIC -load <Build$Dir>.src.ModeTest
-SAVE "<Build$Dir>.ModeTest"
-QUIT
-BASIC -load <Build$Dir>.src.ModeSweep
-SAVE "<Build$Dir>.ModeSweep"
+SAVE "<Build$Dir>.<Build$Target>"
 QUIT

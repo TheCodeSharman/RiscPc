@@ -31,9 +31,21 @@ files, so they have to be converted on a RISC OS machine once:
    name in the parent directory.
 3. `LOAD "ModeServ"` then `RUN`.
 
-`BuildIn` uses `BASIC -load` rather than `-quit`, because `-quit` runs a
+`Build` uses `BASIC -load` rather than `-quit`, because `-quit` runs a
 `CRUNCH %1111` that strips the spaces and REMs these sources are largely made
-of.
+of. The `SAVE` and `QUIT` that follow reach BASIC through `{ < ... }`, which
+redirects the input of one command, with the destination in `Build$Target`.
+
+**It builds headless as well as from a double-click**, which is what lets a
+session drive it over an RPCEmu HostCmd socket:
+
+```sh
+Obey HostFS::HostFS.$.Xfer.ModeSrv.Build
+```
+
+`*Exec` cannot do that job. It sets the input stream globally and nothing
+consumes it when the command arrives over HostCmd, so an `Exec`-driven build
+returns success and silently tokenises nothing.
 
 **Matrix Brandy cannot tokenise for RISC OS** — its `SAVE` emits text. RPCEmu
 is the tokeniser, which is what `Build` automates.
