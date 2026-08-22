@@ -6,10 +6,18 @@ public schematic exists for this board; the whole audio section was
 reverse-engineered by probing. See [[board-revision-vs-schematic]] /
 [[board-audio-chain]] in memory.
 
-## Status — ✅ RESOLVED (both headphone channels working)
+## Status — ✅ RESOLVED — line out / headphones fixed (both channels)
 - **Right channel:** working. Q4 (output transistor) was internally damaged and
   replaced (temp **BC549C** TO-92 in place; SMD **BC849C** on order).
-- **Left channel:** working. Corroded **15 kΩ +in reference** (pin 10) rebuilt.
+- **Left channel:** working — but needed a **chain of battery‑corrosion fixes**
+  (faults #7–#9): interstage/driver via, I/V feedback resistor‑leg‑to‑via, and the
+  **pin 10 +in reference open to ground** (fault #4 recurred). Now balanced and
+  hum‑free.
+- **On the "one channel quieter" chase:** an *early* round of this was a phantom —
+  overlaid on the scope the outputs matched, and the perceived difference was the
+  **earphones** (see phantom‑fault gotchas). But a *later* round was **real** — the
+  left‑channel corrosion chain above. Lesson: verify on the scope *and* keep
+  digging if the mirror method shows a genuine L≠R.
 - **Speaker path (LM386):** *still open* — heavily-corroded output traces; see
   "Remaining" at the bottom.
 
@@ -139,6 +147,58 @@ op-amp **output**, not the DAC pin.
    Diode-test OK (0.6 V @ 1 mA) but **B-E = 1.8–2.2 V @ 35 mA** (≈ 34 Ω
    current-dependent series R); reflow made it *worse* → internal, not a joint.
    Replaced (temp **BC549C**; SMD **BC849C** to fit).
+6. **Q4 base connection intermittent — donor-pad rebuild failed under probe
+   pressure.** The ripped-off base pad had been rebuilt with a donor pad +
+   lead-bridge (photos 17-19); probing the base cracked it, opening the
+   pin 14 → Q4 base net (symptom: **op-amp Sec D output railed to +10 V** while
+   the base pin sat at 1.3 V — a driver op-amp railing = its feedback loop is
+   open). Making/breaking under probe pressure = a marginal joint, not a fixed
+   one. **Fixed: bridged the base to its via** (solder bridge — same technique as
+   the resistor/reference fixes, no flying wire needed). Poke-test verified. NB:
+   the *base* donor-pad transplant had **failed**, but the **collector donor pad
+   went on successfully** — the donor-pad-transplant technique is validated, it
+   just didn't take on that one pad.
+7. **Left channel interstage open — intermittent via between the 47 kΩ input
+   resistor and driver −in (pin 9), buried *under* the SOIC.** Symptoms: weak +
+   noisy + **wandering pin 8 DC** (drifted to ~1 V). Pin 9 is the driver's
+   −in/summing node, so an intermittent there breaks the input *and* the feedback
+   return at once → open loop (pin 8 DC wanders), dropout (weak), floating node
+   (noise) — one fault, all three. **Thermally intermittent:** reflowing pin 8
+   quieted it *while hot*, fault returned on cooling → the pin joint was fine, the
+   fault was a buried via (heat expanded a cracked barrel). A diagnostic bodge
+   **pin 8 → Q1 base did NOT help**, proving the fault was *upstream* of the
+   driver output. Mirror of fault #3 (coupling-via family / battery corrosion).
+   **Fixed:** lifted op-amp #1 to access, bodged the 47 kΩ's pin-9 terminal
+   straight to pin 9's pad, bypassing the buried via. The diagnostic pin 8 → Q1
+   base bodge was later **removed** — left channel unaffected, confirming that
+   connection was never the fault. NB: value read as "4k7" on the board vs 47 kΩ
+   in the netlist — confirm marking.
+8. **Left channel dead/railed — I/V feedback open (corroded resistor‑leg‑to‑via).**
+   The **root cause** of the second left‑channel round. pin 7 (I/V out) railed to
+   **−11 V**, pin 6 (−in) floated to **5 V** → op‑amp Sec B open‑loop (railed =
+   open feedback loop, cf. fault #6). The 2.1 kΩ I/V feedback resistor measured
+   **good (2k2) across its own body**, but **pin 6 ↔ pin 7 read 1 MΩ→OL**: the
+   resistor's **leg‑to‑via joint was open** (the via reached pin 7 fine; the
+   resistor leg didn't reach the via). Intermittent for ages — pressure/heat
+   closed it (→ 510 mV, working), released → dead/railed — which is why the fault
+   "moved" and fooled us, *stacked on top of #7*. **Fixed:** reflowed the
+   resistor leg to the via → pin 6 ↔ pin 7 = 2.2 kΩ, pin 7 off the rail. (A wire
+   bridge would be more durable on corroded copper — reflow onto it is a known
+   "reads good now, dies later" risk.) Confirm 2k2 matches the right channel
+   (pin 2 ↔ pin 1) for level balance.
+   - *Driver‑stage sequel:* with the I/V fixed, pin 8 was still dead — Q1 emitter
+     at **5 V** (saturated), pin 9 at 1.5 V (another open in the interstage/driver
+     around pin 9). Reflowing that resistor restored the loop → pin 8 healthy,
+     emitter back to 0 V. Same corrosion family; peeled off one joint at a time.
+9. **Left channel hum — pin 10 (+in reference) open to ground.** fault #4 redux.
+   After the signal was restored, a residual hum remained. Tell: **touching a scope
+   probe to pin 10 killed the hum** (a floating high‑Z node reacts to the probe's
+   ground path; a solid one is silent). Mirror confirmed it: **pin 10 → GND = OL,
+   but pin 12 → GND = 15 kΩ** (right channel good). The 15 kΩ‑to‑ground path
+   (marking "153") had a **bad connection between the resistor and its via** — no
+   visible crack (surface residue scraped off), but genuinely open. **Fixed:**
+   bridged resistor‑to‑via with a **wire**. Verified: pin 10 → GND = 15 kΩ, pin 10
+   DC steady 0 V, hum gone, and pin 10 **no longer reacts to the probe**.
 
 ## Diagnostic gotchas / measurement phantoms
 - **Diode test only proves a junction at ~1 mA** — high-current faults are
@@ -149,7 +209,34 @@ op-amp **output**, not the DAC pin.
 - **op-amp-out ↔ −in reads OPEN** by design (composite amp, feedback off the
   emitter) — not a fault.
 - **A floating/high-Z node clicks when scope-probed**; a solid ground is silent.
+- **An op-amp output stuck near a supply rail = its feedback loop is open.** Find
+  the break between the output and its −in return. For the composite drivers that
+  means the path `out (pin 8/14) → base → emitter → 47 kΩ → −in (pin 9/13)` — a
+  cracked base joint railed Sec D to +10 V (fault #6). Rail voltage ≠ dead op-amp.
+- **Battery‑corrosion faults *stack* — fix one, the next in line appears.** The
+  left channel had a *chain*: I/V feedback via (#8) → interstage/driver via (#7 +
+  the pin‑9 sequel) → pin‑10 reference (#9). Each masked the next, so the fault
+  seemed to "move" and single readings lied. **Use the mirror (L vs R) method
+  religiously — a value is only meaningful compared to the working channel at the
+  same node.** It cracked every one of these (pin 10 = OL vs pin 12 = 15 kΩ, etc.).
+- **A reflow that works hot and fails on cooling = a buried/corroded via, not the
+  pin joint.** Bypass with a wire; don't trust a reflow onto corroded copper.
+- **A joint that makes/breaks under probe pressure is intermittent, not fixed** —
+  reinforce (or bypass with a flying wire) and confirm with a poke test.
 - **`*Stereo` can fake a channel imbalance** — rule out config first.
+- **Scope the output before suspecting the board.** A perceived L/R loudness
+  imbalance can be the *earphones* (weak driver, blocked port, worn coil) — not
+  the amp. Overlay both channels on the scope at equal drive: identical amplitude
+  = the board is symmetric, look downstream. Chasing this cost a needless Q1 swap.
+- **Crackle/hum in the first ~minute after a reflow = wet flux (or IPA) drying
+  across a high-Z node**, not a fault. It clears as it dries — same mechanism as
+  the floating-reference hum. Let it dry fully before judging a joint.
+- **Swapping an in-loop transistor won't fix a level imbalance.** The BJT sits
+  inside the op-amp feedback loop (feedback off the emitter), so the loop corrects
+  its Vbe/hFE spread — a device difference changes *distortion at high current*,
+  never steady gain. The idle base reads ~0.6 V (one Vbe above the 0 V emitter);
+  a 50 mV L/R Vbe difference is normal spread, not a fault. Verify on **AC**, not
+  DC bias, and don't desolder on a hunch.
 
 ## RISC OS bench aids
 Sustained test tone (the default beep voice decays — use a flat envelope):
@@ -180,6 +267,15 @@ SOUND 1,1,120,-1          REM stop with: SOUND 1,0,0,1
 | 10 | broken-via-found | the corroded/broken via in the +12 V feed |
 | 11 | broken-via-highmag | high-mag of the broken copper |
 | 12 | via-repaired-opamp1 | rebuilt link (solder bridge) for op-amp #1 |
+| 13 | opamp2-output-transistors | op-amp #2 output transistors |
+| 14 | opamp2-burnt-680r | a burnt 680 Ω in the op-amp #2 area |
+| 15 | opamp2-underside-via-field | op-amp #2 underside via field |
+| 16 | opamp2-via-tap-repaired | repaired via tap (+12 V → op-amp #2 pin 4) |
+| 17 | pads-replaced-donor-and-leadbridge | two ripped pads rebuilt — donor pad + component-lead bridge (soldermask as glue) |
+| 18 | pad-repair-closeup-2c-transistor | close-up: the `2C` (BC849C) transistor + `681` (680 Ω) pull over the rebuilt pads |
+| 19 | 2c-transistor-soldered-in | BC849C soldered onto the rebuilt pads |
+| 20 | pin10-ref-15k-open-to-ground | the 15 kΩ (`153`) pin‑10 reference — open connection to its via/ground (fault #9) |
+| 21 | pin10-ref-15k-wire-bridge-fix | resistor‑to‑via bridged with a wire → reference back to 0 V, hum gone |
 
 ## Remaining
 - Swap the temp **BC549C → SMD BC849C** at Q4; optionally fit a matched BC849C at
