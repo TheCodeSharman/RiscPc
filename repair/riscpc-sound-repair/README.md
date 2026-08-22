@@ -18,8 +18,14 @@ reverse-engineered by probing. See [[board-revision-vs-schematic]] /
   **earphones** (see phantom‑fault gotchas). But a *later* round was **real** — the
   left‑channel corrosion chain above. Lesson: verify on the scope *and* keep
   digging if the mirror method shows a genuine L≠R.
-- **Speaker path (LM386):** *still open* — heavily-corroded output traces; see
-  "Remaining" at the bottom.
+- **Op-amp #2 / speaker(?) path — DEFERRED** (until a pressing need). op-amp #2
+  (TL074) is now **populated** (it was unfitted). Its purpose is **unconfirmed** —
+  may feed the internal speaker *and/or* an aux / CD-audio connector; not yet
+  reverse-engineered like #1. Power rails good; **pin 8 & pin 14 (both section
+  outputs) sit railed at −12 V** — most likely just the **2 unused sections**
+  open-loop (harmless), not confirmable without mapping #2. NB the internal
+  speaker's main job is the **power-on beep** — low value, hence deferred. See
+  "Remaining".
 
 ## Original symptom
 No sound, **both channels**, headphones *and* internal speaker. POST `SIRQ`
@@ -280,6 +286,11 @@ SOUND 1,1,120,-1          REM stop with: SOUND 1,0,0,1
 ## Remaining
 - Swap the temp **BC549C → SMD BC849C** at Q4; optionally fit a matched BC849C at
   **Q1** for a balanced pair.
-- **Speaker path (LM386):** trace + clean the corroded output traces (LM386 pin 5
-  → 220 µF C161 → speaker; Zobel; LK11), verify the 220 µF cap.
+- **Op-amp #2 / speaker(?) path — DEFERRED** (low value: drives the power-on
+  beep through a tinny mono speaker). op-amp #2 now populated. If ever revisited:
+  (1) **reverse-engineer op-amp #2** — which sections are used, and what it
+  actually feeds (internal speaker? CD-audio in? AMP connector?); pin 8 & pin 14
+  railed to −12 V are probably just its unused sections. (2) Then trace + clean
+  the corroded LM386 output traces (pin 5 → 220 µF C161 → speaker; Zobel; LK11),
+  verify the 220 µF cap.
 - Re-verify the **+5 V collector** rail on Q1/Q4 when the SMD part goes in.
