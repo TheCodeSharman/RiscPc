@@ -9,6 +9,7 @@
    90 REM
   100 REM   PING                      OK ModeServ 1
   110 REM   MODE X320 Y256 C256 F50   OK <mode>, read back from the hardware
+  115 REM                             draws PM5544, so the reply means there is a picture
   120 REM   MODES                     one line per mode this monitor definition allows
   130 REM   PATTERN [CARD|PM5544]     OK, once drawn
   140 REM   QUIT                      OK, then the server stops
@@ -18,6 +19,10 @@
   170 REM no framing to get wrong and a stalled client cannot hold the server. Accept
   180 REM blocks, which is why QUIT exists - Escape does not interrupt a blocking SWI.
   190 REM
+  195 REM MODE repaints because a mode change clears the screen, and the default
+  196 REM signal is then black with a flashing cursor -- which reads at the far end as
+  197 REM a scaler with no output, and has been diagnosed as one more than once.
+  198 REM
   200 REM MODE replies with what the hardware ended up in, never with the request. A
   210 REM monitor definition that cannot do what was asked would otherwise look, from
   220 REM the far end, exactly like a fault in the thing being tested.
@@ -142,6 +147,7 @@
  1450 sel%!0=1:sel%!4=px%:sel%!8=py%:sel%!12=pd%:sel%!16=pr%:sel%!20=-1
  1460 SYS "XOS_ScreenMode",0,sel% TO e%;f%
  1470 IF f% AND 1 THEN PROCsend(c%,"FAIL "+FNstr(e%+4)):ENDPROC
+ 1475 IF haslib% THEN PROCpaint("PM5544")
  1480 PROCsend(c%,"OK "+FNachieved)
  1490 ENDPROC
  1500 :
@@ -228,10 +234,14 @@
  2270 REM past all four edges. PATTERN CARD asks for the plainer capture card.
  2280 DEF PROCdrawcard(c%,which$)
  2290 IF NOT haslib% THEN PROCsend(c%,"FAIL PatLib not loaded - run Build"):ENDPROC
- 2300 PROCpatinit
- 2310 IF which$="CARD" THEN PROCpatdraw ELSE PROCpm5544
- 2320 PROCsend(c%,"OK")
- 2330 ENDPROC
+ 2300 PROCpaint(which$)
+ 2310 PROCsend(c%,"OK")
+ 2320 ENDPROC
+ 2325 :
+ 2326 DEF PROCpaint(which$)
+ 2327 PROCpatinit
+ 2328 IF which$="CARD" THEN PROCpatdraw ELSE PROCpm5544
+ 2329 ENDPROC
  2340 :
  2350 DEF FNword(s$,n%)
  2360 LOCAL i%,c%,w$
