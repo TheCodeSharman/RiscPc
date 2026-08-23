@@ -2445,3 +2445,198 @@ one, and its absence is evidence against.
 
 Nobody has captured anything from three occurrences. That, rather than another hypothesis,
 is what this needs.
+
+### Aug 23 (later) — RESOLVED: the boot garbage is the VRAM socket, and the CMOS account is withdrawn
+
+The garbage-at-boot fault that three entries above chased through CMOS, the SD card and
+the podule bus is **the VRAM socket's marginal contacts**. The entry immediately above
+called the CMOS account a weak working hypothesis and asked for a capture; the capture
+that arrived was a different and much better one.
+
+**The observation that broke it open: the symptom is keyed to the network card loading.**
+Not a random position in the boot — the point where the netslot module comes up. That is
+the "repeatable position" three entries had been asking someone to record.
+
+#### The mechanism, and every link was already in this diary
+
+1. **RISC OS pools spare VRAM as general RAM on this box** — proven by arithmetic on Jul 5
+   (shrinking the screen mode freed ~780 K) and confirmed again today from the OS side.
+   The usual "VRAM is screen-only" lore does not apply here.
+2. **The netslot ROM is 16 bits wide.** PRM4: 32-bit extension ROM sets execute in place,
+   **8- and 16-bit sets must be copied into RAM to run**. So a large ROM→RAM copy happens
+   at boot, and the RMA it lands in **can be VRAM**.
+3. **A marginal VRAM contact corrupts that copy** → garbage, or an abort. This is not a new
+   mechanism: Jul 10 already recorded a marginal D19 doing exactly this — *"corrupts system
+   memory … aborts with no screen corruption."*
+4. **RMA allocation varies between boots.** Land on bad cells and the boot is garbled; land
+   elsewhere and it is clean.
+
+**Point 4 is the one that matters, because it dissolves the self-healing problem.** Nothing
+is stored corrupt, so nothing has to repair itself. Two entries above went looking for a
+mechanism by which corruption could clear itself and landed on a CMOS checksum reset that
+nobody has ever seen this machine report. That search was for a phenomenon that does not
+exist. **The CMOS account is withdrawn** — not downgraded, withdrawn.
+
+#### The experiment, and how much it actually carries
+
+| | result |
+|---|---|
+| VRAM removed | **5/5 clean cold boots** |
+| VRAM refitted | 1 clean, then **failed** |
+| VRAM reseated | **5/5 clean**, and `VRAMtestA` clean unless aggressively wiggled |
+
+**The counts alone do not carry this**, and it is worth writing that down because this board
+has faked a fix before (Jul 29's reseat red herrings). Fisher one-tailed on 5/5 vs 1/2 gives
+**p ≈ 0.29**, and five clean boots is consistent with a 20%-per-boot failure rate about a
+third of the time.
+
+What makes it conclusive is **convergence of three independent legs**: wiggling the VRAM
+reliably fails `VRAMtestA`'s March-U (which alone proves the contacts are bad, and was
+already established), the pooled-VRAM mechanism above predicts this exact symptom, and the
+A/B reversal ties the two together. The A/B's job was linking a *known* defect to *this*
+symptom — not discovering the defect.
+
+#### What this retires
+
+- **CMOS.** No corrupt byte, no checksum reset, no pointer abort. Withdrawn.
+- **The SD card and its cable.** Never needed disc corruption at any point.
+- **The podule bus**, and the network card itself — a known-good card, correctly exonerated.
+- **ModeServ**, which two entries spent a soak trying and failing to convict.
+
+#### Dead ends walked today, recorded so they are not walked again
+
+- **The RJ45 was reflowed and made no difference — and could not have.** It carries only the
+  differential Ethernet pairs into the magnetics; nothing on those pins can become screen
+  text. A bad joint there gives no link or CRC errors, never garbage.
+- **SK4 pin A3 = `Bd<1>`**, and its slow rise looked like a fault but is not: a bidirectional
+  data line idling in high-Z with a passive pull-up rise is normal. The tell was that it
+  looked identical with the board unplugged.
+- **`*Podules` reads the card name correctly every time.** The ROM read path was never at
+  fault, which is consistent — the corruption is in the *copy destination*, not the source.
+- **The scope's 20 MHz bandwidth limit was on**, manufacturing ~17.5 ns rise times on every
+  edge measured before it was noticed. Check it first, next time.
+
+#### SK4 pinout — not in the TRM
+
+The TRM defers to the *Network Card Mk II Specification* (0472,208), which we do not have.
+The pinout **is** on **MainPCBCircuitDiagram sheet 4 of 7**, "Network Interface Connector":
+SK4 is a 48-way DIN, rows a/b/c × 16. Low byte: `Bd<0>`=c3, `Bd<1>`=a3, `Bd<2>`=a2,
+`Bd<3>`=a1, `Bd<4>`=c1, `Bd<5>`=c2, `Bd<6>`=b3, `Bd<7>`=a4. `Netrom*`=b1, `Netcs*`=c16.
+NetROM select decodes at `&0302 8800–&0302 88FF` from La<10>/La<11> via half a 74ACT139.
+
+#### The fix, and why the socket is not being replaced
+
+The Jul 10 escalation trigger (*"instability returning after solid, undisturbed use"*) **did
+fire**, and the response was a reseat, which worked. Current state is live-and-let-live
+again, with thinner margin than before.
+
+**Socket replacement is rejected.** It is a proprietary 136-way dual read-out DIMM connector
+with no replacement part in circulation — donor board only. Extracting a 136-pin through-hole
+connector from a multilayer board with **known battery-corroded vias** would likely destroy
+pads, and it would force redoing video-bus bodges that currently work. That trades a working
+machine for a tidier one.
+
+**The co-grounded bodge (Jul 10 fix menu item 3) remains the durable option**, and the
+signal-integrity worry against it is answerable. At ~2 ns edges, transmission-line behaviour
+starts past roughly `t_r × v / 6` ≈ 60–70 mm, so any sane route stays electrically short —
+**length is not the problem, loop area is.** A 50 mm wire with a detoured return is ~50 nH,
+and a CMOS edge slewing ~20 mA in 2 ns across that develops ~0.5 V of ringing. Co-routing the
+ground return collapses it. That is why the parallel ground wire is the whole fix rather than
+a refinement. `D19` (CPU/random port) is forgiving enough for twisted pair; `Vcd4`
+(display/serial port) is the faster line and wants miniature coax. Add slack and a service
+loop, as was done for the CMOS coin cell in July.
+
+**Re-tensioning will not help the two known-bad contacts** — `Vcd4` and pin 82/`D19` are
+already re-formed stubs with nothing left to tension.
+
+**Do not bodge blind — and note that aggressive stress will not tell you where to bodge.**
+Under hard stress **every** bit fails, not a specific one. That is a *non-specific* provocation:
+flexing the card hard lifts it in the socket and momentarily opens many contacts at once, so it
+proves the socket is mechanically marginal (already known) and localises nothing. An address
+line would produce the same all-bits signature, but so would a **control strobe (RAS/CAS/WE/OE)**
+or a marginal **power/ground contact** — and on a DIMM those are the likelier candidates, since
+the two contacts already known broken (`Vcd4`, `D19`) are neither.
+
+To localise, the provocation has to be **graded and directional**: back it off until it is
+*just barely* failing, and press one corner or edge at a time. At the threshold the weakest
+contact fails first and identifies itself; saturated stress hides it.
+
+The sharper tool is the failure *pattern*, which `VRAMtestA` already logs (`addr`, `exp`, `got`):
+
+- `got` = all-zeros / all-ones / bus float → the access failed outright → **control or power**.
+- `got` = plausible data that belongs at a *different* address → **address line**, and
+  `failing_addr EOR addr_where_that_data_lives` names the bad address bit outright.
+- a single differing bit → back to the `WalkBits` D-line table.
+
+### Aug 23 (later) — RESOLVED: the "left-channel hum" was the headphones
+
+Hum returned on the left channel hours after the Aug 22 repair, on a day of heavy handling
+(VRAM in and out twice, five power cycles, scope probes on SK4). Given this board **fails by
+moving** (Jul 10 lesson 1), a fragile bodge letting go looked like the predicted cost of the
+day. It was not. **The headphones were faulty** — through the TV there is no hum, and the
+Aug 22 repair is intact.
+
+Recorded because the path to that answer was wrong twice, and both wrong turns are reusable.
+
+**Fault #9 was ruled out first, cleanly.** That fault (pin 10, the left driver's +in reference,
+open to ground — itself a redux of #4) has a documented tell: touching a scope probe to pin 10
+kills the hum, and pin 10→GND reads OL instead of 15 kΩ. **Neither held**: pin 10→GND measured
+a reliable 15 kΩ and the probe did not change the hum. The tell earned its keep by giving a
+clean negative fast.
+
+**Then the left/right asymmetry argument, which was sound but aimed at nothing.** Left hums,
+right is clean, and the ±12 V rails and VREF generation are shared — so the fault "must" be in
+a left-specific node, ranking pin 5 (VREF into the left I/V converter, the exact mirror of #9
+one stage earlier), the Aug 22 bodge wires, and the −12 V feed via L14. **All three were
+killed at once by scoping both channels at the jack: the outputs are identical.** No asymmetry
+at the board output means no left-specific fault, and an hour of candidate-ranking evaporated.
+The lesson is to **measure the asymmetry before reasoning from it** — the whole argument was
+built on an asymmetry that only ever existed in the transducer.
+
+#### The measurement trap, which cost more than the fault did
+
+Scope readings at the jack showed **80 mVpp on both channels**, and that number is a lie worth
+understanding:
+
+- **It contradicted itself.** 80 mVpp into 32 Ω is 28 mVrms = 25 µW ≈ **80 dB SPL** — busy-street
+  loud. It could not possibly be inaudible on the right. When a reading and your ears disagree
+  by that margin, the reading is measuring the wrong thing.
+- **It moved when the probe moved** (80 mV dropping to 30 mV depending on probing). Real circuit
+  noise does not care how you hold the probe.
+- **Cause: a mains-earth ground loop.** The scope is earthed, the RiscPC is earthed, and clipping
+  a probe ground to audio ground closes a loop through both earth conductors. The pickup appears
+  **common-mode** — every tip bounces with the ground it is measured against — so the scope sees
+  it on both channels while the headphones, which respond only to tip-to-sleeve and float, see
+  none of it.
+
+The honest figure was the **20–30 mVpp at the op-amp output**, and it was the same on both
+channels. **Do not lift the scope earth to break the loop** — it works and it is a shock hazard.
+Ground the probe to the plug's **sleeve** and measure tip-to-sleeve, which is what the transducer
+actually sees.
+
+#### Banked
+
+1. **A source fault must show as an electrical asymmetry.** Identical outputs on both channels
+   mean the board is symmetric and the problem is downstream of the jack, whatever the ears say.
+2. **Probing a mains-earthed device with a mains-earthed scope injects common-mode hum.** Suspect
+   any hum reading that appears equally on all channels, and any that changes with probe handling.
+3. **Swap the transducer early.** It is the cheapest test available and it was the one that
+   actually answered this. (And rotating headphones on your head proves nothing — the left cup
+   is still fed by the left channel. Swap the *pair*, or the *channels*, or the sink entirely.)
+4. **A mains-powered sink is not a clean control either** — a sound bar or TV can hum from its own
+   earth loop. The TV test was decisive here; had it hummed, the control would have been a
+   battery-powered source into the same input.
+
+### Aug 23 — bench tooling: the Rigol is scriptable from the host
+
+The DS1104Z now answers SCPI over USBTMC from Linux, which makes waveform measurements
+capturable and comparable instead of eyeballed. Two gotchas, both cost time:
+
+- **The USB product ID changes with the mode.** `1ab1:04ce` when *Utility > IO Setting > USB
+  Device* is set to **Computer** (the USBTMC interface), `1ab1:8805` when set to
+  **PictBridge**. Only the former speaks SCPI. The udev rule in `nix-config`
+  (`modules/nixos/electronics.nix`) matches both.
+- **USBTMC exposes a bulk-IN *and* an interrupt-IN endpoint**, and matching on direction alone
+  picks the wrong one and times out on every read. Match on transfer type as well. Large
+  responses also span multiple packets *and* multiple DEV_DEP_MSG_IN transactions — handling
+  only one of those truncates silently.
