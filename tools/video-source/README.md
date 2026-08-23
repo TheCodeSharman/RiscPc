@@ -16,6 +16,7 @@ specific to any one scaler.
 | `TestPat.bas` | The capture-geometry card, standalone. Draws into whatever mode is current. |
 | `ModeSweep.bas` | Cycles the stock AKF50 modes on a timer, 15.6–37.9 kHz. |
 | `ModeTest.bas` | 24 checks over `ModeServ`'s parsing. No networking. |
+| `modeserv_soak.py` | **Host side.** Cycles modes until ModeServ stops answering, then says whether ModeServ or the machine went. |
 | `Build.obey`, `BuildIn.exec` | Tokenise `src/` on the RISC OS side. |
 
 ## Building
