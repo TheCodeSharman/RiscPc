@@ -2162,3 +2162,99 @@ data-line bodges) after a day of heavy handling. Three live hypotheses:
     candidates, not one — **game/software (documented self-clearing pattern)** *and* **IPA
     leakage (observed drip)** — both fit transient→cold-boot-cleared→clean-soaks; can't separate
     from n=1; possibly either or both. Not "IPA was the answer."
+
+### Aug 22 — TWO HANGS, both with ModeServ running; the boot garbage is a separate fault
+
+Two hangs in one session, on a machine that had run for weeks and many sessions with
+nothing like this. **ModeServ was running for both.** That is the first trigger this class
+of fault has had — every previous occurrence was a single event with nothing to reach for.
+
+| | first | second |
+|---|---|---|
+| what it was doing | ModeServ running | ModeServ running |
+| recovery | `Ctrl-Break` | reboot |
+| boot afterwards | **garbled, four or five lines in, hung again** | **clean** |
+
+**The hang and the boot garbage are separate faults.** The second hang produced no garbled
+boot at all, so the garbage is not a consequence of the hard reset leaving the disc
+mid-write, and the two do not have to share a cause. They were run together as one
+watch-item for most of the day and should not be.
+
+#### The hang: reproducible, and the first thing to chase
+
+ModeServ single-tasks and drives the Internet module through `SYS` from BASIC. Nothing in
+it is proven except on hardware, which is the standing warning in `tools/video-source/`'s
+README. A hang while it runs is therefore as likely to be ModeServ as the machine, and
+that is testable rather than a matter of waiting:
+
+- **Run ModeServ and leave it idle in its accept loop for a long period, driving nothing.**
+  Separates "the listener" from "the mode changes", which is the first fork.
+- **Then drive mode changes in a loop.** The four-leg sweep 640x480@60 -> @73 -> @75 ->
+  320x256@50 completed cleanly earlier in the day, so a single sweep is not enough; run
+  it repeatedly.
+- **Then run the machine for the same period with ModeServ NOT running.** If it survives,
+  the machine is exonerated and the fault is in the BASIC.
+- Record the screen at the hang. A `SYS` returning into a bad state usually leaves an error
+  or a partial line, and that names the call.
+
+#### The boot garbage: still open, still n=1 in its own right
+
+The Jul-8 rule (~line 1564) is that a post-game *soft-reset* abort is self-clearing noise
+and only a *cold-boot* fault counts as hardware evidence. This one recurred across a full
+power-down and a reassembly, so it clears that bar where the Jul 29 event did not.
+
+**It is not persistent corruption on the card.** Corrupt `!Boot` files fail every time;
+these read clean on a later boot with nothing repaired and no restore. So the data is
+intact and the read path is intermittent -- which is the SD-IDE hypothesis rather than the
+file-corruption one, with form at **Jul 7** (SD boot flakiness, a power-on init race) and
+**Jul 8** (random data aborts, disc corruption the prime suspect). Nothing "recovered": a
+marginal read that later succeeds needs no repair.
+
+Boot-from-ROM is clean throughout, which puts ROM, DRAM and the memory bus outside the
+failing path.
+
+- **Capture the garbage next time.** It is at a repeatable position -- four or five lines
+  in -- and if that position repeats it names the file `!Boot` is reading there, which
+  separates one bad region from random read failure. This is the cheapest discriminator
+  and neither occurrence produced it.
+- `ADFStort` is the disc/SD torture test and per Jul 29 the one that catches a flaky cable.
+  A clean `RAMtestD` does not exonerate the SD path; different bus.
+- Reseat, then **swap**, the SD-IDE ribbon and adapter. A swap is the only thing that
+  separates cable from card from adapter.
+
+#### The confounder that applies to both
+
+The machine was opened this morning to finish the audio repair, and both hangs are after
+it. Reassembly-induced faults have precedent here twice over -- **Jul 29** (the cascade
+whose real culprit was a broken CMOS-battery ground lead) and **Jun 30** (surface leakage
+under the board). Weeks of stability before and two failures the same day after is the
+strongest single correlation available, and it is not the SD path.
+
+### Aug 22 — audio: the temporary TO-92 became the proper SMT part, and the left channel's corrosion came out with it
+
+The TO-92 at Q4 was **always meant to be temporary** — a through-hole part standing in for
+an SMD one that had not arrived. During disassembly it was torn off the board and took
+**two pads with it**, so the choice was to repair the pads and put the temporary part back,
+or repair them once and fit the right part. The replacement NPN SMT transistors arrived the
+same day, so it was the second: pad repair and the correct SMD transistor together.
+
+**The left channel then died intermittently mid-repair**, and the useful part is what that
+turned out to be. It was not really intermittent — it was **at half volume**, from several
+corroded pads that needed bridging. So the balance problem and the "intermittent" one were
+the same fault seen two ways, and the audio path needed more work than the pad repair that
+started it.
+
+Result: **two hum-free channels at a balanced volume.** The full fault chain, the probing
+and the photographs are in `repair/riscpc-sound-repair/README.md`, which is the record for
+this repair — this entry points at it rather than paraphrasing it, because a paraphrase on
+one machine and the record on another had already drifted apart within a day.
+
+**The internal speaker path is broken and stays broken, by decision.** With headphones and
+speakers working, the only thing it buys is a **power-on beep when nothing is plugged in**,
+which has some diagnostic value and nothing else — a tinny mono speaker is not worth
+tracing corroded LM386 output traces for. Op-amp #2 behind it is populated but unmapped:
+internal speaker, CD-audio in or the AMP connector, unconfirmed, with pins 8 and 14 railed
+to -12 V and most likely its two unused sections. Parked, not overlooked.
+
+The reassembly this repair required is the confounder the two entries above both carry:
+the machine was opened for it, and both of the day's hangs are after it.
