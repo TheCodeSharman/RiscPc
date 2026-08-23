@@ -2404,3 +2404,44 @@ interrupt, so a flashing cursor means interrupts are alive and the machine is ex
 a software stall, in BASIC or the Internet module. A stopped cursor means interrupts are dead:
 a hard lockup, and a different fault entirely. One glance separates them, and it decides
 whether this is chased in software or on the board.
+
+### Aug 23 — the CMOS account is a WEAK WORKING HYPOTHESIS, and here is what is wrong with it
+
+The entry above reads as settled. It is not, and the weaknesses are specific rather than
+general caution.
+
+**Nothing obvious writes CMOS at the moment of a hang.** CMOS is written on configuration
+change, not during ordinary running, so a hang landing mid-I2C-write to the PCF8583 should
+be *rare*. Garbage followed **two of three** abrupt terminations. A mechanism that requires
+a rare coincidence does not explain a common outcome, and this one was written up without
+that check. If something *is* writing CMOS routinely -- a mode change path touching the
+configured mode, say -- that would rescue it, and nobody has established that either.
+
+**The pointer-abort mechanism is borrowed, not observed.** Jul 29 proved a corrupt CMOS byte
+used as a pointer gave a data abort at a ROM PC, on a fault `DEL` cleared. Nothing here has
+been shown to be that. No CMOS has been read after an occurrence, and nobody has seen RISC OS
+report a checksum reset -- which the self-healing story predicts should be visible.
+
+**The flicker is not established as CMOS-derived.** Interlace could equally come from the
+mode itself, the monitor definition, or VIDC state left behind. It was assigned to a
+"monitor/mode byte" by analogy with Jul 29's "changed screen mode", which is suggestive and
+not evidence.
+
+**n=3**, across two events a month apart, with a teardown between them.
+
+#### The alternatives it displaced are still live
+
+A partially-written **file** -- `!Boot`, a Choices file, a scrap file -- fits the same
+observations and has the advantage that files *are* written routinely, so an abrupt
+termination has something to interrupt. The marginal-read account is weaker but not dead.
+
+#### The capture that would settle it costs one command, now
+
+Take a **`*Status` baseline while the machine is healthy** and keep it. After the next
+occurrence, take `*Status` again **before clearing anything** and diff. A CMOS byte that
+differs names the fault; an identical CMOS exonerates it and sends this back to the disc.
+Also watch the recovering boot for a checksum-reset message: the self-healing story predicts
+one, and its absence is evidence against.
+
+Nobody has captured anything from three occurrences. That, rather than another hypothesis,
+is what this needs.
