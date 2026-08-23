@@ -494,6 +494,49 @@ This also de-risks the effort: milestone 1.5 is both the validation step *and*
 a finished shippable product, so there's something real in hand before any pin
 is ever touched.
 
+## Prior art — ArcDVI (and what it does / doesn't change here)
+
+**[ArcDVI](https://github.com/evansm7/ArcDVI)** (Matt Evans; open-source; Lattice ECP5
+FPGA) is a *working prototype* of "reconstruct VIDC video and emit it digitally" — but by
+a **different route than this doc analyses**, and that subtlety is the whole answer to
+"does this make our VIDC20 conclusion premature?":
+
+- ArcDVI **passively taps VIDC's in-circuit data bus + strobes and models the chip's pixel
+  pipeline** — i.e. it is, in effect, **a live hardware VIDC1 emulator**: a functional
+  re-implementation of the chip in the FPGA, synchronised to the real one via its input
+  signals. The real VIDC still runs and drives the analog output; ArcDVI just *shadows* it,
+  so the authentic machine is untouched (unlike an RTG *replacement*). It does **not** use
+  the `ED[7:0]` external-output port or `ESEL` at all. Consequence: the **VIDC20 version is
+  a VIDC20 emulator in the FPGA** — harder (more modes, wider/faster path, DMA-cycle
+  decode) but a *well-defined* problem, because the model already exists in software
+  (**RPCEmu**, and the [mame-riscpc-driver.md](mame-riscpc-driver.md) idea) — the FPGA build
+  is "port an existing accurate VIDC20 model to hardware, fed by the real bus."
+- Therefore it **does not challenge this doc's ED-port conclusion.** ESEL being hardwired
+  (EREG→ESEL tie) for supremacy/overlay, plus the ~5–7 ns `Ted` settle ceiling capping
+  muxed RGB at ~640–800 px, still kill the *ED-port* live-full-colour route on VIDC20.
+  That analysis stands unchanged.
+- **Scope:** VIDC1 / Archimedes only (no VIDC20/RISC PC); **DVI only, no audio (WIP —
+  S/PDIF or HDMI-via-external-encoder planned)**; **clips onto the VIDC chip** (not a
+  podule); line/pixel-doubles; native-timing sync out. Marked "deprecated prototype";
+  stated next step = a consolidated FPGA + HDMI-encoder + MCU PCB.
+
+**What it DOES reopen.** ArcDVI proves the **input-side tap + chip-model** route is real and
+FPGA-tractable — the route this doc lumped into "memory-bus sniff / shadow-GPU" and
+dismissed as impractical for VIDC20 (64-bit bus, multi-GB/s, re-implement the front-end).
+That blanket dismissal is arguably **premature for the low-res / native-timing modes we
+actually care about (demos):** VIDC1's bus is narrow/slow enough for an ECP5, VIDC20's
+*effective* video data rate for MODE-13-class modes is modest (the GB/s figure is the
+worst-case high-res/high-colour number, not the demo case), and with VRAM the VIDC20 feed
+isn't the full 64-bit DRAM bus. So the honest revised position:
+- **ED-port route on VIDC20 — dead** (ESEL hardwired + settle ceiling). *Unchanged.*
+- **Input-tap + chip-model route on VIDC20 — worth reopening at low/moderate res**, using
+  ArcDVI as a directly-studiable open-source reference (and a possible collaboration — its
+  roadmap is the FPGA+HDMI+MCU board this doc envisions, just for VIDC1).
+- **High-res full-colour digital — still impractical** (the 64-bit / GB/s point holds).
+
+So: ArcDVI doesn't rescue the *port* we analysed, but it does show we may have closed the
+door too early on a *different* digital route for VIDC20 at the resolutions that matter.
+
 ## References (in-repo)
 
 - `docs/ARM7500 Data Sheet (DDI0050C 1995-10).pdf` — integrated VIDC20
