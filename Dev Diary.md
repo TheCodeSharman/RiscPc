@@ -2258,3 +2258,42 @@ to -12 V and most likely its two unused sections. Parked, not overlooked.
 
 The reassembly this repair required is the confounder the two entries above both carry:
 the machine was opened for it, and both of the day's hangs are after it.
+
+### Aug 23 — the boot garbage is the Jul 29 watch-item recurring, and it is not game-specific
+
+The Aug 22 garbled boot and the **Jul 29 post-game boot garbage are the same symptom**:
+an abrupt soft-reset exit from a program that had set the screen mode, then a boot that
+comes up wrong — changed screen mode and garbage printed partway through on Jul 29, garbage
+four or five lines in on Aug 22. That watch-item was left at **n=1** and explicitly "not
+concluded benign". It is now **n=2**, which is what it was waiting for.
+
+**This kills hypothesis 1.** Jul 29 reasoned from "garbage only after a game (n=1)" that
+Nevryon's direct VIDC programming might leave sticky state a soft reset cannot clear. There
+was no game on Aug 22 — ModeServ was running, which sets modes through the OS, not by
+poking VIDC. So the garbage is not game-specific and the VIDC-soft-state story goes.
+
+**What the two occurrences actually share is handling.** Jul 29 was "after a day of heavy
+handling"; Aug 22 was hours after the machine was opened and reassembled for the audio
+repair. That is the same shared factor the Jul 29 verdict eventually landed on — transient
+surface leakage, corroborated by IPA observed draining from under the daughterboards — and
+it is hypothesis 2's territory (a bodge, via or ROM-area contact disturbed by handling)
+rather than hypothesis 3's.
+
+**The Jul-8 rule no longer covers it.** That rule is that a post-game *soft-reset* abort is
+self-clearing noise and only a *cold-boot* fault counts as hardware evidence. Both events
+are soft-reset aborts, so both were exempt under it — but the Aug 22 garbage **recurred on
+the boot after a full power-down and reassembly**, which the rule does not survive.
+
+**ModeServ is not the cause of the hang, on the evidence so far.** A night idle in its
+accept loop survived, and a driven soak has now put **145 mode changes through in 37 minutes**
+with no failure — six times what either of the Aug 22 sessions did before hanging. What
+remains different about those sessions is **uptime**: both hangs were on a machine that had
+not been rebooted since the reassembly, and everything since has been on a freshly booted
+one. Accumulation rather than activity is the surviving idea, and it predicts the soak
+hangs eventually whether or not modes are being driven.
+
+**The discriminator is still uncaptured, and it is still the cheapest one.** Photograph or
+transcribe the screen at the garbled boot. The garbage sits at a repeatable position; if
+that position repeats across occurrences it names the file `!Boot` is reading there, which
+separates one bad region from random read failure. Three occurrences have now gone by
+without it.
