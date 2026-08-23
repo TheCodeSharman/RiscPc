@@ -1993,3 +1993,172 @@ smoke-test an `.adf` under RPCEmu.
   `SOUND 1,1,120,-1` (stop: `SOUND 1,0,0,1`; pan: `*Stereo 1 -127`).
 - **Remaining:** swap the temp BC549C → SMD **BC849C**; optionally fit a matched
   BC849C at Q1 for a balanced pair.
+
+### Jul 29 — RESOLVED: VGA→HDMI "speckle" noise was cracked VGA-socket solder joints
+- **Symptom:** heavy full-field pixel **speckle** on the RetroScaler's HDMI output,
+  re-randomising every frame. Two earlier sessions chased it as a scaler/timing
+  problem (locks, frame-sync, thermal, marginal RGBHV bypass) — all dead ends.
+  Frame-extraction (ffmpeg) showed the noise is **analog** (ADC-level speckle),
+  upstream of anything firmware/timing → look at the *signal path*, not the scaler.
+- **The tell that cracked it:** wiggling the VGA cable — then the **connector shell
+  itself** — at the RISC PC end changed/worsened the noise. A mechanical fault
+  explains everything: the speckle, "was rock-solid originally, now degraded",
+  worse-when-warm, and the scaler's occasional `RGBHV limit no sync` (a noisy input
+  won't lock cleanly).
+- **False fix (instructive):** DeoxIT on the VGA plug pins + hard-tightening the
+  thumbscrews **stopped the noise for a few days, then it recurred.** That
+  recurrence *is* the diagnosis: a purely oxidised contact stays fixed once
+  cleaned; a fix that keeps coming back is a **load-bearing cracked joint** the
+  better contact pressure only masked.
+- **Isolation:** swapped the VGA cable → **no change**, still wiggle-sensitive right
+  at the socket, same speckle. Rules out cable/plug ⇒ the fault is in the RISC PC's
+  **VGA D-sub socket-to-board solder joints.**
+- **Fix:** reflowed the socket joints — there were **visible cracks** in them,
+  confirming it. Key detail: the two large **ground/shield mounting tabs** are the
+  culprit and the usual fatigue point (cable insert/removal force). They're big
+  copper heat-sinks tied to the ground plane, so **hot air won't flow them** — hit
+  those two with a **direct iron** (flux + leaded solder, ~350 °C, dwell to a clean
+  fillet). The 15 signal pins are low-mass. **Result: rock-solid 640×480 desktop,
+  speckle gone.**
+- **Lessons banked:**
+  1. **A fix that keeps recurring after cleaning = a mechanical/cracked joint,
+     not oxide.** DeoxIT that lasts days is a symptom, not a cure.
+  2. **Wiggle the *connector shell*, not just the cable** — distinguishes a
+     socket-board-joint fault from a cable/plug fault.
+  3. **Full-field per-frame speckle = analog/ADC noise upstream of the scaler** —
+     stop tuning firmware/timing and go look at the physical signal path.
+  4. **D-sub ground/shield tabs need a direct iron**, not hot air — they sink the
+     heat into the ground plane. They're also the first joints to crack.
+- Companion detail (scaler-side mode tuning, backups, firmware tasks) lives in the
+  RetroScaler handover, `~/riscpc-retroscaler-handover.md`.
+
+### Jul 29 (later) — RESOLVED: reassembly cascade, real culprit was a broken CMOS-battery ground lead
+Buttoned the machine up after the VGA reflow and it fell into a *cascade* of faults —
+each new one caused by the handling of chasing the last. A long, messy evening whose
+lesson is as much about method as electronics. Final state: **boots clean, 1280×1024
+in 256 colours, no shimmer** — better than pre-saga. Faults, in the order they bit:
+
+- **No boot (fan+LED, no video).** Board went in/out of the case → a **DRAM SIMM
+  unseated** in its already-marginal socket (see Jul 10). Reseating both sticks → back.
+  Keyboard-LED confusion along the way: with *all* DRAM out the machine dies in
+  `NoDRAMPanic` before the keyboard lamp-test, so "no keyboard LED" was a *side effect
+  of empty RAM sockets*, not a second fault. Blinking keyboard LEDs later = POST
+  *running and reporting* — the board core was alive throughout.
+- **Network card no-boot / no link.** The **parallel-port D-sub jackpost (hex pillar)
+  was fouling — and probably shorting — the EtherX podule**, so the podule couldn't
+  seat square (POST podule-scan hangs) or link (LED off). Removed the jackpost, screwed
+  the podule down to hold clearance → boots + links. (My "maybe something's shorting"
+  hunch was right *here* — just a jackpost, not IPA.)
+- **VRAM not detected.** Repeated in/out fatigued the **fragile VRAM socket** (two pins
+  already snapped, contacts bent-outward per the earlier repair). Re-formed the flattened
+  contact under magnification, seated once, left it alone → detected. `VRAMtestA` clean.
+- **The big one — data aborts at `&038F79E8`, *same address every time*.** &038F79E8 is
+  in the **ROM region** (kernel map `Docs/0197276.02`: `03800000 8M ROM`), so the first,
+  seductive theory was a **cracked ROM-socket bodge** (pin-37 wire / pin-30 D31 — real
+  fatigue points, Mar/Apr entries). Reseating ROM and moving to the bench both seemed to
+  "fix" it → **red herrings** (each was really just a coincidental power-cycle). The tell
+  that broke it open: **a `DEL` (CMOS-reset-to-defaults) cleared the abort.** A stuck ROM
+  bit *cannot* be fixed by clearing CMOS → the abort was **corrupt CMOS**, not ROM: RISC OS
+  ROM code reads a CMOS byte, uses it as an index/pointer, a corrupt value → bad address →
+  data abort at that ROM PC. Root cause of the corruption: **the black (negative/ground)
+  lead had snapped off the switch in the coin-cell holder** → no backup return path → the
+  PCF8583 loses/corrupts CMOS every time main power drops → DEL-clearable aborts + "needs
+  resetting constantly." Resoldered shorter leads, remounted the cell (cool spot, insulated
+  from chassis, inline-disconnect + service loop so a future teardown can't yank it again).
+- **Collateral:** the Jul 19 tacked-on TO-92 **Q4 (sound) got bumped and lifted its SMD
+  pads** — deferred to the incoming BC849C; the reverse-engineered audio netlist means it's
+  a clean bodge-to-net-endpoints (C→+5V, E→output+47k feedback, B→driver), no pads needed.
+
+- **Lessons banked (mostly about method):**
+  1. **`DEL` clears it ⇒ it's CMOS, not silicon/ROM.** Clearing config can't fix a stuck
+     ROM bit or bad RAM — so a DEL-curable "ROM-region" data abort is a *corrupt CMOS byte
+     used as a pointer*, not a hardware ROM fault. This single test killed the red herring.
+  2. **"Recurs / needs resetting often" ≠ a wrongly-set option; it's ongoing corruption.**
+     A mis-set value DEL-fixes *once* and stays. Recurring corruption = a power/battery
+     fault scrambling random bytes each cycle. Chase the *battery*, not the *setting*.
+  3. **CMOS/clock both lost across power-off = battery-backup fault** (both live in the
+     battery-backed PCF8583). Fast confirmation test.
+  4. **The act of isolating was *generating* faults.** Six collateral hits in one session
+     (DRAM, jackpost, VRAM, ROM-chase, Q4, and nearly the battery splice) on a tired,
+     much-bodged board. On fragile hardware, **stop stripping** — get to one supported,
+     known-good config, reseat *once*, and diagnose without more teardown where possible
+     (the whole CMOS root-cause was found at the keyboard: `DEL` + `*Status`, no screwdriver).
+  5. **Coincidental "fixes" lie.** Reseat-and-it-works / move-to-bench-and-it-works both
+     looked like the fix and were both power-cycle coincidences. Distrust a fix you can't
+     *explain*; demand a mechanism (the `DEL` test gave one).
+  6. **Bonus:** the high-res desktop "shimmer" that looked like a scaler/bypass limit was
+     the **cracked VGA joint** all along — clean signal → 1280×1024×256 is rock-solid.
+- **Case now fragile too.** The aged case plastic has gone brittle — **2–3 pieces snapped
+  off just lifting the motherboard out.** Glued one back, left the rest (kept for reglue /
+  reprint reference). This is itself a hard reason to **stop disassembling**: the case is now
+  a consumable that degrades every teardown. ABS→ABS is best solvent-welded (acetone) rather
+  than glued; broken retention features are candidates for 3D-printed replacements (cf. the
+  Jul 1 printed standoff).
+- **Validated (end of session):** CMOS-battery fix confirmed by a **power-off retention test**
+  — settings (and clock) survived a full power-down, i.e. backup path restored. The RISC PC
+  was then **proven 100% healthy on a direct VGA PC monitor** (perfect picture, bypassing the
+  scaler) — which is how a *later* no-signal scare was correctly pinned on the **RetroScaler**,
+  not the RISC PC (see the RetroScaler handover). Reassembled, running clean at 1280×1024×256.
+  Battery remounted on shorter leads with strain-relief; if putting it on the case, use an
+  **inline disconnect + service loop** so a future teardown can't yank the lead again.
+- **Open items:** Q4 sound-pad repair (pending SMD BC849C); case-plastic repairs (reglue /
+  reprint the snapped pieces).
+
+### Jul 29 (later still) — WATCH-ITEM: post-game boot garbage — unresolved, soak running
+Late in the session, **one** boot (right after quitting **Nevryon** under ADFFS) came up with a
+**changed screen mode + garbage printed partway through boot.** A `DEL` + full cold power-cycle
+cleared it. **NOT concluded benign** — one recovery isn't conclusive, and "garbage during boot"
+is a legitimate data-corruption signature on a board with this bus history (battery-leak vias +
+data-line bodges) after a day of heavy handling. Three live hypotheses:
+1. **Game soft-state** — Nevryon programs **VIDC directly** (also why it *tears* on the scaler —
+   bypasses the MDF). Old games leave sticky mode/hardware state a soft reset won't clear but a
+   cold boot does. Correlation so far: garbage **only after a game (n=1)** — suggestive, weak.
+2. **Memory-bus degradation** — a bodge/via/ROM-area contact disturbed by today's handling.
+3. **SD-IDE cable flakiness** — *strong fit*: boot is disc-read-heavy, and the SD path has form
+   (Jul 7 "SD boot flakiness = power-on init race, cheap card vs one-shot adapter"). A marginal
+   SD read → corrupt boot files → garbage + wrong-mode (bad `!Boot`/config read); cold-boot-fixes
+   -it matches an init-race resolved on clean power-up. The game correlation may be coincidental
+   (that's just when a reboot happened).
+- **Discriminators queued (all non-invasive):**
+  - **`RAMtestD` 9999-pass soak running overnight** (line 31 `passes%`=9999; uncached March-U over
+    the free pool). Tests DRAM + **memory bus only** — NOT the SD path. **Read `RAMlogD`** in the
+    morning (it flushes each line to disk): many clean passes → memory bus exonerated; `FAULTS
+    ... bits N PA &x (SIMMx/bankY)` → exact culprit bit/stick; `STOPPED err @line` → an *SD-write*
+    failure is possible (it logs to SD every pass) → a clue toward the cable, not RAM.
+  - **`ADFStort`** next — the disc/SD torture test (Jul 8 ran clean overnight); *this* is what
+    catches a flaky SD cable. A clean RAMtestD does NOT exonerate the SD path — different bus.
+  - **Reseat the SD↔IDE ribbon/adapter** (bench, gentle) as the mechanical check.
+- **Verdict (2026-07-31): no *ongoing* hardware fault, but the single event's cause is
+  genuinely AMBIGUOUS (n=1) — leading candidate is transient IPA/flux leakage, NOT the game.**
+  Soaks all clean: **RAMtestD 879 passes** (both SIMM banks, ~29MB, 0 faults — `RAMlogD`),
+  **VRAMtestA clean** (re-formed socket holds), **ADFStort 1000 passes clean** (SD-IDE path),
+  + **~a day continuous stable**. That rules out a *persistent* hardware fault.
+  - ⚠️ The earlier "Nevryon left VIDC soft-state" idea is **weak**: VIDC20 registers are
+    **write-only / memory-mapped**, so a game writing them **cannot cause a data abort**.
+  - **Leading candidate — transient IPA/flux surface leakage.** IPA drizzled under the daughter
+    repair-boards during the reassembly clean → leakage / subtle bus interference / CMOS
+    corruption, then **dried out**. This is *exactly* the **Jun-30 "surface leakage under the
+    board / wet-paper interference"** class — precedent and all. Fits transient-then-self-healed;
+    "after a game" is likely coincidence (IPA drying in that window).
+  - Other software candidates: game corrupting **vectors / system workspace** (survives a
+    soft reset, cleared by cold boot) or **bad CMOS** (fits the mode-change; cleared by the DEL).
+  - **KEY:** the clean soaks do **NOT** distinguish these — a transient wet-leakage fault that
+    has since dried leaves the soaks equally clean, so "clean soaks ⇒ game software" is a
+    non-sequitur.
+  - **Action:** per the Jun-30 lesson (leakage recurs with humidity until scrubbed), **isopropyl-
+    scrub + thoroughly dry the underside** under the daughterboards to kill any IPA/flux residue.
+    Passively watch for recurrence + note correlation (game / humidity / nothing).
+  - **CORROBORATED:** IPA was **observed dripping/draining from that trapped area after the
+    work** — direct evidence of pooled liquid, upgrading transient-IPA-leakage from "leading
+    hypothesis" to evidenced cause. **Lesson: stop drenching the board in IPA to clean flux —
+    targeted/conservative application (swab/brush + blot, or sparing no-clean flux) in future.
+    The stacked-daughterboard capillary trap can't drain or dry once assembled, so keep it dry
+    at reassembly.**
+  - **BUT game/software is co-equal (arguably leading) — established precedent:** the **Jul-8
+    rule** (~line 1564) already documents that **a post-game *soft-reset* abort is self-clearing
+    noise; only a *cold-boot* desktop abort counts as hardware evidence.** This episode was
+    exactly that — Ctrl-Break out of Nevryon (soft reset) → garbled boot → cold boot cleared it
+    — so by our own criterion it **doesn't even count as hardware evidence.** So: two supported
+    candidates, not one — **game/software (documented self-clearing pattern)** *and* **IPA
+    leakage (observed drip)** — both fit transient→cold-boot-cleared→clean-soaks; can't separate
+    from n=1; possibly either or both. Not "IPA was the answer."
