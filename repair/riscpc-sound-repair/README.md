@@ -18,6 +18,12 @@ reverse-engineered by probing. See [[board-revision-vs-schematic]] /
   **earphones** (see phantom‑fault gotchas). But a *later* round was **real** — the
   left‑channel corrosion chain above. Lesson: verify on the scope *and* keep
   digging if the mirror method shows a genuine L≠R.
+- **Q1 and Q4 are both the proper SMD part now, as a matched pair.** The TO-92
+  BC549C at Q4 was always a stand-in; it was torn off during a disassembly and took
+  two pads with it, so the pads were repaired once and an SMD BC849C fitted rather
+  than the temporary part going back. **Q1 was swapped with it** — not strictly
+  necessary, since Q1 had not failed, but the channels are symmetric and a matched
+  pair is worth more than the one part saved.
 - **Op-amp #2 / speaker(?) path — DEFERRED** (until a pressing need). op-amp #2
   (TL074) is now **populated** (it was unfitted). Its purpose is **unconfirmed** —
   may feed the internal speaker *and/or* an aux / CD-audio connector; not yet
@@ -283,14 +289,25 @@ SOUND 1,1,120,-1          REM stop with: SOUND 1,0,0,1
 | 20 | pin10-ref-15k-open-to-ground | the 15 kΩ (`153`) pin‑10 reference — open connection to its via/ground (fault #9) |
 | 21 | pin10-ref-15k-wire-bridge-fix | resistor‑to‑via bridged with a wire → reference back to 0 V, hum gone |
 
-## Remaining
-- Swap the temp **BC549C → SMD BC849C** at Q4; optionally fit a matched BC849C at
-  **Q1** for a balanced pair.
-- **Op-amp #2 / speaker(?) path — DEFERRED** (low value: drives the power-on
-  beep through a tinny mono speaker). op-amp #2 now populated. If ever revisited:
-  (1) **reverse-engineer op-amp #2** — which sections are used, and what it
-  actually feeds (internal speaker? CD-audio in? AMP connector?); pin 8 & pin 14
-  railed to −12 V are probably just its unused sections. (2) Then trace + clean
-  the corroded LM386 output traces (pin 5 → 220 µF C161 → speaker; Zobel; LK11),
-  verify the 220 µF cap.
-- Re-verify the **+5 V collector** rail on Q1/Q4 when the SMD part goes in.
+## Remaining — DEFERRED, and intended to stay that way
+
+**Everything the headphone and speaker outputs need is done.** What is left is the
+**internal speaker and the unknown sound ports**, and reaching them means
+**reverse-engineering the rest of the sound schematics** — op-amp #2's sections and
+what they actually feed (internal speaker? CD-audio in? AMP connector?), then the
+LM386 output traces behind it.
+
+**This is diminishing returns and the intention is to leave it unresolved until
+there is a concrete need for it.** With headphones and external speakers working,
+the whole prize is a power-on beep when nothing is plugged in — real diagnostic
+value, but only that, against mapping an undocumented board revision by probing.
+Not an oversight to be tidied up later; a decision.
+
+If a need does arrive, the order is:
+
+1. **Reverse-engineer op-amp #2** as op-amp #1 was — which sections are used and
+   what each feeds. Pins 8 and 14 sit railed at −12 V and are most likely just its
+   two unused sections open-loop, which is harmless, but that is not confirmable
+   without the map.
+2. **Then** trace and clean the corroded LM386 output traces (pin 5 → 220 µF C161
+   → speaker; Zobel; LK11) and verify the 220 µF cap.
