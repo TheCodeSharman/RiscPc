@@ -2345,3 +2345,62 @@ a better account of "twice in hours after weeks of nothing" than coincidence is.
 Image the card and diff it against the existing backup: differences that are ordinary drift
 look like drift, and a boot file full of garbage does not. Identical boot files mean the data
 was never corrupt and the read path is at fault; a differing one names what was rewritten.
+
+### Aug 23 — one fault, not three: the hang corrupts CMOS, and everything else is downstream
+
+Today's entries above treat the hang, the garbled boot and the flickering output as separate
+things. **They are one fault with two consequences**, and the reasoning that separated them
+was bad: hang 2 produced no garbage, which was read as evidence of independence. It is not —
+separability in one direction is exactly what a *probabilistic* consequence looks like. The
+asymmetry that matters is the other one: **garbage has never occurred without an abrupt
+termination before it**, while an abrupt termination only sometimes produces garbage.
+
+**What gets corrupted is CMOS, not the card.** The mechanism is already in this diary, from
+Jul 29: RISC OS ROM code reads a CMOS byte, uses it as an index or pointer, and a corrupt
+value gives a bad address and a data abort at that ROM PC. That is precisely "garbage four or
+five lines into boot, then hangs". The flickering VGA is the same corruption seen through a
+different byte — a wrong monitor/mode setting, which is why Jul 29 recorded it as "changed
+screen mode". Both symptoms, one cause.
+
+**CMOS lives in the battery-backed PCF8583 and is written over I²C, so a hang mid-write
+leaves a partial write.** That needs no battery fault and no disc fault. It also explains the
+intermittency exactly: a CMOS write has to be in flight for the hang to corrupt anything,
+which is why hang 2 left a clean boot.
+
+**And it explains the self-healing that had no mechanism.** RISC OS checksums CMOS; a failed
+checksum resets it to defaults. So it clears itself with nobody touching anything — no file
+rewritten, no marginal read that later succeeded, no card that repaired itself.
+
+#### What this rules out, and on what evidence
+
+- **The battery and its return path.** The machine sat fully disconnected through the teardown
+  and reassembly and **kept its CMOS settings**, which is a stronger version of the lesson-3
+  test (CMOS and clock both lost across power-off = backup fault) and it passes.
+- **The SD card and its cable.** Nothing here requires disc corruption. The earlier argument
+  that clustering implied a ribbon disturbed by the rebuild is withdrawn: two garbled boots in
+  one day needs no cable at all once the cause is two abrupt terminations in one day.
+- **Accumulated uptime**, already refuted above — days at one hang, two hours at the other.
+- **ModeServ**, as far as a targeted test can say: a night idle in its accept loop survived,
+  and a driven soak put **176 mode changes through in 45 minutes with zero failures**. It was
+  running for both hangs and cannot be cleared outright, but it cannot be reproduced either.
+
+#### The banked lesson that needs amending
+
+Jul 29 lesson 2 reads: *"Recurring corruption = a power/battery fault scrambling random bytes
+each cycle. Chase the battery, not the setting."* That is incomplete. **Repeated crashes are a
+second way for CMOS corruption to recur**, and they leave the battery blameless. The Jul 29
+root cause -- a snapped coin-cell ground lead -- was a real defect and worth fixing, but
+"broken lead therefore the corruption" was an inference, and corruption has now recurred with
+a backup path demonstrably working.
+
+#### What is actually open
+
+**Only the hang**, and it has no reproduction. Both occurrences had ModeServ running and a
+session driving mode changes; neither the idle soak nor the driven one reproduces it. The
+next thing worth capturing costs nothing and nobody has recorded it yet:
+
+**whether the text cursor is still flashing when it hangs.** The cursor blinks off the VSync
+interrupt, so a flashing cursor means interrupts are alive and the machine is executing --
+a software stall, in BASIC or the Internet module. A stopped cursor means interrupts are dead:
+a hard lockup, and a different fault entirely. One glance separates them, and it decides
+whether this is chased in software or on the board.
