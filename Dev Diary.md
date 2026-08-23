@@ -2640,3 +2640,82 @@ capturable and comparable instead of eyeballed. Two gotchas, both cost time:
   picks the wrong one and times out on every read. Match on transfer type as well. Large
   responses also span multiple packets *and* multiple DEV_DEP_MSG_IN transactions — handling
   only one of those truncates silently.
+
+### Aug 23 (evening) — what survives the network-card account
+
+The entry above resolves the fault to the VRAM socket. Before that landed, the same evening was
+spent building a case that the network card itself was defective. **That conclusion is withdrawn**
+— the card is a known-good part and the resolution above exonerates it. The measurements taken
+along the way stand, and several of them corroborate the VRAM account rather than competing with
+it, so they are kept here and the prose that misread them is not.
+
+#### The transfer rate, and why the card kept appearing in it
+
+`ADFStort` at a 4 MB file and `&40000` blocks reaches its first corruption at about **88 MB
+moved**. `shared-xfer/Diag/ADFStortLo` records a **1000-pass, 8 GB clean run at the same block
+size** before the teardown. That is roughly a **ninety-fold rate change**, so it measures a change
+in the machine rather than a marginality that was always present.
+
+With the network card **removed**, the same test runs **440 MB clean**.
+
+| clean run | probability under the 88 MB rate |
+|---|---|
+| 128 MB | 23% |
+| 264 MB | 5% |
+| 440 MB | 0.7% |
+| 880 MB | 0.005% |
+
+**Under the VRAM account this is the expected result, not a fact about the card.** Removing the
+card removes the netslot ROM→RAM copy and the Internet module's allocations, which lowers RMA
+pressure — so less of what the test moves lands in pooled VRAM. The card raises the failure rate
+without being faulty, which is the same keying the resolution above describes.
+
+It also explains why the disc looked guilty for so long: **everything written to the SD is
+buffered in RAM first**, so a marginal VRAM contact corrupts the buffer and the machine writes
+garbage to a good disc over a good cable.
+
+#### The disc is structurally perfect, with evidence
+
+`riscpc-2026-08-23-post-hangs.hdf`, 2000 MiB, read twice to the same sha256.
+
+| check | result |
+|---|---|
+| 127 map zone checksums, both copies | all valid |
+| map cross check (EOR of `CrossCheck` must be `&FF`) | `&FF` |
+| the two redundant map copies | byte-identical |
+| boot block checksum, defect list | valid, empty |
+| directories, `StartMasSeq` vs `EndMasSeq` | 2634, none incomplete |
+
+The 56 MB differing from the July baseline are named by the directory diff and are ordinary use —
+packages installed, `Choices` grown, 77 runs into previously-free space. No run became zeros or a
+uniform fill. **What this cannot see is a file overwritten inside an extent it already owns**, so
+a content-level partial write passes all of it.
+
+**The IDE cable is out**: a second cable, an ATA66 with the pin-20 key drilled out, reproduces the
+boot fault at the same line.
+
+#### Measurement discipline, which is the durable part
+
+- **Measure megabytes, never passes or cycles.** The rate is per byte moved, so shrinking the file
+  or the block changes the unit and not the sensitivity.
+- **`blk%` is a live variable, not a free speedup.** The failure mode is multi-sector transfer
+  timing, so a smaller block can suppress the fault outright. A small-block run only means
+  something against a large-block run of equal MB.
+- **A negative from an instrument that has never fired is worth nothing.** The clean 440 MB counts
+  only because `ADFStort` had already corrupted on this machine, at these parameters, the same day.
+- **Anything under a few hundred megabytes is uninformative**, which is what makes a single clean
+  boot after an intervention worthless here.
+
+#### Two traps that are not about the card
+
+**The disc-unplugged A/B does not mean what it appears to.** Booting with no disc is clean and the
+first boot with the disc connected fails, which reads as the disc path being implicated. But with
+no disc there is no `!Boot`, so `PreDesk.SetupNet` never runs — and that is what first drives the
+card. No disc means the card is never touched, so the comparison is not about the disc at all.
+
+**The cursor test has three states, not two.** The banked version reads: cursor flashing means
+interrupts are alive and it is a software stall, cursor stopped means interrupts are dead and it is
+a hard lockup. A third has been seen — **cursor stopped, Caps Lock still working**. The LED is
+host-driven, so a responding Caps Lock means IRQs are still being serviced: interrupt handlers
+running while the foreground is stuck in SVC inside a driver loop. Ask whether the picture is still
+stable as well, since that keeps the video subsystem out.
