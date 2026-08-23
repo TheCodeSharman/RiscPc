@@ -2297,3 +2297,51 @@ transcribe the screen at the garbled boot. The garbage sits at a repeatable posi
 that position repeats across occurrences it names the file `!Boot` is reading there, which
 separates one bad region from random read failure. Three occurrences have now gone by
 without it.
+
+### Aug 23 — CORRECTION: uptime is refuted, by the audio repair's own timeline
+
+The entry above calls accumulated uptime "the surviving idea" for the hangs. **It is wrong**,
+and the repair timeline settles it — the second hang was on a machine that had been up about
+two hours, not days.
+
+| | uptime at the hang | recent handling | ModeServ |
+|---|---|---|---|
+| hang 1, morning | **days** — weeks of stability before it | none | running |
+| hang 2, ~23:45 | **~2 hours** | complete teardown and rebuild, hours earlier | running mid-sweep |
+
+The second hang is pinned to about 23:45: the commit written immediately after finding
+ModeServ gone is stamped 23:51. The machine was reassembled and working well before that,
+because the sound repair's own commits at 21:32 and 22:14 were written while testing audio
+through it. So the two hangs bracket the range — days at one end, hours at the other — and
+**uptime does not discriminate between them.**
+
+What survives is uncomfortable rather than satisfying. ModeServ was running for both, and a
+driven soak has now put **166 mode changes through in 42 minutes** without reproducing it,
+after a night idle that also survived. So ModeServ is necessary-but-not-sufficient at best
+and coincidental at worst: two occurrences sharing a factor that a targeted test cannot
+reproduce is the shape of a coincidence, not of a cause.
+
+### Aug 23 — the boot garbage: what "it healed itself" would have to mean
+
+Two readings, and they differ in whether anything needed repairing at all.
+
+**Corrupt write, later rewritten.** The only way corrupt data on the card clears itself is
+if the corrupted thing is a file `!Boot` **rewrites** on a later boot — a Choices file, a
+scrap file, a PreDesk log. Written half-way while the machine hung or was `Ctrl-Break`ed,
+read as garbage on the next boot, and rewritten once a boot got far enough. That is a real
+mechanism rather than magic, but it requires the file to be one written every boot, and it
+predicts the file's **contents changed** across the episode.
+
+**Marginal read, nothing corrupt.** Needs no healing at all: the data was always fine and a
+later read simply succeeded. Nothing repaired anything because nothing on disc was broken.
+
+The clustering favours the second, and not by chance. A marginal cable quiet for weeks does
+not usually fire twice in a few hours at random — it does if something disturbed it, and
+**the machine was opened and rebuilt that day.** A ribbon reseated a little differently
+turns a comfortable margin into a marginal one. That is a step change with a cause, which is
+a better account of "twice in hours after weeks of nothing" than coincidence is.
+
+**The discriminator is a file comparison, and it does not need the fault to be happening.**
+Image the card and diff it against the existing backup: differences that are ordinary drift
+look like drift, and a boot file full of garbage does not. Identical boot files mean the data
+was never corrupt and the read path is at fault; a differing one names what was rewritten.
