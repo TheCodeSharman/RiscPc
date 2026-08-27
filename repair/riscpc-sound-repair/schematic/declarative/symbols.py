@@ -87,6 +87,10 @@ class Unit:
     """One drawable section of a symbol: unit 1 of a TL074, say."""
     index: int
     pins: dict[str, Pin] = field(default_factory=dict)
+    # Extent of the drawn body in symbol space, excluding pin leads. Wires
+    # must route around this: checking pins alone let a feedback leg drop
+    # straight through a transistor.
+    box: tuple[float, float, float, float] | None = None
 
 
 @dataclass
@@ -210,6 +214,8 @@ def load(lib_id: str, _seen: set[str] | None = None) -> Symbol:
                 angle=float(ang), length=float(length),
             )
 
+    _measure(sym, body, name)
+
     # Drop unit 0 (common graphics) when real units exist, and drop any unit
     # that turned out to hold no pins.
     sym.units = {i: u for i, u in sym.units.items() if u.pins}
@@ -248,6 +254,7 @@ def generate_box(part) -> Symbol:
         unit.pins[num] = Pin(num, num, BOX_HALF_W + PIN_PITCH, y, 180.0, PIN_PITCH)
         graphics.append(_pin_sexp(num, BOX_HALF_W + PIN_PITCH, y, 180))
 
+    unit.box = (-BOX_HALF_W, -(top + PIN_PITCH), BOX_HALF_W, top + PIN_PITCH)
     sym.units[1] = unit
     sym.art_name = part.type
     h = top + PIN_PITCH
@@ -287,6 +294,43 @@ def for_part(part) -> Symbol:
         if part.kind in ("chip", "box"):
             return generate_box(part)
         raise
+
+
+_COORD_RE = re.compile(r"\((?:xy|start|end|center|mid) ([-\d.]+) ([-\d.]+)\)")
+_RADIUS_RE = re.compile(r"\(radius ([-\d.]+)\)")
+
+
+def _measure(sym: Symbol, body: str, name: str) -> None:
+    """Bounding box of each unit's artwork, in symbol space.
+
+    Unit 0 holds graphics common to every unit, so its extent is merged into
+    all of them.
+    """
+    boxes: dict[int, list[float]] = {}
+    for m in re.finditer(rf'\(symbol\s+"{re.escape(name)}_(\d+)_(\d+)"', body):
+        idx = int(m.group(1))
+        sub = _extract(body[m.start():], "(symbol")
+        xs = [float(a) for a, _ in _COORD_RE.findall(sub)]
+        ys = [float(b) for _, b in _COORD_RE.findall(sub)]
+        for r in (float(v) for v in _RADIUS_RE.findall(sub)):
+            cm = re.search(r"\(center ([-\d.]+) ([-\d.]+)\)", sub)
+            if cm:
+                cx, cy = float(cm.group(1)), float(cm.group(2))
+                xs += [cx - r, cx + r]
+                ys += [cy - r, cy + r]
+        if not xs:
+            continue
+        b = boxes.setdefault(idx, [min(xs), min(ys), max(xs), max(ys)])
+        b[0], b[1] = min(b[0], min(xs)), min(b[1], min(ys))
+        b[2], b[3] = max(b[2], max(xs)), max(b[3], max(ys))
+
+    common = boxes.get(0)
+    for idx, unit in sym.units.items():
+        b = boxes.get(idx) or (list(common) if common else None)
+        if b and common and idx != 0:
+            b = [min(b[0], common[0]), min(b[1], common[1]),
+                 max(b[2], common[2]), max(b[3], common[3])]
+        unit.box = tuple(b) if b else None
 
 
 def lib_id_for(part) -> str:

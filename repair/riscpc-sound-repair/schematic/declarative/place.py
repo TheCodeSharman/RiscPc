@@ -19,8 +19,9 @@ except where nets genuinely meet.
 
 from __future__ import annotations
 
-from geometry import (COL, GRID, ROW, STUB, TIER, Builder, Sheet, pin_dir,
-                      pin_xy, snap)
+import route
+from geometry import (COL, GRID, ROW, STUB, TIER, Builder, Sheet, body_box,
+                      pin_dir, pin_xy, snap)
 
 MARGIN_X = GRID * 16
 MARGIN_Y = GRID * 24
@@ -33,6 +34,7 @@ class Placer(Builder):
         super().__init__(cir, lay)
         self._bridges = {}
         self._pins_cache = None
+        self._box_cache = None
 
     def run(self) -> Sheet:
         y = MARGIN_Y
@@ -111,6 +113,7 @@ class Placer(Builder):
             else:
                 self._stub(att, placed, y)
         self._pins_cache = None
+        self._box_cache = None
         for att in lane.attachments:
             if att.kind == "bridge":
                 self._wire_bridge(att, placed)
@@ -142,70 +145,34 @@ class Placer(Builder):
         self._globals_for(p)
 
     def _route(self, source, target, net: str, toward: float) -> None:
-        """Wire one pin to another, leaving each along its own axis.
-
-        The lead out of the source is worked out *after* the drop column is
-        chosen. Emitting a fixed lead first and picking the column afterwards
-        makes the wire double back on itself whenever the column turns out to
-        be behind the lead.
-        """
+        """Wire one pin to another, around every symbol body in the way."""
         spin = self._pin_name_at(source, net)
-        if spin is None:
+        tpin = self._pin_name_at(target, net)
+        if spin is None or tpin is None:
             return
-        ssym = self.sym(source.ref)
-        a = pin_xy(source, ssym, spin)
-        adx, _ = pin_dir(source, ssym, spin)
+        ssym, tsym = self.sym(source.ref), self.sym(target.ref)
+        a, b = pin_xy(source, ssym, spin), pin_xy(target, tsym, tpin)
+        adir = pin_dir(source, ssym, spin)
+        bdir = pin_dir(target, tsym, tpin)
 
-        column, elbow_y, end = self._approach(target, net, toward)
-        if column is None:
-            return
-
-        # A horizontal run to the column is its own lead. Only when the column
-        # sits under the pin does the wire need one of its own, otherwise it
-        # would drop the instant it left the pin.
-        if abs(column - a[0]) < GRID:
-            lead = snap(a[0] + (adx or 1) * GRID * 2)
-            self.wire(a, (lead, a[1]), net, source.traced)
-            self.wire((lead, a[1]), (lead, elbow_y), net, source.traced)
-            self.wire((lead, elbow_y), (column, elbow_y), net, source.traced)
+        pts = route.route(self._obstacles(net), a, b, adir, bdir)
+        if pts is None:
+            # Nothing found: fall back to a plain L so the net is still drawn
+            # rather than silently dropped. It may look wrong; it will not be
+            # missing, and --check reports it.
+            self.wire(a, b, net, source.traced)
         else:
-            self.wire(a, (column, a[1]), net, source.traced)
-            self.wire((column, a[1]), (column, elbow_y), net, source.traced)
+            for p1, p2 in zip(pts, pts[1:]):
+                self.wire(p1, p2, net, source.traced)
+        self.sheet.junctions.append(b)
 
-        if column != end[0]:
-            self.wire((column, elbow_y), (end[0], elbow_y), net, source.traced)
-        if elbow_y != end[1]:
-            self.wire((end[0], elbow_y), end, net, source.traced)
-        self.sheet.junctions.append(end)
-
-    def _approach(self, target, net: str, toward: float):
-        """Where a wire should come down onto a pin: (column, elbow y, pin)."""
-        pin = self._pin_name_at(target, net)
-        if pin is None:
-            return (None, None, None)
-        sym = self.sym(target.ref)
-        end = pin_xy(target, sym, pin)
-        dx, dy = pin_dir(target, sym, pin)
-
-        if abs(dx) > abs(dy):
-            # Sideways pin: its endpoint already sticks out past the body, so
-            # dropping down its own x cannot cross the symbol.
-            return (end[0], end[1], end)
-
-        # Up/down pin: leave along the pin, then come in from the side.
-        elbow_y = snap(end[1] + dy * GRID * 3)
-        step = GRID * 2
-        out = 1 if toward > end[0] else -1
-        cands = [snap(end[0] + k * step * out) for k in range(1, 7)]
-        cands += [snap(end[0] - k * step * out) for k in range(1, 7)]
-        column = next(
-            (c for c in cands if self._column_is_clear(c, elbow_y, end[1], net)),
-            cands[0],
-        )
-        return (column, elbow_y, end)
+    def _obstacles(self, net: str):
+        """Bodies and foreign pins the router must avoid, for one net."""
+        pts = [(x, y) for x, y, n in self._pin_map() if n != net]
+        return route.build(self._boxes(), pts, self.sheet.bounds())
 
     def _pin_map(self):
-        """Every placed pin, for collision checks. Built once, after placing."""
+        """Every placed pin with its net. Rebuilt whenever placement changes."""
         if self._pins_cache is None:
             out = []
             for pl in self.sheet.placed:
@@ -217,60 +184,16 @@ class Placer(Builder):
             self._pins_cache = out
         return self._pins_cache
 
-    def _column_is_clear(self, x: float, y1: float, y2: float, net: str) -> bool:
-        """Can a vertical run down x between y1 and y2 without hitting a pin?
-
-        A drop landing on another pin is not a cosmetic problem, it shorts two
-        nets: Rfb's leg to the emitter was landing exactly on Q4's base.
-        """
-        lo, hi = sorted((y1, y2))
-        for px, py, pnet in self._pin_map():
-            if pnet == net:
-                continue
-            if abs(px - x) < GRID * 1.5 and lo - GRID < py < hi + GRID:
-                return False
-        return True
-
-    def _drop_to(self, frm, target, net: str, traced: bool, toward: float) -> None:
-        """Route from a point above down onto a pin, clear of everything else.
-
-        The last hop runs along the pin's own axis, so the wire never cuts
-        across the symbol it is reaching, and the vertical goes down a column
-        checked to be free of other pins rather than merely assumed to be.
-        """
-        pin = self._pin_name_at(target, net)
-        if pin is None:
-            return
-        sym = self.sym(target.ref)
-        end = pin_xy(target, sym, pin)
-        dx, dy = pin_dir(target, sym, pin)
-
-        if abs(dx) > abs(dy):
-            # Sideways pin: its endpoint already sticks out past the body, so
-            # dropping down its own x cannot cross the symbol.
-            preferred = [end[0]]
-            elbow_y = end[1]
-        else:
-            # Up/down pin: leave along the pin, then come in from the side.
-            elbow_y = snap(end[1] + dy * GRID * 3)
-            step = GRID * 2
-            out = 1 if toward > end[0] else -1
-            preferred = [snap(end[0] + k * step * out) for k in range(1, 7)]
-            preferred += [snap(end[0] - k * step * out) for k in range(1, 7)]
-
-        column = next(
-            (c for c in preferred
-             if self._column_is_clear(c, frm[1], elbow_y, net)),
-            preferred[0],
-        )
-
-        self.wire(frm, (column, frm[1]), net, traced)
-        self.wire((column, frm[1]), (column, elbow_y), net, traced)
-        if column != end[0]:
-            self.wire((column, elbow_y), (end[0], elbow_y), net, traced)
-        if elbow_y != end[1]:
-            self.wire((end[0], elbow_y), end, net, traced)
-        self.sheet.junctions.append(end)
+    def _boxes(self):
+        """Every placed symbol's drawn body, padded so wires do not graze."""
+        if self._box_cache is None:
+            self._box_cache = [
+                box for box in
+                (body_box(pl, self.sym(pl.ref), pad=GRID * 0.5)
+                 for pl in self.sheet.placed)
+                if box
+            ]
+        return self._box_cache
 
     def _pin_name_at(self, placed, net: str):
         sym = self.sym(placed.ref)

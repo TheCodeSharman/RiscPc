@@ -27,6 +27,8 @@ def main(argv=None) -> int:
     ap.add_argument("-o", "--output", help="SVG output path")
     ap.add_argument("--layout", action="store_true", help="print the layout")
     ap.add_argument("--netlist", action="store_true", help="print the netlist")
+    ap.add_argument("--check", action="store_true",
+                    help="report wires that cross a symbol body")
     args = ap.parse_args(argv)
 
     try:
@@ -46,6 +48,10 @@ def main(argv=None) -> int:
         return 0
 
     sheet = place.build(cir, lay)
+
+    if args.check:
+        return _check(cir, sheet)
+
     svg = render_svg.render(sheet, cir)
     out = args.output or args.source.rsplit(".", 1)[0] + ".svg"
     with open(out, "w") as fh:
@@ -55,6 +61,49 @@ def main(argv=None) -> int:
         f"{len(sheet.powers)} power pins"
     )
     return 0
+
+
+def _check(cir, sheet) -> int:
+    """Report any wire running through a symbol body.
+
+    Worth having as a command rather than a habit: a wire crossing a body is
+    invisible in a thumbnail and obvious in KiCad, and the routing bugs that
+    produced them were also producing real shorts.
+    """
+    import geometry
+    import symbols
+
+    boxes = []
+    for placed in sheet.placed:
+        box = geometry.body_box(placed, symbols.for_part(cir.parts[placed.ref]))
+        if box:
+            boxes.append((placed.ref, box))
+
+    def crosses(p1, p2, box) -> bool:
+        x0, y0, x1, y1 = box
+        (ax, ay), (bx, by) = p1, p2
+        if abs(ax - bx) < 1e-6:
+            lo, hi = sorted((ay, by))
+            return x0 < ax < x1 and lo < y1 - 0.01 and hi > y0 + 0.01
+        if abs(ay - by) < 1e-6:
+            lo, hi = sorted((ax, bx))
+            return y0 < ay < y1 and lo < x1 - 0.01 and hi > x0 + 0.01
+        return False
+
+    bad = set()
+    for wire in sheet.wires:
+        for p1, p2 in zip(wire.pts, wire.pts[1:]):
+            for ref, box in boxes:
+                if crosses(p1, p2, box):
+                    bad.add((wire.net, ref))
+
+    if not bad:
+        print(f"ok: {len(sheet.wires)} wires, none crossing a symbol body")
+        return 0
+    print(f"{len(bad)} net/body crossings:")
+    for net, ref in sorted(bad):
+        print(f"   net {net} crosses {ref}")
+    return 1
 
 
 def _print_netlist(cir) -> None:

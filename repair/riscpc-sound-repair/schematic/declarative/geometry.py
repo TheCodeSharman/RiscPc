@@ -119,6 +119,25 @@ def pin_dir(placed: Placed, sym: symbols.Symbol, pin: str) -> tuple[float, float
     return (round(rx / n, 6), round(-ry / n, 6))
 
 
+def body_box(placed: Placed, sym: symbols.Symbol, pad: float = 0.0):
+    """The symbol's drawn body as an axis-aligned box in sheet space."""
+    box = sym.units[placed.unit].box
+    if not box:
+        return None
+    ax, ay, bx, by = box
+    pts = []
+    th = math.radians(placed.angle)
+    for x, y in ((ax, ay), (bx, ay), (bx, by), (ax, by)):
+        rx = x * math.cos(th) - y * math.sin(th)
+        ry = x * math.sin(th) + y * math.cos(th)
+        if placed.mirror == "y":
+            rx = -rx
+        pts.append((placed.x + rx, placed.y - ry))
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    return (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
+
+
 def _two_terminal_angle(sym: symbols.Symbol, unit: int) -> float:
     """Angle that lays a two-pin symbol out horizontally.
 
