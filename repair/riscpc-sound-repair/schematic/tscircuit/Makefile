@@ -11,15 +11,21 @@ headphone-amp.svg: $(SRC) node_modules
 netlist.txt: $(SRC) node_modules
 	npx tsci export $(SRC) -f readable-netlist -o $@
 
-# Not committed (large, derived). KiCad 9 .kicad_sch.
+# Not committed (large, derived).
+# `kicad`     -> a single KiCad 9 schematic (format version 20250114).
+# `kicad-zip` -> a full project: .kicad_sch + .kicad_pcb + .kicad_pro + 3D models.
 kicad: $(SRC) node_modules
 	npx tsci export $(SRC) -f kicad_sch -o headphone-amp.kicad_sch
+
+kicad-zip: $(SRC) node_modules
+	npx tsci export $(SRC) -f kicad_zip -o headphone-amp-kicad.zip
 
 node_modules: package.json
 	npm install
 	@touch $@
 
 clean:
-	rm -f headphone-amp.svg netlist.txt headphone-amp.kicad_sch
+	rm -f headphone-amp.svg netlist.txt headphone-amp.kicad_sch \
+	      headphone-amp-kicad.zip
 
-.PHONY: all kicad clean
+.PHONY: all kicad kicad-zip clean

@@ -33,10 +33,17 @@ Gitignored: `node_modules/`, `*.kicad_sch` (large and derived — `make kicad`).
 - **It is a netlist, not a picture.** `netlist.txt` is a real net-by-net
   listing that can be checked against the probing notes — something schemdraw
   fundamentally cannot give, because schemdraw only draws lines.
-- **`kicad_sch` export works.** A valid KiCad 9 file (`version 20250114`).
-  Caveat: symbols come out as tscircuit's own embedded `lib_symbols`
+- **KiCad export works, and it is a real file.** Verified rather than
+  assumed: balanced s-expressions, format `version 20250114` (KiCad 9),
+  38 symbol instances, 120 wire segments, 12 junctions, 14 global labels,
+  every reference present. `make kicad-zip` gives a whole project —
+  `.kicad_sch` + `.kicad_pcb` + `.kicad_pro` + STEP models.
+
+  Caveat: symbols are tscircuit's own embedded `lib_symbols`
   (`Device:boxresistor_right`, `Custom:rail_up`), not KiCad's standard
-  `Device:R` — it opens, but it is not idiomatic KiCad.
+  `Device:R`. Because `.kicad_sch` embeds its symbol definitions, it opens
+  and renders standalone — but editing it against KiCad's own libraries, or
+  taking it to a board with real footprints, means remapping symbols first.
 - **Same mirror win as schemdraw.** `Channel` is written once and instantiated
   twice.
 
