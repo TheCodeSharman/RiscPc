@@ -1,0 +1,308 @@
+COMPONENTS:
+ - DAC: TDA1545A, dip8
+ - L13: L13, source_component
+ - L14: L14, source_component
+ - U1A: U1A, source_component
+ - R_iv_RIGHT: 2.1kΩ res0603 resistor
+ - C_f_RIGHT: 100pF cap0603 capacitor
+ - C_ac_RIGHT: 47uF cap0805 capacitor
+ - R_in_RIGHT: 47kΩ res0603 resistor
+ - U1D: U1D, source_component
+ - R_bias_RIGHT: 15kΩ res0603 resistor
+ - R_fb_RIGHT: 47kΩ res0603 resistor
+ - Q4: Q4, source_component
+ - R_pull_RIGHT: 340Ω res0603 resistor
+ - R_s1_RIGHT: 33Ω res0603 resistor
+ - R_s2_RIGHT: 3.3Ω res0603 resistor
+ - U1B: U1B, source_component
+ - R_iv_LEFT: 2.1kΩ res0603 resistor
+ - C_f_LEFT: 100pF cap0603 capacitor
+ - C_ac_LEFT: 47uF cap0805 capacitor
+ - R_in_LEFT: 47kΩ res0603 resistor
+ - U1C: U1C, source_component
+ - R_bias_LEFT: 15kΩ res0603 resistor
+ - R_fb_LEFT: 47kΩ res0603 resistor
+ - Q1: Q1, source_component
+ - R_pull_LEFT: 340Ω res0603 resistor
+ - R_s1_LEFT: 33Ω res0603 resistor
+ - R_s2_LEFT: 3.3Ω res0603 resistor
+
+NET: IOR
+  - C_f_RIGHT pin1 (+)
+  - R_iv_RIGHT pin1
+  - U1A pin2
+  - DAC IOR
+
+NET: U1A_out
+  - C_ac_RIGHT pin1 (+)
+  - C_f_RIGHT pin2 (-)
+  - R_iv_RIGHT pin2
+  - U1A pin3
+
+NET: C_ac_RIGHT_neg
+  - C_ac_RIGHT pin2 (-)
+  - R_in_RIGHT pin1
+
+NET: U1D_non_inverting_input
+  - U1D pin1
+  - R_bias_RIGHT pin1
+
+NET: U1D_out
+  - Q4 pin2
+  - U1D pin3
+
+NET: U1D_inverting_input
+  - R_fb_RIGHT pin2
+  - R_in_RIGHT pin2
+  - U1D pin2
+
+NET: Q4_emitter
+  - Q4 pin3
+  - R_fb_RIGHT pin1
+  - R_pull_RIGHT pin1
+  - R_s1_RIGHT pin1
+
+NET: R_s1_RIGHT_neg
+  - R_s1_RIGHT pin2
+  - R_s2_RIGHT pin1
+
+NET: VREF
+  - U1B pin1
+  - U1A pin1
+
+NET: IOL
+  - C_f_LEFT pin1 (+)
+  - R_iv_LEFT pin1
+  - U1B pin2
+  - DAC IOL
+
+NET: U1B_out
+  - C_ac_LEFT pin1 (+)
+  - C_f_LEFT pin2 (-)
+  - R_iv_LEFT pin2
+  - U1B pin3
+
+NET: C_ac_LEFT_neg
+  - C_ac_LEFT pin2 (-)
+  - R_in_LEFT pin1
+
+NET: U1C_non_inverting_input
+  - U1C pin1
+  - R_bias_LEFT pin1
+
+NET: GND
+  - R_bias_LEFT pin2
+  - R_bias_RIGHT pin2
+  - DAC GND
+
+NET: V_PLUS12
+  - U1C pin4
+  - U1B pin4
+  - U1D pin4
+  - U1A pin4
+  - L13 pin2 (-)
+
+NET: U1C_out
+  - Q1 pin2
+  - U1C pin3
+
+NET: V_PLUS5
+  - Q1 pin1
+  - Q4 pin1
+  - DAC VDD
+
+NET: U1C_inverting_input
+  - R_fb_LEFT pin2
+  - R_in_LEFT pin2
+  - U1C pin2
+
+NET: V_MINUS12
+  - R_pull_LEFT pin2
+  - U1C pin5
+  - U1B pin5
+  - R_pull_RIGHT pin2
+  - U1D pin5
+  - U1A pin5
+  - L14 pin2 (-)
+
+NET: Q1_emitter
+  - Q1 pin3
+  - R_fb_LEFT pin1
+  - R_pull_LEFT pin1
+  - R_s1_LEFT pin1
+
+NET: R_s1_LEFT_neg
+  - R_s1_LEFT pin2
+  - R_s2_LEFT pin1
+
+
+EMPTY NET PINS:
+  - L13 pin1 (+)
+  - L14 pin1 (+)
+  - R_s2_RIGHT pin2
+  - R_s2_LEFT pin2
+
+COMPONENT_PINS:
+DAC (TDA1545A)
+- pin1(BCK): NOT_CONNECTED
+- pin2(WS): NOT_CONNECTED
+- pin3(DATA): NOT_CONNECTED
+- pin4(GND): NETS(GND)
+- pin5(VDD): NETS(V_PLUS5)
+- pin6(IOL): NETS(IOL)
+- pin7(IREF): NOT_CONNECTED
+- pin8(IOR): NETS(IOR)
+
+L13
+- pin1(anode, pos, left): NETS(V_PLUS12_RAW)
+- pin2(cathode, neg, right): NETS(V_PLUS12)
+
+L14
+- pin1(anode, pos, left): NETS(V_MINUS12_RAW)
+- pin2(cathode, neg, right): NETS(V_MINUS12)
+
+U1A
+- pin1(inp1, non_inverting_input): NETS(VREF)
+- pin2(inp2, inverting_input): NETS(IOR)
+- pin3(out, output): NETS(U1A_out)
+- pin4(positive_supply, vcc, vdd): NETS(V_PLUS12)
+- pin5(negative_supply, vee, vss, gnd): NETS(V_MINUS12)
+- pin6: NOT_CONNECTED
+- pin7: NOT_CONNECTED
+- pin8: NOT_CONNECTED
+- pin9: NOT_CONNECTED
+- pin10: NOT_CONNECTED
+- pin11: NOT_CONNECTED
+- pin12: NOT_CONNECTED
+- pin13: NOT_CONNECTED
+- pin14: NOT_CONNECTED
+
+R_iv_RIGHT (2.1kΩ res0603)
+- pin1(anode, pos, left): NETS(IOR)
+- pin2(cathode, neg, right): NETS(U1A_out)
+
+C_f_RIGHT (100pF cap0603)
+- pin1(pos, anode, left): NETS(IOR)
+- pin2(neg, cathode, right): NETS(U1A_out)
+
+C_ac_RIGHT (47uF cap0805)
+- pin1(pos, anode, left): NETS(U1A_out)
+- pin2(neg, cathode, right): NETS(C_ac_RIGHT_neg)
+
+R_in_RIGHT (47kΩ res0603)
+- pin1(anode, pos, left): NETS(C_ac_RIGHT_neg)
+- pin2(cathode, neg, right): NETS(U1D_inverting_input)
+
+U1D
+- pin1(inp1, non_inverting_input): NETS(U1D_non_inverting_input)
+- pin2(inp2, inverting_input): NETS(U1D_inverting_input)
+- pin3(out, output): NETS(U1D_out)
+- pin4(positive_supply, vcc, vdd): NETS(V_PLUS12)
+- pin5(negative_supply, vee, vss, gnd): NETS(V_MINUS12)
+- pin6: NOT_CONNECTED
+- pin7: NOT_CONNECTED
+- pin8: NOT_CONNECTED
+- pin9: NOT_CONNECTED
+- pin10: NOT_CONNECTED
+- pin11: NOT_CONNECTED
+- pin12: NOT_CONNECTED
+- pin13: NOT_CONNECTED
+- pin14: NOT_CONNECTED
+
+R_bias_RIGHT (15kΩ res0603)
+- pin1(anode, pos, left): NETS(U1D_non_inverting_input)
+- pin2(cathode, neg, right): NETS(GND)
+
+R_fb_RIGHT (47kΩ res0603)
+- pin1(anode, pos, left): NETS(Q4_emitter)
+- pin2(cathode, neg, right): NETS(U1D_inverting_input)
+
+Q4
+- pin1(collector, c): NETS(V_PLUS5)
+- pin2(base, b): NETS(U1D_out)
+- pin3(emitter, e): NETS(Q4_emitter)
+
+R_pull_RIGHT (340Ω res0603)
+- pin1(anode, pos, left): NETS(Q4_emitter)
+- pin2(cathode, neg, right): NETS(V_MINUS12)
+
+R_s1_RIGHT (33Ω res0603)
+- pin1(anode, pos, left): NETS(Q4_emitter)
+- pin2(cathode, neg, right): NETS(R_s1_RIGHT_neg)
+
+R_s2_RIGHT (3.3Ω res0603)
+- pin1(anode, pos, left): NETS(R_s1_RIGHT_neg)
+- pin2(cathode, neg, right): NETS(SK12_R)
+
+U1B
+- pin1(inp1, non_inverting_input): NETS(VREF)
+- pin2(inp2, inverting_input): NETS(IOL)
+- pin3(out, output): NETS(U1B_out)
+- pin4(positive_supply, vcc, vdd): NETS(V_PLUS12)
+- pin5(negative_supply, vee, vss, gnd): NETS(V_MINUS12)
+- pin6: NOT_CONNECTED
+- pin7: NOT_CONNECTED
+- pin8: NOT_CONNECTED
+- pin9: NOT_CONNECTED
+- pin10: NOT_CONNECTED
+- pin11: NOT_CONNECTED
+- pin12: NOT_CONNECTED
+- pin13: NOT_CONNECTED
+- pin14: NOT_CONNECTED
+
+R_iv_LEFT (2.1kΩ res0603)
+- pin1(anode, pos, left): NETS(IOL)
+- pin2(cathode, neg, right): NETS(U1B_out)
+
+C_f_LEFT (100pF cap0603)
+- pin1(pos, anode, left): NETS(IOL)
+- pin2(neg, cathode, right): NETS(U1B_out)
+
+C_ac_LEFT (47uF cap0805)
+- pin1(pos, anode, left): NETS(U1B_out)
+- pin2(neg, cathode, right): NETS(C_ac_LEFT_neg)
+
+R_in_LEFT (47kΩ res0603)
+- pin1(anode, pos, left): NETS(C_ac_LEFT_neg)
+- pin2(cathode, neg, right): NETS(U1C_inverting_input)
+
+U1C
+- pin1(inp1, non_inverting_input): NETS(U1C_non_inverting_input)
+- pin2(inp2, inverting_input): NETS(U1C_inverting_input)
+- pin3(out, output): NETS(U1C_out)
+- pin4(positive_supply, vcc, vdd): NETS(V_PLUS12)
+- pin5(negative_supply, vee, vss, gnd): NETS(V_MINUS12)
+- pin6: NOT_CONNECTED
+- pin7: NOT_CONNECTED
+- pin8: NOT_CONNECTED
+- pin9: NOT_CONNECTED
+- pin10: NOT_CONNECTED
+- pin11: NOT_CONNECTED
+- pin12: NOT_CONNECTED
+- pin13: NOT_CONNECTED
+- pin14: NOT_CONNECTED
+
+R_bias_LEFT (15kΩ res0603)
+- pin1(anode, pos, left): NETS(U1C_non_inverting_input)
+- pin2(cathode, neg, right): NETS(GND)
+
+R_fb_LEFT (47kΩ res0603)
+- pin1(anode, pos, left): NETS(Q1_emitter)
+- pin2(cathode, neg, right): NETS(U1C_inverting_input)
+
+Q1
+- pin1(collector, c): NETS(V_PLUS5)
+- pin2(base, b): NETS(U1C_out)
+- pin3(emitter, e): NETS(Q1_emitter)
+
+R_pull_LEFT (340Ω res0603)
+- pin1(anode, pos, left): NETS(Q1_emitter)
+- pin2(cathode, neg, right): NETS(V_MINUS12)
+
+R_s1_LEFT (33Ω res0603)
+- pin1(anode, pos, left): NETS(Q1_emitter)
+- pin2(cathode, neg, right): NETS(R_s1_LEFT_neg)
+
+R_s2_LEFT (3.3Ω res0603)
+- pin1(anode, pos, left): NETS(R_s1_LEFT_neg)
+- pin2(cathode, neg, right): NETS(SK12_L)

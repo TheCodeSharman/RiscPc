@@ -39,6 +39,21 @@
               echo "RiscPc dev shell — pdftoppm, python3+pyserial+schemdraw; SIGROKDECODE_DIR set."
             '';
           };
+
+          # Kept separate from `default` so the everyday shell stays lean: this
+          # is only for the tscircuit evaluation in
+          # repair/riscpc-sound-repair/schematic/tscircuit/, which pulls its
+          # own deps from npm rather than nixpkgs.
+          tscircuit = pkgs.mkShell {
+            packages = [
+              pkgs.nodejs
+              pkgs.bun           # the tscircuit CLI shells out to bun
+              pkgs.librsvg       # rsvg-convert — rasterise the exported .svg
+            ];
+            shellHook = ''
+              echo "RiscPc tscircuit shell — node $(node -v), npm $(npm -v), bun $(bun -v)."
+            '';
+          };
         });
     };
 }

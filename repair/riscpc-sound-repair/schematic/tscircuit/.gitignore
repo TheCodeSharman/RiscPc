@@ -1,0 +1,5 @@
+node_modules/
+# Regenerate with `make`: large and derived.
+*.kicad_sch
+*.png
+.tscircuit/

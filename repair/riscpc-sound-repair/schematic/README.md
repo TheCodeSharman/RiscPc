@@ -9,6 +9,11 @@ map, generated with [schemdraw](https://schemdraw.readthedocs.io).
 |---|---|---|
 | `headphone_amp.py` | `headphone-amp.svg` | TDA1545A → TL074 #1 (I/V + driver) → Q1/Q4 → SK12, both channels, ±12 V feed |
 
+[`tscircuit/`](tscircuit/) holds the same circuit written declaratively, as an
+evaluation of whether software can apply the schematic conventions for you.
+Short answer: it can, but less well than a person — see its README. The
+schemdraw drawing above remains the one for the notes.
+
 op-amp #2 and the LM386 speaker path are **not** drawn — they are deliberately
 unmapped, see "Remaining" in [`../README.md`](../README.md).
 
