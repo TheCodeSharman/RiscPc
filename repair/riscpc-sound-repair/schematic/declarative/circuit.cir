@@ -40,6 +40,7 @@ part TL074:U1B
 part TL074:U1C
 part TL074:U1D
 
+# BC849 (SOT-23): pin 1 = base, 2 = emitter, 3 = collector.
 part BC849C:Q4
 part BC849C:Q1
 
@@ -110,18 +111,18 @@ Cac_R@2 -> Rin_R@1
 Rin_R@2 -> U1D@13
 U1D@12 -> Rbias_R@1
 Rbias_R@2 -> GND
-U1D@14 -> Q4@b
+U1D@14 -> Q4@1
 
 # Output follower. Feedback is taken from the EMITTER, so the transistor
 # sits inside the loop — which is why op-amp out <-> -in reads OPEN.
-Q4@c -> 5V
-Q4@e -> Rfb_R@1
+Q4@3 -> 5V
+Q4@2 -> Rfb_R@1
 Rfb_R@2 -> U1D@13
-Q4@e -> Rpull_R@1
+Q4@2 -> Rpull_R@1
 Rpull_R@2 -> -12V
 
 # DC-coupled to the phones — no series output capacitor.
-Q4@e -> Rs1_R@1
+Q4@2 -> Rs1_R@1
 Rs1_R@2 -> Rs2_R@1
 Rs2_R@2 -> SK12_R@1
 
@@ -141,15 +142,15 @@ Cac_L@2 -> Rin_L@1
 Rin_L@2 -> U1C@9
 U1C@10 -> Rbias_L@1
 Rbias_L@2 -> GND
-U1C@8 -> Q1@b
+U1C@8 -> Q1@1
 
-Q1@c -> 5V
-Q1@e -> Rfb_L@1
+Q1@3 -> 5V
+Q1@2 -> Rfb_L@1
 Rfb_L@2 -> U1C@9
-Q1@e -> Rpull_L@1
+Q1@2 -> Rpull_L@1
 Rpull_L@2 -> -12V
 
-Q1@e -> Rs1_L@1
+Q1@2 -> Rs1_L@1
 Rs1_L@2 -> Rs2_L@1
 Rs2_L@2 -> SK12_L@1
 
