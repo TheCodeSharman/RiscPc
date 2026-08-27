@@ -15,14 +15,20 @@
     {
       devShells = forAllSystems (pkgs:
         let
-          # Bench-test scripts (repair/riscpc-rtc-repair/) drive a serial bridge.
-          pythonEnv = pkgs.python3.withPackages (ps: [ ps.pyserial ]);
+          # Bench-test scripts (repair/riscpc-rtc-repair/) drive a serial bridge;
+          # schemdraw renders the reverse-engineered sound schematic
+          # (repair/riscpc-sound-repair/schematic/).
+          pythonEnv = pkgs.python3.withPackages (ps: [
+            ps.pyserial
+            ps.schemdraw
+          ]);
         in
         {
           default = pkgs.mkShell {
             packages = [
               pkgs.poppler-utils   # pdftoppm — render schematics/datasheets to PNG
-              pythonEnv            # python3 + pyserial for the RTC bench tests
+              pkgs.librsvg         # rsvg-convert — rasterise generated .svg schematics
+              pythonEnv            # python3 + pyserial (RTC bench) + schemdraw (schematics)
             ];
 
             # DSView (system-wide, from the TheCodeSharman/DSView fork) loads
@@ -30,7 +36,7 @@
             # the POST decoders on top of the bundled set. See CLAUDE.md.
             shellHook = ''
               export SIGROKDECODE_DIR="$PWD/acorn-post/decoders"
-              echo "RiscPc dev shell — pdftoppm, python3+pyserial; SIGROKDECODE_DIR set."
+              echo "RiscPc dev shell — pdftoppm, python3+pyserial+schemdraw; SIGROKDECODE_DIR set."
             '';
           };
         });
