@@ -9,10 +9,17 @@ map, generated with [schemdraw](https://schemdraw.readthedocs.io).
 |---|---|---|
 | `headphone_amp.py` | `headphone-amp.svg` | TDA1545A → TL074 #1 (I/V + driver) → Q1/Q4 → SK12, both channels, ±12 V feed |
 
-[`tscircuit/`](tscircuit/) holds the same circuit written declaratively, as an
-evaluation of whether software can apply the schematic conventions for you.
-Short answer: it can, but less well than a person — see its README. The
-schemdraw drawing above remains the one for the notes.
+Two other approaches to the same circuit live alongside this one. Start from
+[`HANDOVER.md`](HANDOVER.md) for the state of all three.
+
+- [`declarative/`](declarative/) — **the live work.** Our own three-construct
+  netlist language with inferred auto-layout, drawn with KiCad's own symbols.
+  Renders SVG today; a KiCad writer is the next piece.
+- [`tscircuit/`](tscircuit/) — evaluated and abandoned. It auto-lays-out and
+  exports a real KiCad project, but fragments nets into islands joined by
+  generated labels, which is precisely what hand-tidying cannot fix.
+
+The schemdraw drawing above remains the one for the notes.
 
 op-amp #2 and the LM386 speaker path are **not** drawn — they are deliberately
 unmapped, see "Remaining" in [`../README.md`](../README.md).

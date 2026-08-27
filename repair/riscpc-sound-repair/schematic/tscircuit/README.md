@@ -105,5 +105,17 @@ For **verifying the trace**, tscircuit wins, and this is not a small thing:
 never is. If op-amp #2 is ever mapped, or a repair board is ever built, this is
 the file to grow.
 
-Keeping both. They are the same circuit described twice, which is also a
-cross-check in itself.
+## Superseded
+
+This is no longer being developed. The net fragmentation above turned out to
+be fatal: the plan was to export to KiCad and hand-tidy the layout there, and
+you cannot tidy a schematic whose nets are broken into islands joined by
+generated labels — you cannot even trace a net by eye.
+
+[`../declarative/`](../declarative/) took over, keeping the idea (a
+coordinate-free source, laid out by software, exported to KiCad) and dropping
+the implementation. It owns the routing, so nets stay whole.
+
+Kept for reference and as a cross-check: it is the same circuit described a
+third time, and `netlist.txt` is still a valid thing to diff against the
+probing notes.
