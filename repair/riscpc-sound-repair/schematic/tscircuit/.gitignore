@@ -1,6 +1,11 @@
 node_modules/
-# Regenerate with `make`: large and derived.
-*.kicad_sch
-*-kicad.zip
-*.png
 .tscircuit/
+*.png
+
+# Derived: regenerate with `make`.
+*-kicad.zip
+/headphone-amp.kicad_sch
+
+# KiCad's editor lock files, and the STEP models (2.6 MB, regenerable).
+kicad-project/~*.lck
+kicad-project/3dmodels/

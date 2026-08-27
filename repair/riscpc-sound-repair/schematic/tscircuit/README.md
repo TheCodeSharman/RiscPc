@@ -21,8 +21,17 @@ nix develop .#tscircuit --command make -C repair/riscpc-sound-repair/schematic/t
 `tscircuit` devShell in `flake.nix` — kept separate from `default` so the
 everyday shell stays lean. Deps come from npm, not nixpkgs.
 
-Committed: `headphone-amp.svg`, `netlist.txt`, `package-lock.json`.
-Gitignored: `node_modules/`, `*.kicad_sch` (large and derived — `make kicad`).
+Committed: `headphone-amp.svg`, `netlist.txt`, `package-lock.json`, and
+`kicad-project/` — the extracted KiCad project.
+Gitignored: `node_modules/`, the `.zip`, KiCad's `~*.lck` locks, and
+`kicad-project/3dmodels/` (2.6 MB of STEP, regenerable).
+
+**`kicad-project/` is tracked on purpose.** It starts out derived, but the
+whole point of exporting to KiCad is to hand-tidy the layout there — and the
+moment it is edited it stops being derived and becomes source. So it is
+committed as text (`.kicad_sch`, `.kicad_pcb` and `.kicad_pro` are all
+s-expressions or JSON, and diff readably), and `make kicad-project`
+**overwrites it**. Check `git status` before re-running that target.
 
 ## What it got right
 
