@@ -2719,3 +2719,15 @@ a hard lockup. A third has been seen — **cursor stopped, Caps Lock still worki
 host-driven, so a responding Caps Lock means IRQs are still being serviced: interrupt handlers
 running while the foreground is stuck in SVC inside a driver loop. Ask whether the picture is still
 stable as well, since that keeps the video subsystem out.
+
+### Humam sunnnary of the 23 Aug
+
+The Ai summary is moistly us goung around in circles, the conclusion is the following:
+  - The bad contacts in the VRAM socket wer the fault all along:
+      - When the VRAM is present the crash with garbage happens 100% of boots
+      - When the VRAM is removed there is no crash and no hangs
+      - Suspected mechanism: Risc OS loading network card ROM in high memory address that are mapped to leftover VRAM.
+      - This corrupts the EtherX module, and this causes a crash during !Boot when the module is loaded.
+      - Randomly the VRAM reads enough to survive boot.
+      - When there is less corruption, something is causing the machine to hang responding to network activity. Cursor stops flashing udrin g IO - this is the least understood but plausible because a bad ROM module can corrupt anything,
+      - Pressing down hard on the VRAM board clears the error, so a permanent fix is to print a 3d printed clip that screws on to prevent the board wiggling free. 
