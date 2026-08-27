@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     ap.add_argument("--netlist", action="store_true", help="print the netlist")
     ap.add_argument("--check", action="store_true",
                     help="report wires that cross a symbol body")
+    ap.add_argument("--verify", action="store_true",
+                    help="read the drawing back and compare it to the netlist")
     args = ap.parse_args(argv)
 
     try:
@@ -52,6 +54,9 @@ def main(argv=None) -> int:
     if args.check:
         return _check(cir, sheet)
 
+    if args.verify:
+        return _verify(cir, sheet)
+
     svg = render_svg.render(sheet, cir)
     out = args.output or args.source.rsplit(".", 1)[0] + ".svg"
     with open(out, "w") as fh:
@@ -61,6 +66,27 @@ def main(argv=None) -> int:
         f"{len(sheet.powers)} power pins"
     )
     return 0
+
+
+def _verify(cir, sheet) -> int:
+    """Round-trip the geometry back into a netlist and diff it.
+
+    This is the check that matters. `--check` only asks whether the drawing is
+    tidy; this asks whether it is the circuit. See verify.py.
+    """
+    import verify
+
+    findings = verify.check(cir, sheet)
+    fatal = [f for f in findings if f.kind in ("short", "open")]
+    if not findings:
+        print(f"verified: {len(sheet.wires)} wires, "
+              f"{len(cir.nets)} nets read back identical")
+        return 0
+    for f in findings:
+        print(f)
+    print(f"\n{len(fatal)} connectivity error(s), "
+          f"{len(findings) - len(fatal)} warning(s)")
+    return 1 if fatal else 0
 
 
 def _check(cir, sheet) -> int:

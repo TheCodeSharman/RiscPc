@@ -1,0 +1,11 @@
+# Series R with a shunt C — the "hanging shunt" pattern. The cap should drop
+# below the row, not take a column of its own.
+net IN
+net OUT
+net GND
+part 1k:R1
+part 100n:C1
+IN -> R1@1
+R1@2 -> OUT
+R1@2 -> C1@1
+C1@2 -> GND

@@ -1,0 +1,19 @@
+# Inverting op-amp stage. The first circuit with feedback: Rf runs backwards
+# from the output to the inverting input, which is the "bridge" pattern and
+# the shape that currently draws Rfb_R shorted.
+net IN
+net OUT
+net GND
+net 12V
+net -12V
+part 1k:Rin
+part 10k:Rf
+part TL074:U1A
+IN -> Rin@1
+Rin@2 -> U1A@2
+U1A@2 -> Rf@1
+Rf@2 -> U1A@1
+U1A@1 -> OUT
+U1A@3 -> GND
+U1A@4 -> 12V
+U1A@11 -> -12V

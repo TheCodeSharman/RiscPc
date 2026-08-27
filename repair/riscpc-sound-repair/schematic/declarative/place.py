@@ -1,8 +1,10 @@
-"""Place and route a laid-out circuit into absolute geometry.
+"""Place a laid-out circuit, then wire it.
 
-The overlap problem is handled by construction rather than by search, because
-layout.py has already decomposed each lane into a spine, bridges over it and
-stubs under it. Each of those owns a disjoint band of the sheet:
+Two phases, and keeping them apart is the whole point.
+
+**Placement** decides where every symbol sits, using the decomposition
+layout.py already made — a spine along the row, bridges tiered above it,
+stubs hung below, globals terminating in a power symbol at the pin:
 
     tier 1        ---[ bridge ]---            (above, one row per tier)
     tier 0     ------[ bridge ]------
@@ -11,13 +13,21 @@ stubs under it. Each of those owns a disjoint band of the sheet:
                          |
                         GND
 
-Verticals from a bridge drop at that bridge's own x extent; verticals from a
-stub drop at its host's x. Neither can land on the other, and two bridges
-sharing a span already have different tiers. So no wire crosses another
-except where nets genuinely meet.
+**Wiring** then runs once, over the finished sheet, one *net* at a time
+through a shared occupancy grid (see route.py).
+
+The earlier version wired as it placed, and emitted wires from six different
+places — the spine, bridges, stubs, globals, loose pins, terminals — each
+drawing its own straight line and none of them aware of the others. That is
+how two resistors in series came out with the wire through both bodies and
+the label lying on top of it. There is now exactly one function that emits a
+wire, it sees the whole sheet, and `verify.py` reads back what it drew.
 """
 
 from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass
 
 import route
 from geometry import (COL, GRID, ROW, STUB, TIER, Builder, Sheet, body_box,
@@ -27,19 +37,31 @@ MARGIN_X = GRID * 16
 MARGIN_Y = GRID * 24
 HEAD_GAP = COL * 2          # source part to the first lane column
 POWER_STUB = GRID * 4       # pin to power symbol
+GLYPH = GRID * 2            # room the power symbol's own artwork takes
+
+
+@dataclass
+class _Stub:
+    """A pin that leads out to a power symbol or an off-sheet label."""
+    at: tuple[float, float]
+    out: tuple[float, float]        # the pin's own outward direction
+    net: str
+    traced: bool
+    power: bool
+    prefer_horizontal: bool = False
 
 
 class Placer(Builder):
     def __init__(self, cir, lay):
         super().__init__(cir, lay)
         self._bridges = {}
-        self._pins_cache = None
-        self._box_cache = None
+        self._pending: list[_Stub] = []
 
     def run(self) -> Sheet:
         y = MARGIN_Y
         for group in self.lay.groups:
             y = self._group(group, y) + ROW // 2
+        self._wire_all()
         self._title()
         return self.sheet
 
@@ -98,29 +120,108 @@ class Placer(Builder):
             placed[ref] = self._place_multi(ref, x, y)
             x += COL
 
-        # Wire the spine together, orienting each part so its incoming pin
-        # faces left — otherwise a resistor's pin 1 can end up downstream and
-        # the wire doubles back on itself.
+        # Orient each part so the pin it shares with its upstream neighbour
+        # faces left. Nothing is wired here — a resistor whose pin 1 ends up
+        # downstream would make the wire double back through its own body,
+        # and the router cannot undo that.
         for a, b in zip(lane.spine, lane.spine[1:]):
-            self._connect(placed[a], placed[b], orient=True)
-
-        if head is not None and lane.spine:
-            self._connect(head, placed[lane.spine[0]])
+            self._orient(placed[a], placed[b])
 
         for att in lane.attachments:
             if att.kind == "bridge":
                 self._place_bridge(att, placed, y)
             else:
                 self._stub(att, placed, y)
-        self._pins_cache = None
-        self._box_cache = None
         for att in lane.attachments:
             if att.kind == "bridge":
-                self._wire_bridge(att, placed)
+                self._globals_for(self._bridges[att.ref])
 
         for ref in lane.spine:
             self._globals_for(placed[ref])
+            self._loose_for(placed[ref])
             self._terminals_for(placed[ref])
+
+    # --- wiring, once, over the whole sheet ----------------------------
+    def _wire_all(self) -> None:
+        """Draw every net, each as one tree, on one shared occupancy grid.
+
+        Placement is finished by the time this runs, so the router can see
+        every body and every pin at once. Nothing here knows what a spine or
+        a bridge is: those distinctions did their job during placement, and a
+        net is a net.
+        """
+        grid = route.Grid(self.sheet.bounds(), pad=GRID * 24)
+        for placed in self.sheet.placed:
+            box = body_box(placed, self.sym(placed.ref), pad=GRID * 0.5)
+            if box:
+                grid.add_body(box)
+
+        terminals: dict[str, list] = defaultdict(list)
+        for placed in self.sheet.placed:
+            sym = self.sym(placed.ref)
+            for pin in sym.units[placed.unit].pins:
+                net = self.cir.net_at(placed.ref, pin)
+                if not net:
+                    continue
+                at = pin_xy(placed, sym, pin)
+                grid.add_pin(at, net.name)
+                if net.name not in self.lay.globals:
+                    terminals[net.name].append(
+                        (at, pin_dir(placed, sym, pin), placed.traced))
+
+        # Global and off-sheet stubs go down first. They are short and
+        # straight, so it is the signal nets that must give way to them.
+        self._place_stubs(grid)
+
+        # Shortest net first: a net with the least room to move should choose
+        # before the sheet fills up around it.
+        def cost(name: str):
+            pts = [t[0] for t in terminals[name]]
+            w = max(p[0] for p in pts) - min(p[0] for p in pts)
+            h = max(p[1] for p in pts) - min(p[1] for p in pts)
+            return (len(pts), w + h, name)
+
+        for name in sorted((n for n in terminals if len(terminals[n]) > 1),
+                           key=cost):
+            self._wire_net(grid, name, terminals[name])
+
+    def _wire_net(self, grid, name: str, terms: list) -> None:
+        """Grow one net as a rectilinear tree, nearest terminal first.
+
+        The first two pins are joined directly; every pin after that routes to
+        whatever of the net is *already drawn*, so it branches off the trunk
+        instead of starting another run back from the first pin. That is what
+        a junction dot means, and it is why an emitter with four things on it
+        no longer draws four wires stacked on each other.
+        """
+        traced = all(t[2] for t in terms)
+        remaining = list(terms)
+        seed = remaining.pop(0)
+        tree = {grid.cell(seed[0])}
+        tree_pts = [seed[0]]
+        first = True
+
+        while remaining:
+            i = min(range(len(remaining)),
+                    key=lambda k: min(_manhattan(remaining[k][0], q)
+                                      for q in tree_pts))
+            at, direction, _ = remaining.pop(i)
+            goals = [seed[0]] if first else [grid.point(c) for c in tree]
+            pts = grid.route(name, at, goals, direction,
+                             [seed[1]] if first else None)
+            if pts is None:
+                # Draw it anyway rather than dropping the net silently: a wrong
+                # wire is a bug report, a missing one is a mystery. --verify
+                # will name it.
+                pts = _elbow(at, seed[0] if first else _nearest(at, tree_pts))
+            for a, b in zip(pts, pts[1:]):
+                self.wire(a, b, name, traced)
+            grid.occupy(pts, name)
+            if not first:
+                self.sheet.junctions.append(pts[-1])
+            tree |= grid.path_cells(pts)
+            tree_pts.extend(pts)
+            first = False
 
     # --- attachments --------------------------------------------------
     def _place_bridge(self, att, placed, row_y: float) -> None:
@@ -130,70 +231,6 @@ class Placer(Builder):
         y = row_y - (att.tier + 1) * TIER - TIER
         self._bridges[att.ref] = self._place_multi(
             att.ref, snap((lo.x + hi.x) / 2), y)
-
-    def _wire_bridge(self, att, placed) -> None:
-        lo, hi = placed.get(att.spans[0]), placed.get(att.spans[1])
-        p = self._bridges.get(att.ref)
-        if lo is None or hi is None or p is None:
-            return
-        x = p.x
-        for target in (lo, hi):
-            net = self._shared_net(p.ref, target.ref)
-            if not net:
-                continue
-            self._route(p, target, net, toward=x)
-        self._globals_for(p)
-
-    def _route(self, source, target, net: str, toward: float) -> None:
-        """Wire one pin to another, around every symbol body in the way."""
-        spin = self._pin_name_at(source, net)
-        tpin = self._pin_name_at(target, net)
-        if spin is None or tpin is None:
-            return
-        ssym, tsym = self.sym(source.ref), self.sym(target.ref)
-        a, b = pin_xy(source, ssym, spin), pin_xy(target, tsym, tpin)
-        adir = pin_dir(source, ssym, spin)
-        bdir = pin_dir(target, tsym, tpin)
-
-        pts = route.route(self._obstacles(net), a, b, adir, bdir)
-        if pts is None:
-            # Nothing found: fall back to a plain L so the net is still drawn
-            # rather than silently dropped. It may look wrong; it will not be
-            # missing, and --check reports it.
-            self.wire(a, b, net, source.traced)
-        else:
-            for p1, p2 in zip(pts, pts[1:]):
-                self.wire(p1, p2, net, source.traced)
-        self.sheet.junctions.append(b)
-
-    def _obstacles(self, net: str):
-        """Bodies and foreign pins the router must avoid, for one net."""
-        pts = [(x, y) for x, y, n in self._pin_map() if n != net]
-        return route.build(self._boxes(), pts, self.sheet.bounds())
-
-    def _pin_map(self):
-        """Every placed pin with its net. Rebuilt whenever placement changes."""
-        if self._pins_cache is None:
-            out = []
-            for pl in self.sheet.placed:
-                sym = self.sym(pl.ref)
-                for pin in sym.units[pl.unit].pins:
-                    px, py = pin_xy(pl, sym, pin)
-                    n = self.cir.net_at(pl.ref, pin)
-                    out.append((px, py, n.name if n else ""))
-            self._pins_cache = out
-        return self._pins_cache
-
-    def _boxes(self):
-        """Every placed symbol's drawn body, padded so wires do not graze."""
-        if self._box_cache is None:
-            self._box_cache = [
-                box for box in
-                (body_box(pl, self.sym(pl.ref), pad=GRID * 0.5)
-                 for pl in self.sheet.placed)
-                if box
-            ]
-        return self._box_cache
 
     def _pin_name_at(self, placed, net: str):
         sym = self.sym(placed.ref)
@@ -208,11 +245,6 @@ class Placer(Builder):
         if host is None:
             return
         p = self._place_multi(att.ref, host.x, row_y + STUB, angle=90.0)
-        net = self._shared_net(p.ref, host.ref)
-        if net:
-            a, b = self._pin_at(p, net), self._pin_at(host, net)
-            if a and b:
-                self.wire(b, a, net, p.traced)
         self._globals_for(p)
 
     # --- helpers ------------------------------------------------------
@@ -253,15 +285,10 @@ class Placer(Builder):
                 return pin_xy(placed, sym, pin)
         return None
 
-    def _connect(self, a, b, orient: bool = False) -> None:
+    def _orient(self, a, b) -> None:
         net = self._shared_net(a.ref, b.ref)
-        if not net:
-            return
-        if orient:
+        if net:
             self._face_left(b, net)
-        pa, pb = self._pin_at(a, net), self._pin_at(b, net)
-        if pa and pb:
-            self.wire(pa, pb, net)
 
     def _face_left(self, placed, net: str) -> None:
         """Rotate a two-terminal part so its `net` pin is the leftmost."""
@@ -278,22 +305,27 @@ class Placer(Builder):
             placed.angle = (placed.angle + 180) % 360
 
     def _globals_for(self, placed, prefer_horizontal: bool = False) -> None:
-        """Every global pin terminates in a power symbol at the pin itself."""
+        """Note every global pin. Where its symbol goes is decided later.
+
+        The direction cannot be settled here: four of the DAC's pins are
+        global and they are all on one side, so dropping each straight down
+        laid four stubs on top of each other. Which way is free is only
+        knowable once everything is placed, so this records the pin and
+        `_place_stubs` chooses.
+        """
         sym = self.sym(placed.ref)
         for pin in sym.units[placed.unit].pins:
             net = self.cir.net_at(placed.ref, pin)
             if not net or net.name not in self.lay.globals:
                 continue
-            at = pin_xy(placed, sym, pin)
-            up = not net.name.lstrip().startswith("-") and \
-                not net.name.upper().startswith(("GND", "0V"))
-            if prefer_horizontal:
-                end = (at[0] + (POWER_STUB if at[0] > placed.x else -POWER_STUB), at[1])
-            else:
-                end = (at[0], at[1] - POWER_STUB if up else at[1] + POWER_STUB)
-            self.wire(at, end, net.name)
-            if not self.power(net.name, end, 0.0 if up else 180.0):
-                self.sheet.labels.append((end[0], end[1], net.name))
+            self._pending.append(_Stub(
+                at=pin_xy(placed, sym, pin),
+                out=pin_dir(placed, sym, pin),
+                net=net.name,
+                traced=placed.traced,
+                power=True,
+                prefer_horizontal=prefer_horizontal,
+            ))
 
     def _loose_for(self, placed) -> None:
         """Label a pin whose net has no other part — an off-sheet connection."""
@@ -304,11 +336,57 @@ class Placer(Builder):
                 continue
             if len({r for r, _ in net.pins}) > 1:
                 continue
-            at = pin_xy(placed, sym, pin)
-            end = (at[0] - POWER_STUB * 1.5 if at[0] < placed.x
-                   else at[0] + POWER_STUB * 1.5, at[1])
-            self.wire(at, end, net.name)
-            self.sheet.labels.append((end[0], end[1], net.name))
+            self._pending.append(_Stub(
+                at=pin_xy(placed, sym, pin),
+                out=pin_dir(placed, sym, pin),
+                net=net.name,
+                traced=placed.traced,
+                power=False,
+            ))
+
+    def _place_stubs(self, grid) -> None:
+        """Lead each global and off-sheet pin out to a clear spot.
+
+        Tried in order of what a schematic normally does — rails up, grounds
+        down, labels out along the pin — and falling back to whatever is
+        actually free. Each stub is given its own key in the grid even when
+        two are the same net, because two GND leads drawn on top of each
+        other are still two symbols in one place.
+        """
+        for i, stub in enumerate(self._pending):
+            key = f"{stub.net}#{i}"
+            up = not stub.net.lstrip().startswith("-") and \
+                not stub.net.upper().startswith(("GND", "0V"))
+            out = (round(stub.out[0]), round(stub.out[1]))
+            order = [out, (0, -1) if up else (0, 1), (0, 1) if up else (0, -1),
+                     (1, 0), (-1, 0)]
+            if stub.power and not stub.prefer_horizontal and out[1] == 0:
+                # A sideways power pin still reads better dropping to its rail
+                # than sticking out, when there is room.
+                order = [order[1]] + order
+            length = POWER_STUB if stub.power else POWER_STUB * 1.5
+
+            end = None
+            for d in _unique(order):
+                cand = (stub.at[0] + d[0] * length, stub.at[1] + d[1] * length)
+                if grid.clear(stub.at, cand, key):
+                    end = cand
+                    break
+            if end is None:
+                end = (stub.at[0] + order[0][0] * length,
+                       stub.at[1] + order[0][1] * length)
+
+            self.wire(stub.at, end, stub.net, stub.traced)
+            grid.occupy([stub.at, end], key)
+            grid.add_pin(end, key)
+            if not (stub.power and self.power(stub.net, end, 0.0 if up else 180.0)):
+                self.sheet.labels.append((end[0], end[1], stub.net))
+
+            # The glyph itself takes up room. Without this a net could cross
+            # exactly on the arrowhead, which is not a short but reads as one.
+            gy = end[1] - GLYPH if up else end[1] + GLYPH
+            lo, hi = sorted((end[1], gy))
+            grid.add_body((end[0] - GLYPH / 2, lo, end[0] + GLYPH / 2, hi))
 
     def _terminals_for(self, placed) -> None:
         """Off-board connections hang off their host as a labelled point."""
@@ -322,10 +400,7 @@ class Placer(Builder):
             host_pin = self._pin_at(placed, net)
             if not host_pin:
                 continue
-            p = self.place(stub, host_pin[0] + COL, host_pin[1])
-            a = self._pin_at(p, net)
-            if a:
-                self.wire(host_pin, a, net)
+            self.place(stub, host_pin[0] + COL, host_pin[1])
 
     def _title(self) -> None:
         self.sheet.title = self.cir.title or "circuit"
@@ -333,3 +408,27 @@ class Placer(Builder):
 
 def build(cir, lay) -> Sheet:
     return Placer(cir, lay).run()
+
+
+def _manhattan(a, b) -> float:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def _nearest(at, pts):
+    return min(pts, key=lambda q: _manhattan(at, q))
+
+
+def _elbow(a, b):
+    """Last-resort L, horizontal then vertical."""
+    if abs(a[0] - b[0]) < 1e-6 or abs(a[1] - b[1]) < 1e-6:
+        return [a, b]
+    return [a, (b[0], a[1]), b]
+
+
+def _unique(seq):
+    seen, out = set(), []
+    for x in seq:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out

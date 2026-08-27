@@ -1,0 +1,23 @@
+# The same stage twice off one source. Nothing says these are channels; the
+# lane split has to fall out of cutting the source.
+net GND
+net 5V
+net OUTL
+net OUTR
+part TDA1545A:DAC
+part 2k1:Riv_L
+part 2k1:Riv_R
+part TL074:U1A
+part TL074:U1B
+DAC@4 -> GND
+DAC@5 -> 5V
+DAC@8 -> U1A@2
+U1A@2 -> Riv_R@1
+U1A@1 -> Riv_R@2
+U1A@3 -> GND
+U1A@1 -> OUTR
+DAC@6 -> U1B@6
+U1B@6 -> Riv_L@1
+U1B@7 -> Riv_L@2
+U1B@5 -> GND
+U1B@7 -> OUTL

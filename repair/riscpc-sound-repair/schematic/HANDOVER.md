@@ -1,6 +1,6 @@
 # Handover — sound schematic work
 
-State as of 2026-08-28. Branch **`feature/sound-schematic`**, 10 commits,
+State as of 2026-08-28. Branch **`feature/sound-schematic`**, 11 commits,
 **nothing pushed**. Working tree clean apart from `tools/video-source/ModeServ.bas`,
 which is the user's own edit and unrelated.
 
@@ -48,6 +48,44 @@ declared semantics. Layout inferred from four graph rules, symbols from
 KiCad's own libraries, A* routing around symbol bodies. Renders SVG in 0.2 s
 with zero wires crossing bodies.
 
+## The routing rebuild (most recent session)
+
+The SVG was drawing `Rfb_R` with its two legs shorted together and `Q4` as
+about seven wires on top of each other. Both turned out to be the same bug,
+and the fix was to change the unit of work.
+
+**What was wrong.** Routing was per *edge*: each connection got its own A*,
+run from the pin, with no knowledge of any other net. So a net with four pins
+drew four wires radiating from one pin, and two different nets could lie on
+the same line — which is not a smudge, it is a short, and it is invisible.
+
+**What was built.**
+
+- `verify.py` + `render.py --verify` — the round-trip check. Throw the
+  netlist away, read the geometry back the way KiCad reads a sheet, union
+  whatever touches, diff the partition against the source. This is the idea
+  from *Weave* (arXiv 2607.03835) and it is the single highest-value thing
+  in the directory. On first run it found nine connectivity errors in
+  `circuit.cir` — and a wire through both bodies in **two resistors in
+  series**.
+- `tests/` + `tests/run.sh` — a ladder of nine circuits, each one shape
+  bigger than the last, smallest first, so a failure names the smallest
+  circuit that shows it. This was the user's suggestion and it was the right
+  call: t01 was broken, which is not something the full drawing would ever
+  have told you.
+- `route.py` rewritten around a **shared occupancy grid**, one net at a time,
+  grown as a rectilinear tree. Crossings allowed (that is what a schematic
+  is), collinear overlap and corners-on-foreign-nets forbidden.
+- `place.py` split into placement then one wiring pass. It used to emit wires
+  from six different places, each drawing its own straight line, none aware
+  of the others. There is now exactly one function that emits a wire.
+
+All nine rungs pass, `--check` reports zero body crossings, 0.2 s.
+
+**What is still wrong is now placement, not routing** — the router draws what
+it is given without lying about the connectivity. See "Known-wrong" in the
+declarative README.
+
 ## Next steps, in order
 
 1. **The KiCad writer.** This is the point of the whole detour and the reason
@@ -59,7 +97,15 @@ with zero wires crossing bodies.
 2. **The `hints:` section.** The user's design: layout stays inferred by
    default, hints only override. Two concrete cases already visible to test
    against are listed in the declarative README under "Known-wrong".
-3. **Push the branch and open the self-review PR.** CLAUDE.md asks for this
+3. **Placement, informed by the literature.** *Weave* is the closest prior
+   art and it is worth reading: it runs a layered (Sugiyama) engine — elkjs —
+   for the signal chain, and handles feedback, divider legs, hanging shunts
+   and supply corners as explicit placement *patterns* kept **outside** that
+   graph, because forcing them in degrades the main chain. That is what the
+   four graph rules here are groping towards, and the named prior systems in
+   its related work (Swinkels & Hafer 1990; Jehng 1991; Arsintescu 1996;
+   Frezza & Levitan's SPAR 1993) are the classical heuristics.
+4. **Push the branch and open the self-review PR.** CLAUDE.md asks for this
    for code subprojects and it has not been done.
 
 ## Conclusions worth not re-deriving
@@ -77,6 +123,16 @@ These cost real time to establish.
   shortest-path leaves the active devices off the backbone and draws the
   circuit inside out. Maximum pin count overcorrects into a snake through
   every part. Scoring `pins - 2`, ties broken on fewer hops, is what works.
+- **Verify the drawing, not the intent.** Every check that reasoned about
+  what the router *meant* to do passed while the drawing was shorted. The
+  only check that found it read the geometry back and rebuilt the netlist
+  from it. Build that first next time.
+- **Route nets, not wires.** A net is a tree. Routing its edges
+  independently is what produced both the stacked wires and the shorts, and
+  no amount of tuning the per-edge A* would have fixed either.
+- **Start at two parts.** The full drawing is too big to tell you anything.
+  Two resistors in series was broken in four separate ways, and every one of
+  them was also wrong in the big circuit.
 - **"No overlaps by construction" is not enough.** It held for sideways pins
   and failed silently for downward-pointing ones — a feedback leg was landing
   exactly on a transistor's base, which is a short, not a smudge. Routing

@@ -1,0 +1,11 @@
+# A divider: adds a global net, so one leg must terminate in a GND symbol
+# rather than being routed.
+net IN
+net MID
+net GND
+part 1k:R1
+part 2k:R2
+IN -> R1@1
+R1@2 -> MID
+MID -> R2@1
+R2@2 -> GND

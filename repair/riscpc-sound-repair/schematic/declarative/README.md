@@ -6,9 +6,11 @@ the next piece and is not written yet.
 
 ```bash
 nix develop --command python3 render.py circuit.cir -o circuit.svg
-nix develop --command python3 render.py circuit.cir --check     # routing sanity
+nix develop --command python3 render.py circuit.cir --verify    # is it the circuit?
+nix develop --command python3 render.py circuit.cir --check     # does it cross a body?
 nix develop --command python3 render.py circuit.cir --layout    # what was inferred
 nix develop --command python3 render.py circuit.cir --netlist   # net by net
+nix develop --command bash tests/run.sh                         # the whole ladder
 ```
 
 Needs KiCad's symbol libraries installed (found automatically on macOS and
@@ -90,7 +92,9 @@ and exists so the next regression is caught rather than squinted at.
 | `symbols.py` | KiCad symbol lookup, pin geometry, bounding boxes |
 | `geometry.py` | format-agnostic placement types; shared with the KiCad writer |
 | `place.py` | placement and wiring |
-| `route.py` | A* obstacle routing |
+| `route.py` | the occupancy grid and the A* |
+| `verify.py` | reads the drawing back and diffs it against the netlist |
+| `tests/` | the ladder, smallest circuit first |
 | `render_svg.py` | draws KiCad symbol artwork as SVG |
 | `render.py` | CLI |
 
@@ -108,10 +112,20 @@ routing is solved once and the KiCad writer is mostly translation.
    - `Cf_L` / `Cf_R` legs run a long way left to reach the op-amp's
      inverting input; a "keep these together" hint would place them better.
    - `U1A`'s supply unit (pins 4/11) floats below the row looking orphaned.
-3. Wires may cross other **wires**. That is normal on a schematic and is what
-   junction dots are for, but the junction dots are currently only emitted at
-   route endpoints, not at genuine crossings of the same net.
-4. `Rpull` is classified as a bridge spanning Q..Rs1 rather than a stub to
+3. **Routing is correct, placement is not yet good.** Everything above is a
+   placement complaint, and that is the honest state of it: the router now
+   draws what it is given without lying about the connectivity, so the next
+   round of improvement belongs in `layout.py` and `place.py`. The literature
+   agrees — *Weave* runs a layered (Sugiyama) engine for the signal chain and
+   handles feedback, divider legs, hanging shunts and supply corners as
+   explicit placement *patterns* outside that graph, which is what the four
+   graph rules here are reaching towards.
+4. **No rip-up and reroute.** Nets are routed shortest-first and never
+   revisited, so a late net can be boxed in. When routing fails the wire is
+   drawn as a plain L rather than dropped — wrong is a bug report, missing is
+   a mystery — and `--verify` names it as a diagonal or an overlap. Nothing
+   in the current corpus triggers it.
+5. `Rpull` is classified as a bridge spanning Q..Rs1 rather than a stub to
    the negative rail. It draws correctly but reads oddly.
 
 ## Gotchas

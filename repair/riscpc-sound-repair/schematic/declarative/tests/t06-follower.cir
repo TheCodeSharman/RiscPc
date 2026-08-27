@@ -1,0 +1,29 @@
+# Op-amp driving an emitter follower, feedback taken from the emitter so the
+# transistor sits inside the loop. This is the headphone amp's output stage
+# reduced to one channel, and reproduces the Q4 tangle: the emitter node has
+# four pins on it and each one is currently routed as its own wire.
+net IN
+net OUT
+net GND
+net 5V
+net 12V
+net -12V
+part 1k:Rin
+part 47k:Rf
+part 340R:Rpull
+part 33R:Rs
+part TL074:U1A
+part BC849C:Q1
+IN -> Rin@1
+Rin@2 -> U1A@2
+U1A@3 -> GND
+U1A@4 -> 12V
+U1A@11 -> -12V
+U1A@1 -> Q1@1
+Q1@3 -> 5V
+Q1@2 -> Rf@1
+Rf@2 -> U1A@2
+Q1@2 -> Rpull@1
+Rpull@2 -> -12V
+Q1@2 -> Rs@1
+Rs@2 -> OUT

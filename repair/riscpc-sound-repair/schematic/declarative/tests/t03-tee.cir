@@ -1,0 +1,13 @@
+# One net with three pins on it. The first case that needs a Steiner tree
+# rather than a path: R1@2, R2@1 and R3@1 are one node.
+net IN
+net OUT
+net GND
+part 1k:R1
+part 2k:R2
+part 3k:R3
+IN -> R1@1
+R1@2 -> R2@1
+R1@2 -> R3@1
+R2@2 -> OUT
+R3@2 -> GND

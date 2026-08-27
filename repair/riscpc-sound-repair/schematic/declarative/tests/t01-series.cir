@@ -1,0 +1,8 @@
+# Two resistors in series. The smallest thing that has a wire in it.
+net IN
+net OUT
+part 1k:R1
+part 2k:R2
+IN -> R1@1
+R1@2 -> R2@1
+R2@2 -> OUT

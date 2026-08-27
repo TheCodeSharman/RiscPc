@@ -1,0 +1,17 @@
+# I/V converter: R and C in parallel across the same feedback path. Two
+# bridges over one span, which is the case layout.py has to give different
+# tiers, and the case that still draws its legs a long way left.
+net GND
+net VREF
+net IIN
+net OUT
+part TL074:U1A
+part 2k1:Riv
+part 100p:Cf
+IIN -> U1A@2
+U1A@2 -> Riv@1
+U1A@2 -> Cf@1
+U1A@1 -> Riv@2
+U1A@1 -> Cf@2
+U1A@3 -> VREF
+U1A@1 -> OUT
