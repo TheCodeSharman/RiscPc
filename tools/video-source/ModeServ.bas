@@ -41,10 +41,9 @@
   350 AF_INET%=2:SOCK_STREAM%=1
   360 SOL_SOCKET%=&FFFF:SO_REUSEADDR%=4
   370 PORT%=6502
-  380 DIM sa% 16,sel% 24,opt% 4,alen% 4,rx% 1024,tx% 1024,enum% 4096
+  380 DIM sa% 16,opt% 4,alen% 4,rx% 1024,tx% 1024,enum% 4096
   390 listen%=-1:conn%=-1:running%=TRUE
   400 haslib%=FNloadlib
-  410 px%=0:py%=0:pd%=-1:pr%=-1
   420 ENDPROC
   430 :
   440 DEF PROCcleanup
@@ -141,48 +140,29 @@
  1390 ENDPROC
  1400 :
  1410 DEF PROCsetmode(c%,cmd$)
- 1420 LOCAL f%,e%,e$
- 1430 e$=FNparse(cmd$)
- 1440 IF e$<>"" THEN PROCsend(c%,"FAIL "+e$):ENDPROC
- 1450 sel%!0=1:sel%!4=px%:sel%!8=py%:sel%!12=pd%:sel%!16=pr%:sel%!20=-1
- 1460 SYS "XOS_ScreenMode",0,sel% TO e%;f%
- 1470 IF f% AND 1 THEN PROCsend(c%,"FAIL "+FNstr(e%+4)):ENDPROC
- 1475 IF haslib% THEN PROCpaint("PM5544")
- 1480 PROCsend(c%,"OK "+FNachieved)
- 1490 ENDPROC
+ 1420 LOCAL m$
+ 1430 m$=FNrest(cmd$)
+ 1440 IF m$="" THEN PROCsend(c%,"FAIL need a mode string, as in MODE X320 Y256 C256 F50"):ENDPROC
+ 1450 REM BASIC's own MODE <string> takes the whole spec, so there is nothing to
+ 1460 REM parse here. A bad field or an unavailable mode raises an error, which
+ 1470 REM PROCdispatch's handler turns into FAIL - same reply as before.
+ 1480 MODE m$
+ 1485 IF haslib% THEN PROCpaint("PM5544")
+ 1490 PROCsend(c%,"OK "+FNachieved)
+ 1495 ENDPROC
  1500 :
- 1510 DEF FNparse(cmd$)
- 1520 LOCAL i%,w$,t$,r$
- 1530 px%=0:py%=0:pd%=-1:pr%=-1
- 1540 i%=2
- 1550 REPEAT
- 1560  w$=FNword(cmd$,i%)
- 1570  IF w$<>"" THEN
- 1580   t$=FNupper(LEFT$(w$,1)):r$=MID$(w$,2)
- 1590   CASE t$ OF
- 1600   WHEN "X":px%=VAL(r$)
- 1610   WHEN "Y":py%=VAL(r$)
- 1620   WHEN "C":pd%=FNdepth(r$)
- 1630   WHEN "F":pr%=VAL(r$)
- 1640   OTHERWISE:="bad field "+w$
- 1650   ENDCASE
- 1660  ENDIF
- 1670  i%+=1
- 1680 UNTIL w$=""
- 1690 IF px%=0 OR py%=0 THEN ="need X and Y, as in MODE X320 Y256 C256 F50"
- 1700 IF pd%<0 THEN ="need C2 C4 C16 C256 C32K C64K or C16M"
- 1710 =""
- 1720 :
- 1730 DEF FNdepth(s$)
- 1740 s$=FNupper(s$)
- 1750 IF s$="2" THEN =0
- 1760 IF s$="4" THEN =1
- 1770 IF s$="16" THEN =2
- 1780 IF s$="256" THEN =3
- 1790 IF s$="32K" OR s$="64K" THEN =4
- 1800 IF s$="16M" THEN =5
- 1810 =-1
- 1820 :
+ 1510 REM Everything after the first word: the mode string exactly as sent.
+ 1520 DEF FNrest(s$)
+ 1530 LOCAL i%
+ 1540 i%=1
+ 1550 WHILE i%<=LEN(s$) AND MID$(s$,i%,1)<>" " AND MID$(s$,i%,1)<>CHR$9
+ 1560  i%+=1
+ 1570 ENDWHILE
+ 1580 WHILE i%<=LEN(s$) AND (MID$(s$,i%,1)=" " OR MID$(s$,i%,1)=CHR$9)
+ 1590  i%+=1
+ 1600 ENDWHILE
+ 1610 =MID$(s$,i%)
+ 1620 :
  1830 DEF FNcolours(d%)
  1840 CASE d% OF
  1850 WHEN 0:="C2"
