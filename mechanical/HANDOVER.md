@@ -149,11 +149,20 @@ plan, outline to outline:
 | **left tower** | **4.49** — SK4 ✔ | **15.51** — nothing until SK6 ✔ |
 | **right tower** | **2.71** — C152 ✘ | **2.29** — RP16 ✘ |
 
-So `CAP_SIDE` is right for the left tower, with 0.33 mm to spare, and the right
-tower has nowhere in plan on either flank. Note the −Y flank at the *left* tower
-is the roomiest place on the board by a factor of three — the photograph that
-picked +Y ("~5 mm on the RP14/RP15 side, ~2 on the SO package side") was reading
-mid-span, not beside the tower.
+**`CAP_SIDE` is now −1 and that closes it.** It was +1, off a photograph read
+mid-span ("~5 mm on the RP14/RP15 side, ~2 on the SO package side") — backwards
+where it matters: beside the *left* tower, −Y is the roomy flank by a factor of
+three, because the SO packages start further along the socket.
+
+The deciding reason is not board space, though. **SK4 has a network card in it**
+on this machine, standing up right where the boss and a driver want to be.
+Observed on the machine; nothing in the TRM says a card is fitted.
+
+And the flip pays twice. On +Y the right tower was blocked by **C152**, a ~10 mm
+radial can the boss could never clear. On −Y the nearest thing is **RP16**, an
+SOIC-16W **1.6 mm** tall — the boss flies **15.5 mm** over it, confirmed by the
+3D check, not just by plan. So the right tower stops being a problem at all, and
+the boss's plan clearance stops being the binding number anywhere.
 
 **3. Both anchors' outer end walls overlap something in plan.** Each wants
 1.40 mm past the socket's end; the drawing leaves **0.30**. R213 and C151 sit off
@@ -165,26 +174,25 @@ end: the one with **C73** — a ~11 mm radial electrolytic — hard against it. 
 `anchor_right` end is the one with **LK13** and the battery **BT1** beyond it.
 Get this the wrong way round and the boss goes to the tower that has no room.
 
-**What actually blocks now: five heights, all a caliper job on the real board.**
-The assembly drawing is a plan view and has no heights, so every number above is
-a plan screen and is *pessimistic by construction*. The anchor stands 1.5 mm off
-the board and the boss sits 18.3–23.8 mm above it, so:
+**What actually blocks now: three heights, a caliper job on the real board.**
+The boss is settled by the `CAP_SIDE` flip. What is left is the **outer end
+walls**, and the anchor stands 1.5 mm off the board, so:
 
-- **C152** and **RP16** decide the right tower's boss. C152 is a ~10 mm radial
-  electrolytic and RP16 a SIL pack; if either is shorter than 18.3 mm the boss
-  passes clean over it and the plan foul is not a foul at all.
-- **C73**, **C151** and **R213** decide the end walls. Anything under 1.5 mm tall
-  passes under the anchor.
+- **C151** and **R213**, off the right end. Neither identifies as a standard
+  package (2.9 × 5.5 and 2.9 × 5.8), so both are still prisms of an invented
+  height and both still show as fouls. Anything under 1.5 mm tall passes under
+  the anchor.
+- **C73**, off the left end. Its 3D foul vanished only because KiCad's D10 can is
+  1.0 mm smaller than the ø11.01 drawn — the plan figure, 0.26 mm of overlap, is
+  the one to trust. It is a radial can and certainly taller than 1.5 mm, so this
+  one is real.
 
-Measure those five and the design is either finished or needs one change. If it
-does need one, in increasing order of cost:
+If they do foul, in increasing order of cost:
 
-1. `WALL` 2.0 → 1.5 on the jaw — saves 0.5 mm on the boss.
-2. `CAP_WALL` on the outer end face only — the end walls need 1.10 mm off to
+1. `CAP_WALL` on the outer end face only — the end walls need 1.10 mm off to
    clear C151/R213, which is most of the 1.2 they have.
-3. Flip `CAP_SIDE` to −Y. Best at the left tower (15.51 mm), no help at the
-   right (2.29).
-4. Screw only the left anchor and let the right one be press-fit alone. The
+2. `WALL` 2.0 → 1.5 on the jaw — saves 0.5 mm, and now spare rather than needed.
+3. Screw only the left anchor and let the right one be press-fit alone. The
    preload is set by the yoke's bar deflecting, so one screw still preloads —
    asymmetrically, and the report's stiffness figure would need redoing.
 
@@ -229,7 +237,12 @@ PETG. `FIT = 0.2` at the top of the model is the single printer-tolerance knob.
 | `vram_anchor_right.stl` | 1 | 1.0 cm³, 21.1 tall |
 
 **All four changed after the first test fit — reprint everything.** The anchors
-are 1.2 mm shorter and the yoke's foot moved; see below.
+are 1.2 mm shorter, the yoke's foot moved, and `CAP_SIDE` has since flipped the
+screw boss to the other flank; see below.
+
+**The exported files are already in print orientation** — yoke and coupon on the
+bar's top face, anchors roof-down, all sitting on Z = 0. Load and slice; do not
+flip them, and do not mirror an anchor to make its pair.
 
 The anchors are a **chiral pair** — both hands are exported, do not mirror in
 the slicer and do not print two of one.

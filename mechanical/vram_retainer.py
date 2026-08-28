@@ -110,12 +110,29 @@ TOWER_X = 7.7          # MEASURED. End tower, along the socket -- square in plan
                        # moulding only; the cream latch that clipped into it is
                        # gone, so its end face and both flanks are clear.
 TOWER_Y = 7.7          # MEASURED. End tower, across the socket
-CAP_SIDE = +1          # which flank of the socket the cap wraps onto. The
-                       # board is not symmetric here: a sharp top view puts
-                       # roughly 5 mm of clear board on the RP14/RP15 side of
-                       # the left tower and about 2 on the side carrying the SO
-                       # packages, so the cap takes the roomy one. Flip to -1 if
-                       # that is the wrong way round on the real board.
+CAP_SIDE = -1          # which flank the screw boss sits on. -Y: AWAY from the
+                       # VIDC20, over the row of SO packages.
+                       #
+                       # It was +1, chosen off a sharp top view that read "about
+                       # 5 mm of clear board on the RP14/RP15 side, about 2 on
+                       # the SO package side". That reading was taken mid-span
+                       # and it is backwards where it matters. Beside the LEFT
+                       # tower, which is the tower that takes the screw, the
+                       # assembly drawing gives 4.49 mm on +Y and 15.51 on -Y --
+                       # -Y is the roomy flank by a factor of three, because the
+                       # SO packages start further along the socket.
+                       #
+                       # And the deciding reason is not board space at all: SK4,
+                       # the euro socket on the +Y side, has a NETWORK CARD in
+                       # it on this machine, which stands up right where the boss
+                       # and the driver would want to be. Observed, not modelled
+                       # -- nothing in the TRM says a card is fitted.
+                       #
+                       # The move pays twice. On +Y the boss was blocked at the
+                       # right tower by C152, a ~10 mm radial can it could never
+                       # clear. On -Y the nearest thing is RP16, an SOIC-16W
+                       # 1.6 mm tall, and the boss flies 15 mm over the top of
+                       # it -- so the right tower stops being a problem too.
 
 CARD_FREE = CARD_TOP - SOCKET_H  # card standing proud of the socket
 
@@ -604,6 +621,23 @@ def anchor(right: bool = True) -> Part:
     return block if right else mirror(block, Plane.YZ)
 
 
+def for_print(part: Part) -> Part:
+    """The same part, turned the way it is printed and dropped onto the bed.
+
+    All four print UPSIDE DOWN -- the yoke and coupon on the bar's top face, the
+    anchor roof-down -- and the reasons are in the comments on each; they are
+    about overhangs and about which face wants to be a clean top surface, not
+    about convenience. So the exported files carry that orientation rather than
+    the assembly's, and the slicer needs no flipping.
+
+    A rotation, never a mirror, so the anchors stay handed. The model's own frame
+    stays the assembly frame -- that is what the viewer shows and what every
+    clearance in the report is measured in."""
+    turned = Rot(180, 0, 0) * part
+    bb = turned.bounding_box()
+    return Pos(-bb.center().X, -bb.center().Y, -bb.min.Z) * turned
+
+
 def coupon() -> Part:
     """One end of the yoke, for a two-minute test print. It carries the card
     slot, the foot and the screw hole -- everything whose fit is uncertain --
@@ -1026,6 +1060,7 @@ if __name__ == "__main__":
         "coupon": coupon(),
     }
     for name, p in parts.items():
+        p = for_print(p)                # exported bed-down, ready to slice
         step = here / f"vram_{name}.step"
         export_step(p, str(step))
         # STEP writes the wall-clock time into its header, so an unchanged model
@@ -1039,7 +1074,8 @@ if __name__ == "__main__":
         export_stl(p, str(here / f"vram_{name}.stl"))
         bb = p.bounding_box()
         print(f"{name:10s} {bb.size.X:6.1f} x {bb.size.Y:5.1f} x {bb.size.Z:5.1f} mm"
-              f"   {p.volume / 1000:5.1f} cm^3   solids={len(p.solids())}")
+              f"   {p.volume / 1000:5.1f} cm^3   solids={len(p.solids())}"
+              f"   bed-down, {'on Z=0' if abs(bb.min.Z) < 1e-6 else 'NOT on the bed'}")
     print(f"jaw grips  {CARD_FREE - _jaw_z0:.1f} mm of card face, both sides, "
           f"{CLEAR_END:.1f} mm in from each end")
     print(f"           = CARD_TOP {CARD_TOP} - TOWER_TOP {TOWER_TOP} "
@@ -1137,8 +1173,11 @@ if __name__ == "__main__":
             cells.append(f"{flank} {mm:5.2f} ({who})"
                          + (" OK" if mm >= need else " NO"))
         print(f"           {end:5s} tower  " + "   ".join(cells))
-    print(f"           so the boss goes on the LEFT tower and the RIGHT one has "
-          f"nowhere in plan -- but heights are unknown, see the comment")
+    _flank = "+Y" if CAP_SIDE > 0 else "-Y"
+    _ok = [e for e in ("left", "right") if gaps[e, _flank][0] >= need]
+    print(f"           the boss is on {_flank} (CAP_SIDE {CAP_SIDE:+d}), which clears in plan "
+          f"at: {', '.join(_ok) if _ok else 'NEITHER tower'}"
+          + ("" if len(_ok) == 2 else " -- but plan is pessimistic, see the 3D check below"))
     fouls = _fouls(printed)
     if fouls:
         print("           the anchors' OUTER END WALLS also hit: "
