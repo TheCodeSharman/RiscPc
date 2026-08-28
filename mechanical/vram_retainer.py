@@ -127,9 +127,13 @@ GAP = FIT + 0.1        # per-face clearance to the card. Deliberately looser
                        # than FIT: this slides onto a thirty-year-old PCB whose
                        # edge may carry burrs, residue or a little swelling,
                        # and a slot that grips is worse than one that doesn't.
-PRESS = 0.10           # interference per flank, so the pocket is 0.2 narrower
+PRESS = 0.15           # interference per flank, so the pocket is 0.3 narrower
                        # than the tower and the anchor presses on rather than
-                       # being bonded. The U puts the printed part in tension
+                       # being bonded. Raised from 0.10, which printed and went
+                       # on but did not grip hard enough to trust on its own.
+                       # Note this compounds with TIE below: closing the fourth
+                       # side stiffens the flanks a long way, so the SAME
+                       # interference already bites harder than it used to. The U puts the printed part in tension
                        # and the 30-year-old tower in compression, which is the
                        # right way round for the old plastic. Adhesive is still
                        # available as a belt-and-braces addition; it is no
@@ -143,6 +147,25 @@ PRESS = 0.10           # interference per flank, so the pocket is 0.2 narrower
                        # drop of epoxy in the same joint recovers it.
 BAR_H = 5.0            # bar depth above the card's top edge
 FOOT_T = 3.0           # yoke's foot, sitting on the anchor's roof
+ANCHOR_DROP = 0.6      # how far the anchor's roof sits BELOW the yoke datum,
+                       # adding to SEAT_GAP to make the total preload travel.
+                       # Two reasons it lives here rather than in SEAT_GAP,
+                       # which is geometrically the same thing:
+                       #
+                       # 1. It is on the anchor, and the anchors are the part
+                       #    being reprinted anyway. A yoke that already fits
+                       #    stays fitted -- 2 x 1.1 cm3 instead of 4.3.
+                       # 2. It keeps _jaw_z0 fixed. That datum also sets the
+                       #    yoke's jaw bottom and the clearance the insert boss
+                       #    needs over the tower, so moving it to chase preload
+                       #    would quietly change the card grip as well.
+                       #
+                       # This is the ONLY knob for preload force. The joint is
+                       # displacement-controlled: once the foot lands on the
+                       # roof, more screw torque clamps foot to anchor harder
+                       # and adds nothing to the card. Which is the property
+                       # worth keeping -- it cannot be over-tightened onto a
+                       # 30-year-old card, and it repeats build to build.
 SEAT_GAP = 0.4         # designed gap under the foot. The yoke's height is set
                        # by the bar resting on the card's top edge, so the foot
                        # must NOT reach the anchor's roof on its own -- if it
@@ -150,20 +173,23 @@ SEAT_GAP = 0.4         # designed gap under the foot. The yoke's height is set
                        # card, which is the one job it has. Leaving a gap makes
                        # the screw close it, which preloads the bar downward
                        # instead.
-SCREW_CLEAR = 2.5 + 2 * FIT   # M2.5 clearance. Printed holes come out
+SCREW_CLEAR = 2.0 + 2 * FIT   # M2 clearance. Printed holes come out
                        # undersize by roughly a layer width, so this is nominal
                        # plus FIT per side rather than a table value.
-INSERT_D = 3.6         # M2.5 heat-set insert: bore diameter...
+INSERT_D = 3.2         # M2 heat-set insert: bore diameter...
 INSERT_L = 4.0         # ...and length. Check against the inserts actually held;
-                       # 3.4-3.6 x 4.0 is the common M2.5 short.
-SCREW_HEAD_D = 4.8     # M2.5 countersunk head, plus clearance. Countersunk
-                       # rather than pan, because a pan head would need the
-                       # screw moved a further 0.6 outboard to clear the jaw
-                       # wall, and every millimetre on this flank is spent.
-SCREW_CBORE = 2.2      # counterbore depth. A counterbore and a pan head, not a
-                       # countersink: the holes below are SLOTTED, and a
-                       # countersunk head self-centres, which would fight the
-                       # slot and pull the yoke to nominal anyway.
+                       # 3.2 x 4.0 is the common M2 short.
+SCREW_HEAD_D = 4.3     # M2 pan head (4.0 nominal) plus clearance.
+SCREW_CBORE = 1.8      # counterbore depth, against a ~1.6 M2 pan head. A
+                       # counterbore and a pan head, not a countersink: the
+                       # holes below are SLOTTED, and a countersunk head
+                       # self-centres, which would fight the slot and pull the
+                       # yoke back to nominal anyway.
+                       #
+                       # M2 rather than M2.5 because that is what is on hand.
+                       # It also buys back roughly 0.8 mm on the flank, which
+                       # is the direction that matters: the boss clearance past
+                       # the socket body is the one dimension still unverified.
 SCREW_SLOT = 1.0       # +/- travel in the screw slots. The anchors are bonded
                        # to real towers, not placed at modelled coordinates, so
                        # they will not land exactly where SOCKET_L says. This is
@@ -179,14 +205,44 @@ TOWER_CLEAR = INSERT_L + 1.5   # jaw stops this far above the tower. Sized by
                        # costs grip on the card, which the towers are largely
                        # providing anyway.
 
+TIE_CLEAR = 0.25       # extra per face in the anchor's card slot, over and
+                       # above the yoke's GAP. The yoke is located by the screws
+                       # and lands where the anchors put it, but these two slots
+                       # are on parts pressed onto real towers by hand, so the
+                       # card has to thread through both of them before the yoke
+                       # is anywhere near. Cheaper to open them up than to make
+                       # the card fight two hand-placed alignments.
+TIE_Z0 = 0.0           # ...which also makes the tabs a DEPTH STOP, and that
+                       # turns out to matter more than the tie did. Nothing else
+                       # on this anchor bottoms out on anything: the flanks pass
+                       # the socket body outboard and stop 1.5 above the board,
+                       # so before the tabs existed the anchor's height on the
+                       # tower was just however hard it was pressed. Preload is
+                       # SEAT_GAP + ANCHOR_DROP measured from the anchor's ROOF,
+                       # so an anchor sitting 0.5 high or low was 0.5 of preload
+                       # error -- half the travel, set by feel. The tabs land on
+                       # the socket body's top face at exactly nominal depth, so
+                       # now: press until they seat, and the preload is the
+                       # number in the report. Glue, if used, goes on after that
+                       # -- the stop sets the height, not the adhesive.
+                       #
+                       # the tie starts at the socket's TOP FACE, not at the
+                       # bottom of the anchor. Below that the socket body (~6.5
+                       # across) is wider than the tower (7.7) only in the sense
+                       # that the flanks clear it -- a wall on the inner face
+                       # would run straight into the body. Above it there is
+                       # nothing but the card, which the slot is for.
+
 _jaw_hw = CARD_T / 2 + GAP + WALL            # jaw half-width
 _grip_hw = TOWER_Y / 2 - PRESS               # pocket half-width; undersize
 _cap_hw = _grip_hw + CAP_WALL                # anchor half-width, both flanks
 _slot_hw = CARD_T / 2 + GAP                  # card slot half-width
+_tie_hw = _slot_hw + TIE_CLEAR               # ...and the anchor's, looser
 _cap_x1 = SOCKET_L / 2 + FIT + CAP_WALL      # cap outer face
 _cap_x0 = SOCKET_L / 2 - TOWER_X             # cap inner face
 _jaw_x0 = CARD_L / 2 - CLEAR_END             # jaw reaches this far in
 _jaw_z0 = TOWER_H + TOWER_CLEAR              # jaw bottom, clear of the tower
+_anchor_z1 = _jaw_z0 - ANCHOR_DROP           # anchor roof, dropped below it
 # The anchor runs almost to the motherboard rather than stopping at the socket's
 # top face. The tower is full height and 7.7 across where the socket body is
 # only ~6.5, so the anchor's flanks clear the body all the way down -- and the
@@ -288,6 +344,30 @@ def yoke() -> Part:
             _jaw_z0 + SEAT_GAP, _jaw_z0 + SEAT_GAP + FOOT_T,
         )
         _ft = _jaw_z0 + SEAT_GAP + FOOT_T          # top of the foot
+        # Buttress over the foot, which is what lets this print without support.
+        # Printed as the handover says -- bar's top face on the bed -- "up" is
+        # -Z, so the foot's TOP face is its floor in the printer and it lands
+        # 8.2 mm up with nothing beneath it: a 6.15 mm cantilever off the jaw
+        # wall, at 90 degrees. Filling the wedge above it at 45 degrees (rise
+        # equals reach) means each layer grows outward from the jaw by no more
+        # than the layer height, so it carries itself.
+        #
+        # It has to be hollow or it would bury the screw. The channel is the
+        # counterbore's own slot carried up through the wedge, which is exactly
+        # the right size by construction: whatever driver turns the head fits
+        # through the hole the head came down. What's left is two ribs, and they
+        # land under the two solid strips of the foot's floor either side of the
+        # counterbore -- the parts that actually need holding up.
+        _reach = abs(_foot_y) - _jaw_hw
+        _wedge = Plane.YZ * Polygon(
+            (CAP_SIDE * _jaw_hw, _ft),
+            (_foot_y, _ft),
+            (CAP_SIDE * _jaw_hw, _ft + _reach),
+            align=None,
+        )
+        part += Pos(s * _screw_x, 0, 0) * extrude(_wedge, amount=5.0, both=True)
+        part -= _slotted(s * _screw_x, _screw_y, _ft + _reach / 2,
+                         2 * SCREW_SLOT, SCREW_HEAD_D, _reach)
         part -= _slotted(s * _screw_x, _screw_y, _ft - FOOT_T / 2,
                          2 * SCREW_SLOT, SCREW_CLEAR, FOOT_T * 3)
         part -= _slotted(s * _screw_x, _screw_y, _ft - SCREW_CBORE / 2 + 0.05,
@@ -317,23 +397,40 @@ def yoke() -> Part:
 
 
 def anchor(right: bool = True) -> Part:
-    """One bonded anchor: an L over the socket's end tower, taking its outer end
-    face and its one roomier flank. Modelled at +X and mirrored, so the pair is
-    identical and only handed.
+    """One press-fit anchor over the socket's end tower, taking both flanks, the
+    outer end face and — above the socket body — most of the inner face too.
+    Modelled at +X and mirrored, so the pair is identical and only handed.
 
-    The pocket is open at the bottom and open on the inner face, and oversized
-    by EPOXY on every side, so nothing bottoms out on the tower and its
-    unmeasured dimensions are absorbed by the adhesive."""
-    # A U in plan: both flanks plus the outer end wall tying them together, so
-    # the flanks cannot splay and the grip is real. Open at the bottom and open
-    # on the inner face, so it presses straight down over the tower and nothing
-    # crosses whatever stands on top of it.
+    The pocket is open at the bottom and undersize by PRESS on each flank, so it
+    presses on rather than being bonded; nothing bottoms out on the tower, and
+    the part's height is set by the yoke's bar landing on the card."""
+    # A ring in plan, broken only by the card slot: both flanks, the outer end
+    # wall, and two tabs across the inner face. Open at the bottom so it presses
+    # straight down over the tower.
     block = _slab(  # outer end wall
-        SOCKET_L / 2 + FIT, _cap_x1, -_cap_hw, _cap_hw, _anchor_z0, _jaw_z0
+        SOCKET_L / 2 + FIT, _cap_x1, -_cap_hw, _cap_hw, _anchor_z0, _anchor_z1
     )
     for f in (-1, 1):
         block += _slab(
-            _cap_x0, _cap_x1, f * _grip_hw, f * _cap_hw, _anchor_z0, _jaw_z0
+            _cap_x0, _cap_x1, f * _grip_hw, f * _cap_hw, _anchor_z0, _anchor_z1
+        )
+    # The fourth side. As a U the flanks could splay apart under the very load
+    # the part exists to resist -- the outer end wall ties them at one end only,
+    # so the mouth is free to open and the grip is whatever the print's stiffness
+    # in bending happens to be. Two tabs across the inner face close the ring and
+    # put the flanks in tension instead, which is what makes the interference
+    # actually bear.
+    #
+    # It cannot be a full wall: the card passes through here (the towers stand
+    # 3.75 mm proud of the card's ends, so the card's end is INSIDE the tower's
+    # footprint in X), hence the slot between the tabs. And it cannot run the
+    # full height: below the socket's top face the body is in the way, which is
+    # why the flanks clear it out at +/-3.75 and a tab at +/-1.2 would not.
+    for f in (-1, 1):
+        block += _slab(
+            _cap_x0 - CAP_WALL, _cap_x0,
+            f * _tie_hw, f * _cap_hw,
+            TIE_Z0, _anchor_z1,
         )
     # No roof over the tower. It would have to cross whatever posts and latch
     # arms stand up from it, which are the one thing no photograph has shown me
@@ -344,14 +441,20 @@ def anchor(right: bool = True) -> Part:
     block += _slab(
         _screw_x - 5.0, _screw_x + 5.0,
         CAP_SIDE * _boss_in, _foot_y,
-        _jaw_z0 - INSERT_L - 1.5, _jaw_z0,
+        _anchor_z1 - INSERT_L - 1.5, _anchor_z1,
     )
     # Insert bore, open at the top so the insert is set in from above with an
     # iron. Sunk a little deeper than the insert, so displaced plastic has
     # somewhere to go rather than lifting it proud of the face the yoke lands on.
-    block -= Pos(_screw_x, _screw_y, _jaw_z0 - (INSERT_L + 0.8) / 2) * Cylinder(
+    block -= Pos(_screw_x, _screw_y, _anchor_z1 - (INSERT_L + 0.8) / 2) * Cylinder(
         INSERT_D / 2, INSERT_L + 0.8
     )
+    # Print this ROOF DOWN -- the face the yoke's feet land on against the bed.
+    # That puts this boss and both tie tabs on the build plate; mouth down leaves
+    # the boss cantilevered and costs 51 mm2 of 90-degree overhang against 8.
+    # It also means the tabs' stop face prints as a clean top surface rather than
+    # a supported underside, and that face is the preload datum.
+    #
     # Lead-in at the mouth, so a press fit starts square instead of catching a
     # corner on the tower and shearing a flank off.
     block = _bevel(
@@ -424,6 +527,16 @@ if __name__ == "__main__":
         f"{TOWER_TOP + TOWER_CLEAR:.1f} there is none)")
     print(f"bar        {2 * _jaw_hw:.2f} mm across, vs 6.5 for the socket body")
     _grip_h = _jaw_z0 - _anchor_z0
+    _I = 2 * _jaw_hw * BAR_H ** 3 / 12
+    _rate = 48 * 2000.0 * _I / (2 * _screw_x) ** 3
+    print(f"bar stiff  ~{_rate:.0f} N/mm mid-span (E=2 GPa printed PETG, I={_I:.0f} mm4), "
+          f"so {SEAT_GAP + ANCHOR_DROP:.2f} mm travel is roughly "
+          f"{_rate * (SEAT_GAP + ANCHOR_DROP):.0f} N. Order of magnitude only -- E for a "
+          f"printed part is good to about a factor of two.")
+    print(f"preload    {SEAT_GAP + ANCHOR_DROP:.2f} mm of yoke deflection "
+          f"(SEAT_GAP {SEAT_GAP} + ANCHOR_DROP {ANCHOR_DROP}); "
+          f"screw spans {SEAT_GAP + ANCHOR_DROP + FOOT_T - SCREW_CBORE + INSERT_L:.1f} mm "
+          f"head-face to insert bottom")
     print(f"press fit  {2 * PRESS:.2f} mm interference across {TOWER_Y} of tower, "
           f"over 2 x {TOWER_X * _grip_h:.0f} mm2 of flank")
     print(f"           sticks out {_cap_hw - 3.25:.2f} mm past the socket body, "
