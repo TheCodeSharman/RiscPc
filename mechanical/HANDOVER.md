@@ -1,8 +1,25 @@
 # VRAM retainer — handover
 
-State as of 2026-08-28 (revised after the first anchor print). The model is [`vram_retainer.py`](vram_retainer.py); its
-docstring carries the design reasoning, this file carries the project context
+State as of **2026-08-29**. The clip is **fitted and the machine is running
+clean** — see `Dev Diary.md`, entry of Aug 28. The model is
+[`vram_retainer.py`](vram_retainer.py); this file carries the project context
 that isn't in the code.
+
+## Where this stands, in one paragraph
+
+Designed, printed, fitted, working. The fault it exists to fix — garbage on
+100 % of boots with the VRAM in, clean with it out — has stopped. Nothing is
+blocking, no change is pending, and the only open item is **attribution**: the
+board was washed, dried, reassembled and the card reseated in the same session,
+so a clean machine does not by itself prove the clip is why. Pulling the clip
+later and seeing whether the fault returns settles that whenever it is worth
+doing. Everything below is the record of how the design got here and what to
+re-check if it ever stops being true.
+
+**If you are picking this up cold:** read this file, then the model's docstring,
+then `Dev Diary.md` from the Aug 23 entry onward. The four STLs in this
+directory are current, are in print orientation, and match what is on the
+machine.
 
 ## The problem
 
