@@ -48,9 +48,18 @@ reading from four graph rules:
    to right. Heaviest, not shortest: a feedback resistor is always a shorter
    way past an amplifier than through it, so shortest-path draws the circuit
    inside out. Scoring is `pins - 2` with ties broken on fewer hops.
-4. **Bridges** — an off-spine part touching the spine twice is drawn over the
-   top. This is why the composite-amp feedback lands where feedback belongs
-   without anything being told it is feedback.
+4. **Bridges** — an off-spine part is anchored by *net*, not by neighbour.
+   Each of its own nets is asked which spine parts it reaches; two nets
+   reaching the spine make a bridge over the tightest pair of anchors, one
+   net makes a leg hanging off its anchor.
+
+   Counting neighbours instead got both cases wrong. `Rpull` touches both the
+   transistor and the series resistor, so it looked like a bridge spanning
+   the pair — but through *one* net, and it is a leg to the negative rail.
+   `Riv` and `Cf` reach four parts between them, so they stretched across two
+   spine positions — but both their nets meet at the op-amp, so they are
+   feedback round one part and now sit directly over it. Neither needed to be
+   told what it was.
 
 Lanes come from cutting the source, so the two channels separate without
 anyone saying they are channels.
@@ -120,13 +129,19 @@ routing is solved once and the KiCad writer is mostly translation.
    handles feedback, divider legs, hanging shunts and supply corners as
    explicit placement *patterns* outside that graph, which is what the four
    graph rules here are reaching towards.
-4. **No rip-up and reroute.** Nets are routed shortest-first and never
+4. **The spare supply unit reads as two stalks.** A quad op-amp's pins 4 and
+   11 are one pair shared by all four sections, so KiCad draws them as a
+   fifth symbol with no body. They are parked together at the foot of the
+   sheet, which is the right place, but with nothing drawn between them they
+   look like two unrelated fragments. A dashed box would say "package".
+5. **No rip-up and reroute.** Nets are routed shortest-first and never
    revisited, so a late net can be boxed in. When routing fails the wire is
    drawn as a plain L rather than dropped — wrong is a bug report, missing is
    a mystery — and `--verify` names it as a diagonal or an overlap. Nothing
    in the current corpus triggers it.
-5. `Rpull` is classified as a bridge spanning Q..Rs1 rather than a stub to
-   the negative rail. It draws correctly but reads oddly.
+6. Whitespace is still generous — the sheet is taller than it needs to be,
+   and lane pitch is driven by the worst case rather than by what each lane
+   uses.
 
 ## Gotchas
 

@@ -29,6 +29,8 @@ anyone saying they are channels.
 
 from __future__ import annotations
 
+import itertools
+
 import re
 from collections import deque
 from dataclasses import dataclass, field
@@ -228,32 +230,49 @@ def _lay_lane(cir, members, adj, net_between, lay, rank, seed) -> Lane:
     on_spine = set(spine)
 
     for ref in sorted(members - on_spine, key=lambda r: (rank.get(r, 0), r)):
-        touching = [n for n in adj[ref] if n in on_spine]
         globals_on = [
             n.name for n in cir.nets_of(ref) if n.name in lay.globals
         ]
-        if len(touching) >= 2:
-            ends = sorted(touching, key=lambda r: spine.index(r))
-            lane.attachments.append(
-                Attachment(ref, "bridge", (ends[0], ends[-1]), above=True)
+        # Anchor each of the part's own nets to the spine. What decides
+        # bridge-or-stub is how many *nets* reach the spine, not how many
+        # parts: Rpull touches both Q and Rs1, but through one net — it is a
+        # leg to the rail, not something spanning the pair.
+        anchors = []
+        for net in cir.nets_of(ref):
+            if net.name in lay.globals:
+                continue
+            on = sorted(set(cir.parts_on(net)) & on_spine, key=spine.index)
+            if on:
+                anchors.append(on)
+
+        if len(anchors) >= 2:
+            # Of all the ways to pick one anchor per net, take the tightest.
+            # Rfb touches Rin, U1C, Q and Rs1; spanning Rin..Rs1 stretches it
+            # across the whole stage when U1C..Q says the same thing. Equal
+            # indices mean feedback round a single part, which is how Riv and
+            # Cf come to sit directly over their op-amp.
+            lo, hi = min(
+                (tuple(sorted((spine.index(a), spine.index(b))))
+                 for a, b in itertools.product(anchors[0], anchors[1])),
+                key=lambda pr: pr[1] - pr[0],
             )
-        elif touching:
-            host = touching[0]
+            lane.attachments.append(
+                Attachment(ref, "bridge", (spine[lo], spine[hi]), above=True)
+            )
+        else:
+            # One anchor, or none at all. None happens when a part reaches the
+            # spine only through another off-spine part — it used to be
+            # dropped from the drawing without a word, so fall back to the
+            # nearest spine part by graph distance.
+            host = anchors[0][0] if anchors else _nearest_on_spine(
+                ref, adj, on_spine, spine)
+            if host is None:
+                continue
             net = globals_on[0] if globals_on else None
             lane.attachments.append(
                 Attachment(ref, "stub", (host, host), net=net,
                            above=_rail_is_up(net))
             )
-        # A self-bridge: both ends on the same spine part (feedback round one
-        # amplifier). `touching` is length 1 but via two different nets.
-        if len(touching) == 1:
-            nets = [n for n in cir.nets_of(ref) if n.name not in lay.globals]
-            if len(nets) >= 2 and all(
-                touching[0] in cir.parts_on(n) for n in nets[:2]
-            ):
-                lane.attachments[-1] = Attachment(
-                    ref, "bridge", (touching[0], touching[0]), above=True
-                )
 
     _stack(lane)
     return lane
@@ -262,6 +281,23 @@ def _lay_lane(cir, members, adj, net_between, lay, rank, seed) -> Lane:
 # Above this, the exhaustive search is abandoned for a cheap greedy walk.
 # No lane in a hand-traced circuit comes close; this is a runaway guard.
 SEARCH_LIMIT = 22
+
+
+def _nearest_on_spine(ref, adj, on_spine, spine):
+    """The spine part fewest hops away, for a part that touches none directly."""
+    seen, frontier = {ref}, [ref]
+    while frontier:
+        nxt = []
+        for r in frontier:
+            for n in sorted(adj[r]):
+                if n in seen:
+                    continue
+                if n in on_spine:
+                    return n
+                seen.add(n)
+                nxt.append(n)
+        frontier = nxt
+    return spine[0] if spine else None
 
 
 def _heaviest_path(cir, members, sub, entries, sinks) -> list[str]:

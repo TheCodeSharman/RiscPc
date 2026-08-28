@@ -77,7 +77,7 @@ def _verify(cir, sheet) -> int:
     import verify
 
     findings = verify.check(cir, sheet)
-    fatal = [f for f in findings if f.kind in ("short", "open")]
+    fatal = [f for f in findings if f.kind in ("short", "open", "missing")]
     if not findings:
         print(f"verified: {len(sheet.wires)} wires, "
               f"{len(cir.nets)} nets read back identical")

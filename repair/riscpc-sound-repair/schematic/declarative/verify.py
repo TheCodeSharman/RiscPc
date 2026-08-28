@@ -153,7 +153,7 @@ class _UF:
 
 @dataclass
 class Finding:
-    kind: str                # "short" | "open" | "overlap" | "diagonal"
+    kind: str                # "short" | "open" | "missing" | "overlap" | "diagonal"
     detail: str
 
     def __str__(self) -> str:
@@ -294,7 +294,16 @@ def check(cir, sheet) -> list[Finding]:
             findings.append(Finding(
                 "open", f"net {net.name} drawn in {len(nodes)} pieces: {groups}"))
 
-    # 6. Drawing defects that are not connectivity errors but signal a fallback.
+    # 6. Anything the netlist declares must actually be on the sheet. Without
+    # this the check has a blind spot exactly where it hurts: a part that was
+    # never placed has no pins, so its nets simply shrink and every remaining
+    # pin still agrees. Two 15k bias resistors went missing this way.
+    drawn_refs = {p.ref for p in sheet.placed}
+    for ref in sorted(set(cir.parts) - drawn_refs):
+        findings.append(Finding("missing", f"part {ref} is in the netlist "
+                                           f"but was never placed"))
+
+    # 7. Drawing defects that are not connectivity errors but signal a fallback.
     for s in segs:
         if s.axis == DIAGONAL:
             findings.append(Finding(
@@ -307,7 +316,7 @@ def check(cir, sheet) -> list[Finding]:
 
 def _dedupe(findings: list[Finding]) -> list[Finding]:
     seen, out = set(), []
-    order = {"short": 0, "open": 1, "overlap": 2, "diagonal": 3}
+    order = {"short": 0, "open": 1, "missing": 2, "overlap": 3, "diagonal": 4}
     for f in sorted(findings, key=lambda f: (order.get(f.kind, 9), f.detail)):
         if (f.kind, f.detail) not in seen:
             seen.add((f.kind, f.detail))

@@ -38,6 +38,12 @@ MARGIN_Y = GRID * 24
 HEAD_GAP = COL * 2          # source part to the first lane column
 POWER_STUB = GRID * 4       # pin to power symbol
 GLYPH = GRID * 2            # room the power symbol's own artwork takes
+# A stub hangs below its host, and *both* carry text into the gap — the
+# host's value underneath it, the stub's reference above itself. Clearing
+# the symbols is not enough; STUB alone put "Rpull_R" on top of "BC849C".
+STUB_DROP = STUB * 2
+SUPPLY_COLS = 3             # rail-filtering parts per row
+SUPPLY_PITCH = COL * 4      # wide enough for a rail label at each end
 
 
 @dataclass
@@ -56,11 +62,13 @@ class Placer(Builder):
         super().__init__(cir, lay)
         self._bridges = {}
         self._pending: list[_Stub] = []
+        self._spares: list[tuple[str, int]] = []
 
     def run(self) -> Sheet:
         y = MARGIN_Y
         for group in self.lay.groups:
             y = self._group(group, y) + ROW // 2
+        self._spare_units(y + ROW // 2)
         self._wire_all()
         self._title()
         return self.sheet
@@ -81,8 +89,10 @@ class Placer(Builder):
 
         head = None
         if group.head:
-            head = self._place_multi(group.head, x0, sum(ys) / len(ys))
+            hy = sum(ys) / len(ys)
+            head = self._place_multi(group.head, x0, hy)
             self._globals_for(head)
+            self._hangers_for(head, hy, defaultdict(int))
             self._loose_for(head)
             x0 += HEAD_GAP
 
@@ -96,21 +106,38 @@ class Placer(Builder):
         top = max((a.tier for a in lane.attachments if a.above), default=-1)
         return (top + 2) * TIER
 
-    @staticmethod
-    def _legroom(lane) -> float:
-        """Space below the row for stubs and for spare units parked there."""
-        has_stub = any(not a.above or a.kind == "stub" for a in lane.attachments)
-        return STUB * (3 if has_stub else 2)
+    def _legroom(self, lane) -> float:
+        """Space below the row for stubs, hangers and parked spare units."""
+        tiers = defaultdict(int)
+        for att in lane.attachments:
+            if not att.above or att.kind == "stub":
+                tiers[att.spans[0]] = max(tiers[att.spans[0]], att.tier + 1)
+        for ref in lane.spine:
+            hangers = [r for r in self.lay.stubs.get(ref, [])
+                       if self.cir.parts[r].kind != "terminal"]
+            tiers[ref] += len(hangers)
+        deepest = max(tiers.values(), default=0)
+        if not deepest:
+            return STUB * 2
+        return STUB_DROP + STUB + (deepest - 1) * TIER
 
     def _supply(self, group, y0: float) -> float:
-        """Rail filtering: each part runs horizontally between its globals."""
+        """Rail filtering: each part runs horizontally between its globals.
+
+        Laid out as a grid rather than a column. These are all two-terminal
+        parts sitting between two rails, so a column of them is one narrow
+        strip and a page of whitespace beside it — which is most of what made
+        the sheet twice as tall as it needed to be.
+        """
+        per_row = max(1, min(SUPPLY_COLS, len(group.lanes)))
         y = y0
-        for lane in group.lanes:
-            ref = lane.spine[0]
-            p = self.place(ref, MARGIN_X + COL, y)
+        for i, lane in enumerate(group.lanes):
+            if i and i % per_row == 0:
+                y += ROW // 2
+            x = MARGIN_X + COL + (i % per_row) * SUPPLY_PITCH
+            p = self.place(lane.spine[0], x, y)
             self._globals_for(p, prefer_horizontal=True)
-            y += ROW // 2
-        return y - ROW // 2
+        return y
 
     # --- one lane -----------------------------------------------------
     def _lane(self, lane, x0: float, y: float, head) -> None:
@@ -127,19 +154,39 @@ class Placer(Builder):
         for a, b in zip(lane.spine, lane.spine[1:]):
             self._orient(placed[a], placed[b])
 
+        below = defaultdict(int)
         for att in lane.attachments:
             if att.kind == "bridge":
                 self._place_bridge(att, placed, y)
             else:
                 self._stub(att, placed, y)
+                below[att.spans[0]] = max(below[att.spans[0]], att.tier + 1)
         for att in lane.attachments:
             if att.kind == "bridge":
                 self._globals_for(self._bridges[att.ref])
 
         for ref in lane.spine:
             self._globals_for(placed[ref])
+            self._hangers_for(placed[ref], y, below)
             self._loose_for(placed[ref])
             self._terminals_for(placed[ref])
+
+    def _spare_units(self, y: float) -> float:
+        """Park each package's supply unit in a row at the foot of the sheet.
+
+        A quad op-amp's pins 4 and 11 are one pair shared by all four
+        sections, so KiCad draws them as a fifth, bodyless symbol. Left under
+        its own section it reads as an orphaned stalk hanging off nothing in
+        the middle of the drawing. Together at the bottom they read as what
+        they are: the package supply pins.
+        """
+        if not self._spares:
+            return y
+        x = MARGIN_X + COL
+        for ref, unit in self._spares:
+            self._globals_for(self.place(ref, x, y, unit=unit, angle=0.0))
+            x += COL * 3
+        return y + ROW // 2
 
     # --- wiring, once, over the whole sheet ----------------------------
     def _wire_all(self) -> None:
@@ -193,9 +240,16 @@ class Placer(Builder):
         instead of starting another run back from the first pin. That is what
         a junction dot means, and it is why an emitter with four things on it
         no longer draws four wires stacked on each other.
+
+        Confirmed parts are wired before unconfirmed ones, so the trunk is
+        what was actually probed and the guesses hang off it. Greyness then
+        belongs to the *branch*, not the net: one unconfirmed capacitor used
+        to grey out the 2k1 sitting in parallel with it, which says something
+        about the resistor that is not true.
         """
-        traced = all(t[2] for t in terms)
-        remaining = list(terms)
+        # Traced first, so the solid skeleton exists before anything grey
+        # attaches to it; distance decides within each group.
+        remaining = sorted(terms, key=lambda t: not t[2])
         seed = remaining.pop(0)
         tree = {grid.cell(seed[0])}
         tree_pts = [seed[0]]
@@ -203,9 +257,12 @@ class Placer(Builder):
 
         while remaining:
             i = min(range(len(remaining)),
-                    key=lambda k: min(_manhattan(remaining[k][0], q)
-                                      for q in tree_pts))
-            at, direction, _ = remaining.pop(i)
+                    key=lambda k: (not remaining[k][2],
+                                   min(_manhattan(remaining[k][0], q)
+                                       for q in tree_pts)))
+            at, direction, traced = remaining.pop(i)
+            if first:
+                traced = traced and seed[2]
             goals = [seed[0]] if first else [grid.point(c) for c in tree]
             pts = grid.route(name, at, goals, direction,
                              [seed[1]] if first else None)
@@ -244,7 +301,12 @@ class Placer(Builder):
         host = placed.get(att.spans[0])
         if host is None:
             return
-        p = self._place_multi(att.ref, host.x, row_y + STUB, angle=90.0)
+        # `_stack` has already given co-located stubs distinct tiers; using
+        # them is what stops two legs off one host being placed on top of
+        # each other, which is what Rf and Rpull did the moment Rpull stopped
+        # being mistaken for a bridge.
+        y = row_y + STUB_DROP + att.tier * TIER
+        p = self._place_multi(att.ref, host.x, y, angle=90.0)
         self._globals_for(p)
 
     # --- helpers ------------------------------------------------------
@@ -265,10 +327,8 @@ class Placer(Builder):
         main = min(by_unit, key=lambda u: -len(by_unit[u]))
         p = self.place(ref, x, y, unit=main, angle=angle)
         for unit in by_unit:
-            if unit == main:
-                continue
-            extra = self.place(ref, x, y + STUB * 2, unit=unit, angle=0.0)
-            self._globals_for(extra)
+            if unit != main:
+                self._spares.append((ref, unit))
         return p
 
     def _shared_net(self, a: str, b: str) -> str | None:
@@ -387,6 +447,25 @@ class Placer(Builder):
             gy = end[1] - GLYPH if up else end[1] + GLYPH
             lo, hi = sorted((end[1], gy))
             grid.add_body((end[0] - GLYPH / 2, lo, end[0] + GLYPH / 2, hi))
+
+    def _hangers_for(self, placed, row_y: float, below) -> None:
+        """Place the rule-2 stub parts that hang off this host.
+
+        A part whose only neighbour is one other part never takes a column of
+        its own, so it is not in any lane and nothing else places it. Only
+        off-board terminals were being handled, which meant both 15k bias
+        resistors were simply absent from the drawing — and no check noticed,
+        because a part with no pins on the sheet cannot disagree with
+        anything. `--verify` now reports that as MISSING.
+        """
+        for ref in self.lay.stubs.get(placed.ref, []):
+            if self.cir.parts[ref].kind == "terminal":
+                continue                    # `_terminals_for` puts those inline
+            tier = below[placed.ref]
+            below[placed.ref] += 1
+            p = self._place_multi(
+                ref, placed.x, row_y + STUB_DROP + tier * TIER, angle=90.0)
+            self._globals_for(p)
 
     def _terminals_for(self, placed) -> None:
         """Off-board connections hang off their host as a labelled point."""
