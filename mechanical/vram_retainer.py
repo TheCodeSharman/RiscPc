@@ -429,17 +429,39 @@ _KICAD = next((p for p in (
     Path.home() / ".local/share/kicad/3dmodels",
 ) if p.is_dir()), None)
 
+# Vendor STEP for the parts KiCad's library does not carry -- it has no DIN
+# 41612 shorter than the full 32-position body and no SIMM socket at all.
+# Searched first, so a local file wins over a same-named KiCad one. See
+# models/README.md for where each came from.
+_MODELS = Path(__file__).resolve().parent / "models"
+
+# Where the board's top face sits in a file's OWN frame. KiCad puts it at 0, so
+# a KiCad package needs no entry. A vendor STEP need not: TE datums 5535070-5 on
+# the body's TOP face, 11.5 above the board, with the pins running 3.3 below
+# that -- so it lands 11.5 low unless shifted. Measured by slicing the solid,
+# not read off a datasheet: the section is 8.8 mm2 of pin up to z = -11.50 and
+# 139 mm2 of standoff foot from there.
+_DATUM = {"5535070-5.STEP": 11.5}
+
 
 @lru_cache(maxsize=None)
 def _package(rel: str | None) -> Part | None:
-    """One KiCad 3D package, imported once and reused. None if unavailable."""
-    if rel is None or _KICAD is None:
+    """One 3D package, imported once and reused, normalised to KiCad's datum so
+    everything downstream can assume the board's top face is z = 0. None if
+    unavailable."""
+    if rel is None:
+        return None
+    path = next((r / rel for r in (_MODELS, _KICAD)
+                 if r is not None and (r / rel).is_file()), None)
+    if path is None:
         return None
     try:
-        return import_step(str(_KICAD / rel))
+        part = import_step(str(path))
     except Exception as exc:
         print(f"  note: {rel} would not import ({exc.__class__.__name__}); using a block")
         return None
+    dz = _DATUM.get(path.name, 0.0)
+    return Pos(0, 0, dz) * part if dz else part
 
 
 def _tsop() -> Part:
@@ -564,8 +586,15 @@ _SO16 = "Package_SO.3dshapes/SOIC-16W_5.3x10.2mm_P1.27mm.step"
 _CHIPC = "Capacitor_SMD.3dshapes/C_1206_3216Metric.step"
 _CHIPR = "Resistor_SMD.3dshapes/R_1206_3216Metric.step"
 _CAN10 = "Capacitor_THT.3dshapes/CP_Radial_D10.0mm_P5.00mm.step"
+# SK4 is the network slot: a HALF-SIZE DIN 41612, 3 rows x 16 = 48 contacts.
+# The count follows from the drawn length -- 16 positions at 2.54 plus 13.6 of
+# end block is 54.2, against 55.39 drawn, where the full 32-position body is
+# 94.9. KiCad's own DIN41612 models are all that full body whatever the variant
+# says, so this one is TE's, from models/.
+_DIN41612 = "5535070-5.STEP"
 _PACKAGE = {
     "C73": _CAN10, "C152": _CAN10,          # radial electrolytics, drawn as circles
+    "SK4": _DIN41612,                       # network slot, 48-way eurocard
     "IC29": "Package_QFP.3dshapes/PQFP-160_28x28mm_P0.65mm.step",   # VIDC20
     "IC22": _SO20, "IC26": _SO20, "IC30": _SO20, "IC33": _SO20,     # 7.3 x 12.3
     "RP6": _SO16, "RP11": _SO16, "RP13": _SO16,                     # 5.2 x 10.8
@@ -575,7 +604,7 @@ _PACKAGE = {
     "C142": _CHIPC, "C160": _CHIPC,
     "R148": _CHIPR, "R184": _CHIPR,
 }
-# Left as prisms, height unknown: SK4, SK6, LK5, C91, C36 -- and C151 and R213,
+# Left as prisms, height unknown: SK6, LK5, C91, C36 -- and C151 and R213,
 # which is a pity, since those are what the anchors' end walls run into.
 
 # The two radial electrolytics, as (ref, X, Y, diameter).
@@ -784,8 +813,11 @@ if __name__ == "__main__":
     need = abs(_foot_y) - SOCKET_PLAN_W / 2
     _n = len(_NEIGHBOURS) + len(_ROUND)
     _pkg = sum(1 for r in _neighbour_parts() if r in _PACKAGE)
-    print(f"board      drg 0197,000/A, {_n} neighbours -- {_pkg} as KiCad packages "
-          f"(real heights, nominal ones), {_n - _pkg} as prisms (height invented); "
+    _own = sum(1 for r, v in _PACKAGE.items() if r in _neighbour_parts()
+               and (_MODELS / v).is_file())
+    print(f"board      drg 0197,000/A, {_n} neighbours -- {_pkg} as packages "
+          f"({_pkg - _own} KiCad, {_own} vendor STEP; real heights, nominal ones), "
+          f"{_n - _pkg} as prisms (height invented); "
           f"SK9's footprint is {SOCKET_PLAN_W} across, not the {2 * 3.25} the "
           f"calipers gave for its body")
     print(f"           anchor flanks {2 * _cap_hw:.2f} -- inside that footprint, so only "
