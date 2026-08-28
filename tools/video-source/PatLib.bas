@@ -33,6 +33,7 @@
   270 DEF PROCpm5544
   280 LOCAL r%,cx%,cy%
   290 PROCpatinit
+  295 ANIMKIND%=1
   300 cx%=W% DIV 2:cy%=H% DIV 2
   310 r%=(H%*UY%*7) DIV 16
   320 PROCgrid
@@ -55,8 +56,12 @@
   490 NX%=(W%*UX%) DIV (ch%*UY%)
   500 IF NX%<4 THEN NX%=4
   510 cw%=W% DIV NX%
+  515 REM The white ground the rules and the castellation gaps are made of.
+  516 REM Not via PROCpix only because a full-screen fill wants no -1: there is
+  517 REM no next pixel to spill into. See PROCpatinit for why the sacrificial
+  518 REM plot there has to happen before this can land.
   520 PROCcol(&FFFFFF00)
-  530 PROCpix(0,0,W%,H%)
+  530 RECTANGLE FILL 0,0,W%*UX%,H%*UY%
   540 PROCcol(&80808000)
   550 FOR i%=0 TO NX%-1
   560  FOR j%=0 TO NY%-1
@@ -66,22 +71,45 @@
   600 CW%=cw%:CH%=ch%
   610 ENDPROC
   620 :
-  630 REM Black blocks on the top and bottom rows, every other cell. The overscan
-  640 REM check: count how many survive at each edge.
-  645 REM
-  646 REM A THIRD of a cell deep, not a half: on the Philips card the strip is
-  647 REM 14 pixels against a 42-pixel cell. At half a cell it stops reading as
-  648 REM a strip laid over the grid and starts reading as a black grid row,
-  649 REM which is a different thing to count.
+  630 REM The castellations: alternating black and WHITE blocks, on all four
+  631 REM edges. Two things were wrong here. They were drawn only top and bottom,
+  632 REM so the left and right edges of the picture had no overscan check at all
+  633 REM -- and those are the edges a scaler is most likely to trim. And only the
+  634 REM black blocks were drawn, the white ones being left to the ground showing
+  635 REM through; with the ground failing to draw (see PROCgrid) the border came
+  636 REM out as continuous black. Drawing both colours explicitly means the
+  637 REM pattern no longer depends on what is underneath it.
+  638 REM
+  639 REM A third of a cell deep, matching the Philips card's 14 pixels against a
+  640 REM 42-pixel cell. The cells are square in OS units, so taking the same
+  641 REM fraction of CW% across and CH% down gives a border of even depth.
   650 DEF PROCcastell
-  660 LOCAL i%,d%
-  665 d%=CH% DIV 3:IF d%<1 THEN d%=1
-  670 PROCcol(&00000000)
-  680 FOR i%=0 TO NX%-1 STEP 2
-  690  PROCpix(i%*CW%+1,1,CW%-2,d%)
-  700  PROCpix(i%*CW%+1,H%-d%-1,CW%-2,d%)
-  710 NEXT
-  720 ENDPROC
+  652 LOCAL i%,j%,d%,e%
+  654 d%=CH% DIV 3:IF d%<1 THEN d%=1
+  656 e%=CW% DIV 3:IF e%<1 THEN e%=1
+  658 FOR i%=0 TO NX%-1
+  660  IF i% AND 1 THEN PROCcol(&FFFFFF00) ELSE PROCcol(&00000000)
+  662  PROCpix(i%*CW%+1,0,CW%-2,d%)
+  664  PROCpix(i%*CW%+1,H%-d%,CW%-2,d%)
+  666 NEXT
+  668 FOR j%=0 TO NY%-1
+  670  IF j% AND 1 THEN PROCcol(&FFFFFF00) ELSE PROCcol(&00000000)
+  672  PROCpix(0,j%*CH%+1,e%,CH%-2)
+  674  PROCpix(W%-e%,j%*CH%+1,e%,CH%-2)
+  676 NEXT
+  678 REM The four corners, white. Where the two runs meet, each would otherwise
+  680 REM impose its own phase on the same square and whichever drew last would
+  682 REM win -- so the corners are stated outright rather than left to the order
+  684 REM of two loops. White because a corner is the one part of the border that
+  686 REM has to be identifiable as a corner: black corners merge into whichever
+  688 REM black block is beside them, and it is the corners that tell you which
+  690 REM way the picture is cropped.
+  692 PROCcol(&FFFFFF00)
+  694 PROCpix(0,0,e%,d%)
+  696 PROCpix(W%-e%,0,e%,d%)
+  698 PROCpix(0,H%-d%,e%,d%)
+  700 PROCpix(W%-e%,H%-d%,e%,d%)
+  702 ENDPROC
   730 :
   740 REM The chroma bars flanking the circle, and the reference blocks inboard
   741 REM of them. Geometry and colours are measured off the Philips card.
@@ -97,12 +125,15 @@
   751 REM luminance -- not the arbitrary three-colour stack this used to draw.
   752 DEF PROCsidebars
   753 LOCAL y0%,ht%,bh%,xa%,xb%,ba%,bb%
-  754 y0%=CH%:ht%=H%-2*CH%
+  754 y0%=CH%:ht%=(NY%-2)*CH%
   755 xa%=CW%:xb%=(NX%-2)*CW%
   756 ba%=2*CW%:bb%=(NX%-3)*CW%
   757 bh%=2*CH%
-  758 REM Upper half then lower half of each bar.
-  760 PROCcol(&7A9A3C00):PROCpix(xa%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
+  759 REM Upper half then lower half of each bar. Height counted in CELLS, not
+  760 REM as H%-2*CH%: H% is not an exact multiple of CH% after the DIV in
+  761 REM PROCgrid, so the bar stood ~12 pixels proud of the blocks beside it
+  762 REM instead of finishing level with them.
+  763 PROCcol(&7A9A3C00):PROCpix(xa%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
   770 PROCcol(&7A5AB800):PROCpix(xa%+1,y0%,CW%-2,ht% DIV 2)
   780 PROCcol(&0B907A00):PROCpix(xb%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
   790 PROCcol(&E9647A00):PROCpix(xb%+1,y0%,CW%-2,ht% DIV 2)
@@ -229,14 +260,26 @@
  2000 UX%=1<<XE% : UY%=1<<YE%
  2010 B%=H% DIV 32 : IF B%<2 THEN B%=2
  2020 S%=B% : IF S%<4 THEN S%=4
+ 2029 ANIM_CS%=50
  2030 CX%=W% DIV 2 : CY%=H% DIV 2
- 2040 ENDPROC
+ 2031 AP%=0:ANIMKIND%=0
+ 2032 REM Sacrificial plot. The FIRST drawing operation after a MODE change is
+ 2033 REM lost -- measured with OS_ReadPoint, not guessed: a full-screen fill
+ 2034 REM issued straight after MODE reads back black, and the identical fill
+ 2035 REM immediately after it works. Every card here opens by laying a ground,
+ 2036 REM so that lost operation was always the ground, and every white rule
+ 2037 REM and white castellation drawn on top of it came out on black.
+ 2038 REM Here rather than in either card because this is what both of them
+ 2039 REM call after a mode change, which is exactly when the loss happens.
+ 2041 PROCcol(&00000000):RECTANGLE FILL 0,0,W%*UX%,H%*UY%
+ 2042 ENDPROC
  2050 :
  2060 REM The static card. LOCAL rather than global because BASIC restores them on
  2070 REM exit and callees still see them, so PROCgrating gets its GX%/GW% without
  2080 REM either name outliving the draw.
  2090 DEF PROCpatdraw
  2100 LOCAL I%,GX%,GW%,R%,CH%
+ 2105 ANIMKIND%=0
  2110 VDU 19,0,24,255,0,255
  2120 :
  2130 REM ---- concentric bands, outermost first ---------------------------
@@ -336,26 +379,53 @@
  3070 REM Nearest palette entry to a &BBGGRR00 colour, in any mode.
  3080 DEF PROCcol(c%)
  3090 SYS "ColourTrans_SetGCOL",c%,0,0,0,0
- 3100 ENDPROC
- 3110 :
- 3120 REM Liveness test. The screen border and the outermost ring flip
- 3130 REM colour twice a second, so in a video anything that flips is being
- 3140 REM written this frame and anything frozen is scratch space the scaler
- 3150 REM has stopped writing to. That tells leftover junk from live
- 3160 REM captured border apart without having to reason about window sizes.
- 3170 DEF PROCanimate
- 3180 LOCAL p%,T%
- 3190 p%=0
- 3200 REPEAT
- 3210   IF p% THEN PROCcol(&00FFFF00) ELSE PROCcol(&FFFFFF00)
- 3220   PROCring(B%)
- 3230   PROCframe
- 3240   IF p% THEN VDU 19,0,24,0,255,255 ELSE VDU 19,0,24,255,0,255
- 3250   p%=p% EOR 1
- 3260   T%=TIME+50
- 3270   REPEAT UNTIL TIME>T%
- 3280 UNTIL FALSE
- 3290 ENDPROC
+ 3100 REM ONE frame of the liveness flip, so a caller with its own loop can drive
+ 3102 REM it. ModeServ has to sit in a socket poll and cannot give up its thread
+ 3104 REM to PROCanimate's REPEAT, which is why nothing flipped there.
+ 3106 REM
+ 3108 REM What flips has to be INSIDE the picture. The screen border is flipped
+ 3110 REM too, but a scaler is fed active video and may never see it, and the
+ 3112 REM whole point is that a video of the far end shows something changing.
+ 3114 REM
+ 3116 REM The plain card flips its outermost ring, as it always did. The PM5544
+ 3118 REM cannot: that band is the castellations, and painting over the overscan
+ 3120 REM check to prove the picture is live would be a poor trade. It flips the
+ 3122 REM four corner squares instead -- they are the one part of the border that
+ 3124 REM carries no count, white against black either way, so they stay readable
+ 3126 REM as corners while still being unmistakably alive.
+ 3128 DEF PROCanimstep
+ 3130 IF AP% THEN VDU 19,0,24,0,255,255 ELSE VDU 19,0,24,255,0,255
+ 3132 IF ANIMKIND%=0 THEN PROCanimring ELSE PROCanimcorners
+ 3134 AP%=AP% EOR 1
+ 3136 ENDPROC
+ 3138 :
+ 3140 DEF PROCanimring
+ 3142 IF AP% THEN PROCcol(&00FFFF00) ELSE PROCcol(&FFFFFF00)
+ 3144 PROCring(B%)
+ 3146 PROCframe
+ 3148 ENDPROC
+ 3150 :
+ 3152 DEF PROCanimcorners
+ 3154 LOCAL d%,e%
+ 3156 d%=CH% DIV 3:IF d%<1 THEN d%=1
+ 3158 e%=CW% DIV 3:IF e%<1 THEN e%=1
+ 3160 IF AP% THEN PROCcol(&00FFFF00) ELSE PROCcol(&FFFFFF00)
+ 3162 PROCpix(0,0,e%,d%)
+ 3164 PROCpix(W%-e%,0,e%,d%)
+ 3166 PROCpix(0,H%-d%,e%,d%)
+ 3168 PROCpix(W%-e%,H%-d%,e%,d%)
+ 3170 ENDPROC
+ 3172 :
+ 3174 REM The old blocking form, still what TestPat wants: it has nothing else to
+ 3176 REM do. ANIM_CS% is the flip period in centiseconds, twice a second.
+ 3178 DEF PROCanimate
+ 3180 LOCAL T%
+ 3182 REPEAT
+ 3184  PROCanimstep
+ 3186  T%=TIME+ANIM_CS%
+ 3188  REPEAT UNTIL TIME>T%
+ 3190 UNTIL FALSE
+ 3192 ENDPROC
  3300 :
  3310 REM The outermost band as four strips, so redrawing it does not wipe
  3320 REM the centre field the way a nested fill would.

@@ -40,9 +40,10 @@
   340 DEF PROCinit
   350 AF_INET%=2:SOCK_STREAM%=1
   360 SOL_SOCKET%=&FFFF:SO_REUSEADDR%=4
-  370 PORT%=6502
-  380 DIM sa% 16,opt% 4,alen% 4,rx% 1024,tx% 1024,enum% 4096
+  370 PORT%=6502:POLL_CS%=10
+  380 DIM sa% 16,opt% 4,alen% 4,rx% 1024,tx% 1024,enum% 4096,rfd% 32,tv% 8
   390 listen%=-1:conn%=-1:running%=TRUE
+  395 painted%=FALSE:selok%=TRUE:anim%=0
   400 haslib%=FNloadlib
   420 ENDPROC
   430 :
@@ -54,10 +55,14 @@
   490 DEF PROCserve
   500 listen%=FNlisten(PORT%)
   510 PRINT "ModeServ listening on port ";PORT%;" - send QUIT to stop it."
+  512 REM Poll rather than block. The card carries a liveness flip -- something
+  514 REM that changes twice a second, so a video of the far end tells a live
+  516 REM picture from a frozen buffer -- and driving it needs the loop back. A
+  518 REM blocking Socket_Accept never returns it, which is why nothing flipped.
   520 REPEAT
-  530  conn%=FNaccept(listen%)
-  540  PROCdispatch(conn%,FNreadline(conn%))
-  550  SYS "XSocket_Close",conn%:conn%=-1
+  522  conn%=FNpoll(listen%,POLL_CS%)
+  524  IF conn%>=0 THEN PROCdispatch(conn%,FNreadline(conn%)):SYS "XSocket_Close",conn%:conn%=-1
+  526  IF painted% AND TIME>=anim% THEN PROCanimstep:anim%=TIME+ANIM_CS%
   560 UNTIL NOT running%
   570 ENDPROC
   580 :
@@ -221,7 +226,8 @@
  2326 DEF PROCpaint(which$)
  2327 PROCpatinit
  2328 IF which$="CARD" THEN PROCpatdraw ELSE PROCpm5544
- 2329 ENDPROC
+ 2329 painted%=TRUE:anim%=TIME+ANIM_CS%
+ 2330 ENDPROC
  2340 :
  2350 DEF FNword(s$,n%)
  2360 LOCAL i%,c%,w$
@@ -252,3 +258,19 @@
  2610  s$=s$+CHR$(?p%):p%+=1
  2620 ENDWHILE
  2630 =s$
+ 2650 :
+ 2660 REM Wait up to cs% centiseconds for a connection; -1 if none came. Select is
+ 2670 REM the only call here the original did not need, so it is also the only one
+ 2680 REM with no hardware behind it yet -- hence the fallback: if it ever errors,
+ 2690 REM say so once, drop back to the blocking accept the server has always used
+ 2700 REM and carry on. Losing the flip is a nuisance; losing the server is not.
+ 2710 DEF FNpoll(s%,cs%)
+ 2720 LOCAL n%,f%
+ 2730 IF NOT selok% THEN =FNaccept(s%)
+ 2740 !rfd%=0:rfd%!4=0:rfd%!8=0:rfd%!12=0
+ 2750 rfd%!(4*(s% DIV 32))=1<<(s% MOD 32)
+ 2760 !tv%=cs% DIV 100:tv%!4=(cs% MOD 100)*10000
+ 2770 SYS "XSocket_Select",s%+1,rfd%,0,0,tv% TO n%;f%
+ 2780 IF f% AND 1 THEN selok%=FALSE:PRINT "Socket_Select failed - falling back to blocking accept, no liveness flip.":=FNaccept(s%)
+ 2790 IF n%<=0 THEN =-1
+ 2800 =FNaccept(s%)
