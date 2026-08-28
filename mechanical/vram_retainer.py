@@ -23,15 +23,20 @@ One piece, lowered straight down onto the fitted card:
   * a **cap** at each end that drops over the socket's end tower and is bonded
     to it, which is what holds the whole thing down.
 
-Why the jaws are at the ends and not continuous. Photographs of this card
-measured against the TRM's 102.87 length show the TSOPs sitting flush with the
-top edge and the 47uF electrolytics 0.8 below it -- there is no clear card to
-grip along the length, and a channel clearing a 6.5 component stack one side
-and 4.0 the other would be ~16 across in a socket 6.5 wide. But both ends carry
-a component-free zone about 8 mm wide (side A) and 7 mm (side B), full card
-height, and that is where the jaws go. Conveniently that is also where the
-socket's towers are, so gripping the card and anchoring to the socket become
-one feature instead of two.
+Why the jaws are at the ends and not continuous. The TSOPs sit flush with the
+card's top edge and the 47uF electrolytics 0.68 below it -- there is no clear
+card to grip along the length, and a channel clearing a 6.5 component stack one
+side and 4.0 the other would be ~16 across in a socket 6.5 wide. But both ends
+carry a component-free zone, full card height, and that is where the jaws go.
+Conveniently that is also where the socket's towers are, so gripping the card
+and anchoring to the socket become one feature instead of two.
+
+Those zones were first scaled off photographs at "about 8 mm side A, 7 mm side
+B". They are now measured off the TRM assembly drawing (see the components
+section below), which says 6.74 at one end and 7.08 at the other -- and that
+the tighter face SWAPS between the ends, so the jaw has to clear 6.74 at both
+whichever way round the card goes. CLEAR_END 6.5 does, and the report checks
+it as a boolean against the real packages rather than trusting the arithmetic.
 
 Why bonded rather than screwed. The SK9 close-up shows ~3.5 mm of clear board
 beyond the left tower before a large electrolytic, and effectively none beyond
@@ -58,6 +63,7 @@ side; the TRM has Side A facing the front of the main PCB), +Z up.
 """
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from build123d import *
@@ -147,7 +153,7 @@ PRESS = 0.15           # interference per flank, so the pocket is 0.3 narrower
                        # drop of epoxy in the same joint recovers it.
 BAR_H = 5.0            # bar depth above the card's top edge
 FOOT_T = 3.0           # yoke's foot, sitting on the anchor's roof
-ANCHOR_DROP = 0.6      # how far the anchor's roof sits BELOW the yoke datum,
+ANCHOR_DROP = 1.0      # how far the anchor's roof sits BELOW the yoke datum,
                        # adding to SEAT_GAP to make the total preload travel.
                        # Two reasons it lives here rather than in SEAT_GAP,
                        # which is geometrically the same thing:
@@ -166,13 +172,46 @@ ANCHOR_DROP = 0.6      # how far the anchor's roof sits BELOW the yoke datum,
                        # and adds nothing to the card. Which is the property
                        # worth keeping -- it cannot be over-tightened onto a
                        # 30-year-old card, and it repeats build to build.
-SEAT_GAP = 0.4         # designed gap under the foot. The yoke's height is set
-                       # by the bar resting on the card's top edge, so the foot
-                       # must NOT reach the anchor's roof on its own -- if it
-                       # did, any stack-up error would hold the bar off the
-                       # card, which is the one job it has. Leaving a gap makes
-                       # the screw close it, which preloads the bar downward
-                       # instead.
+CARD_SEATED = 25.0     # MEASURED on the fitted card: its top edge above the
+                       # socket's TOP FACE. The model had 25.8 for this
+                       # (CARD_TOP 31.0 - SOCKET_H 5.2), so the card sits 0.8
+                       # deeper than the calipers first said -- it pushes further
+                       # home than it did when measured out of circuit.
+SEAT_ERROR = CARD_FREE - CARD_SEATED   # = 0.8, and derived rather than typed:
+                       # it is exactly how far the card turned out to sit below
+                       # where the model had it, taken back off the anchor's
+                       # roof, which is what the yoke lands on.
+                       #
+                       # It started life as the 1.2 mm gap measured under the
+                       # yoke on the first test fit, before CARD_SEATED existed.
+                       # Deriving it instead is worth the change: 1.2 closed the
+                       # gap but left the foot ON the roof with nothing for the
+                       # screw to pull through, and 0.8 leaves the designed
+                       # 1.0 mm. The other 0.4 of that first gap was the anchors
+                       # not yet pressed fully home.
+                       #
+                       # This does NOT touch the preload: travel stays
+                       # SEAT_GAP + ANCHOR_DROP, because the roof and the foot
+                       # move together. It only puts the roof where the yoke
+                       # actually arrives. CARD_TOP is deliberately left at 31.0
+                       # -- it is the datum the PRINTED yoke was cut to, and
+                       # correcting it there would reshape a part that fits. If
+                       # the yoke is ever reprinted, set CARD_TOP 30.2 and drop
+                       # SEAT_ERROR to 0.4.
+SEAT_GAP = 0.0         # gap under the foot, ON THE YOKE. Now zero, and kept as a
+                       # name because the reasoning is worth more than the
+                       # number: the foot must not reach the anchor's roof while
+                       # the bar is still off the card, or a stack-up error gets
+                       # held open instead of preloaded. That is still true --
+                       # ANCHOR_DROP just carries all of it now.
+                       #
+                       # Zero because at 0.4 it stood the foot's underside 0.4
+                       # proud of the jaw's bottom, and the screw hole broke out
+                       # on that little raised island rather than on the yoke's
+                       # own underside. The two are geometrically the same knob
+                       # (the comment on ANCHOR_DROP says so), so the 0.4 moved
+                       # there and the foot came down flush. Travel, preload and
+                       # every fit are unchanged -- only the step is gone.
 SCREW_CLEAR = 2.0 + 2 * FIT   # M2 clearance. Printed holes come out
                        # undersize by roughly a layer width, so this is nominal
                        # plus FIT per side rather than a table value.
@@ -242,7 +281,52 @@ _cap_x1 = SOCKET_L / 2 + FIT + CAP_WALL      # cap outer face
 _cap_x0 = SOCKET_L / 2 - TOWER_X             # cap inner face
 _jaw_x0 = CARD_L / 2 - CLEAR_END             # jaw reaches this far in
 _jaw_z0 = TOWER_H + TOWER_CLEAR              # jaw bottom, clear of the tower
-_anchor_z1 = _jaw_z0 - ANCHOR_DROP           # anchor roof, dropped below it
+_anchor_z1 = _jaw_z0 - ANCHOR_DROP - SEAT_ERROR   # anchor roof, dropped below it
+# Where the yoke's jaw ends up once the screw has pulled it all the way down,
+# less a little. The anchor must have NOTHING in the jaw's channel above this.
+#
+# It did, and it was quietly eating the preload. The jaw hangs SEAT_GAP below
+# the foot, so anything on the anchor level with the roof -- the tie tabs, the
+# middle of the outer end wall -- stands 0.4 mm proud of where the jaw finishes.
+# The jaw landed on those after ANCHOR_DROP of travel, which made them the stop
+# instead of the roof and gave up 0.4 mm of the 1.0 the screw is there to
+# deliver. Cut as one channel rather than by capping each feature, so nothing
+# added here later can grow back into it.
+#
+# JAW_CLEAR is how far BELOW the jaw's finishing height that channel floor sits,
+# and it is deliberately generous rather than flush. Nothing locates on it -- it
+# is not a fit surface -- so the only thing a deeper cut costs is a couple of
+# millimetres off a tie that is 15 mm tall. Being tight there is not a tight fit
+# but a silent one: the jaw lands on the tabs instead of the foot landing on the
+# roof, and the preload goes missing with nothing to see. So it carries two
+# printer tolerances rather than one, which also covers PETG flexing under load
+# and the anchor sitting a touch high on its tower.
+#
+# The ROOF is deliberately NOT treated this way. It is the one surface on this
+# part that has to be at a designed height -- it is the preload datum, and
+# pulling it back would not protect anything, it would just quietly add travel.
+JAW_CLEAR = 0.0        # ...and now zero, which is what makes the anchor's top
+                       # FLUSH. With SEAT_GAP zero the yoke's whole underside --
+                       # jaw and foot alike -- is one plane, so the anchor's top
+                       # can be one plane too and there is no second surface to
+                       # clear. Nothing can become the wrong stop when there is
+                       # only one. It also stops the top face reading as a
+                       # stepped notch, and hands the joint a lot more bearing
+                       # area than the boss had on its own.
+                       #
+                       # Kept as a name because it stops being zero the moment
+                       # SEAT_GAP does: put 0.4 back on the yoke and the jaw
+                       # drops below the foot again, and this is what has to
+                       # cover it.
+LID_T = 1.0            # lid over the anchor's pocket, so the assembled joint is
+                       # not a hole to look down. Cosmetic, and it costs nothing
+                       # structurally, but it is the one feature that reaches
+                       # over the tower -- see LID_CLEAR.
+_jaw_sweep = _jaw_z0 - SEAT_ERROR - SEAT_GAP - ANCHOR_DROP - JAW_CLEAR
+# How much air the lid leaves over the tower's measured top. Not a design knob --
+# a derived number worth printing, because it is the only claim this part makes
+# about what stands up from a tower nobody has photographed clearly.
+LID_CLEAR = (_jaw_sweep - LID_T) - TOWER_H
 # The anchor runs almost to the motherboard rather than stopping at the socket's
 # top face. The tower is full height and 7.7 across where the socket body is
 # only ~6.5, so the anchor's flanks clear the body all the way down -- and the
@@ -259,7 +343,16 @@ _screw_x = SOCKET_L / 2 - TOWER_X / 2
 # broke straight out of the side. Derived from both, it cannot drift again.
 #   1. the head's counterbore must clear the jaw's outer face
 #   2. the pilot hole must sit wholly inside a boss that starts at the tower
+# The foot runs from here out to the yoke's own end face rather than sitting
+# symmetrically about the screw. Symmetric left a 0.25 mm step short of the end
+# -- nothing structural, but the outer face reads better carried straight
+# through, and the extra 0.25 is free bearing area on the anchor's roof.
+_foot_x0 = _screw_x - 5.0
+_foot_x1 = _cap_x1
 _boss_in = _jaw_hw + FIT       # boss clears the jaw; it is above the tower now
+_boss_z0 = _anchor_z1 - INSERT_L - 1.5   # underside of the boss, and where the
+                       # insert bore breaks out: INSERT_L of insert plus 1.5 of
+                       # clear hole beneath it for the melt to escape into.
 _screw_y = CAP_SIDE * max(
     _jaw_hw + SCREW_HEAD_D / 2 + 0.1,      # counterbore clears the jaw
     _boss_in + 1.2 + INSERT_D / 2,         # insert bore keeps a 1.2 wall
@@ -339,7 +432,7 @@ def yoke() -> Part:
         # Foot: widens the jaw sideways to sit on the anchor's roof, and takes
         # the screw.
         part += _slab(
-            s * (_screw_x - 5.0), s * (_screw_x + 5.0),
+            s * _foot_x0, s * _foot_x1,
             CAP_SIDE * _jaw_hw, _foot_y,
             _jaw_z0 + SEAT_GAP, _jaw_z0 + SEAT_GAP + FOOT_T,
         )
@@ -365,7 +458,8 @@ def yoke() -> Part:
             (CAP_SIDE * _jaw_hw, _ft + _reach),
             align=None,
         )
-        part += Pos(s * _screw_x, 0, 0) * extrude(_wedge, amount=5.0, both=True)
+        part += Pos(s * (_foot_x0 + _foot_x1) / 2, 0, 0) * extrude(
+            _wedge, amount=(_foot_x1 - _foot_x0) / 2, both=True)
         part -= _slotted(s * _screw_x, _screw_y, _ft + _reach / 2,
                          2 * SCREW_SLOT, SCREW_HEAD_D, _reach)
         part -= _slotted(s * _screw_x, _screw_y, _ft - FOOT_T / 2,
@@ -432,22 +526,68 @@ def anchor(right: bool = True) -> Part:
             f * _tie_hw, f * _cap_hw,
             TIE_Z0, _anchor_z1,
         )
-    # No roof over the tower. It would have to cross whatever posts and latch
-    # arms stand up from it, which are the one thing no photograph has shown me
-    # clearly. It turns out to be doing no work: the load path is yoke -> screw
-    # -> boss -> flank -> bond, and the flank boss below sits outboard of the
-    # tower in Y, so nothing of this part passes over the tower at all.
+    # A lid over the pocket. Not structural -- it is there because with the yoke
+    # screwed down you would otherwise look through the 0.2 mm of clearance
+    # either side of the jaw into a 3.3 mm well with the tower at the bottom,
+    # which reads as a hole rather than as a joint.
+    #
+    # It sits at the floor of the jaw's channel, i.e. as high as it can go
+    # without the jaw ever reaching it, so what shows through the clearance is
+    # solid plastic half a millimetre down instead of a shadow. That also keeps
+    # it clear of the thing the original design was avoiding: a roof at the
+    # anchor's own roof height would have to cross whatever posts and latch arms
+    # stand up from the tower, which no photograph has shown clearly. This one
+    # leaves LID_CLEAR above the tower's measured top, and the yoke's own jaw
+    # already passes closer than that, so it assumes nothing new.
+    #
+    # Printing roof-down it is a bridge between the two flanks, 7.4 mm across and
+    # starting LID_T off the bed, with both ends anchored. That prints.
+    # Two strips, not one slab: the card's END passes through this pocket -- the
+    # towers stand 3.75 mm proud of the card's ends -- so the lid has to carry
+    # the same slot the tie tabs do, or it saws straight through the card.
+    for f in (-1, 1):
+        block += _slab(_cap_x0, SOCKET_L / 2 + FIT,
+                       f * _tie_hw, f * _grip_hw,
+                       _jaw_sweep - LID_T, _jaw_sweep)
     # Boss under the screw, since the roof alone is thinner than the thread.
-    block += _slab(
-        _screw_x - 5.0, _screw_x + 5.0,
+    boss = _slab(
+        _foot_x0, _foot_x1,
         CAP_SIDE * _boss_in, _foot_y,
-        _anchor_z1 - INSERT_L - 1.5, _anchor_z1,
+        _boss_z0, _anchor_z1,
     )
-    # Insert bore, open at the top so the insert is set in from above with an
-    # iron. Sunk a little deeper than the insert, so displaced plastic has
-    # somewhere to go rather than lifting it proud of the face the yoke lands on.
-    block -= Pos(_screw_x, _screw_y, _anchor_z1 - (INSERT_L + 0.8) / 2) * Cylinder(
-        INSERT_D / 2, INSERT_L + 0.8
+    # ...notched for the tower. The boss's inner face is at _boss_in, which is
+    # 0.7 mm INSIDE the tower's flank -- that was free while the roof stood clear
+    # above the tower, and SEAT_ERROR has since dropped the roof past its top.
+    # So cut the tower out of the boss and let the boss be locally thinner where
+    # it passes. It costs nothing: the insert bore sits 0.5 mm further out again,
+    # and below the cut the flank wall is already there to carry the load.
+    #
+    # The cut is deliberately made against the BOSS ONLY, not the whole anchor.
+    # Subtracting a FIT-oversize tower from the flanks would open the pocket to
+    # 2 x 4.05 and destroy the 0.15/flank interference that holds this part on.
+    boss -= _slab(_cap_x0 - 1, SOCKET_L / 2 + 1,
+                  -(TOWER_Y / 2 + FIT), TOWER_Y / 2 + FIT,
+                  _anchor_z0 - 1, TOWER_H + FIT)
+    block += boss
+    # The channel the yoke's jaw sweeps through. Takes the tops off both tie tabs
+    # and the middle of the end wall; leaves all three full height outboard of
+    # the jaw, which is where the flanks are and where the tying actually
+    # happens. The boss starts at exactly the channel's edge, by construction --
+    # _boss_in is the same _jaw_hw + FIT -- so it is untouched.
+    block -= _slab(_cap_x0 - CAP_WALL - 1, _cap_x1 + 1,
+                   -(_jaw_hw + FIT), _jaw_hw + FIT,
+                   _jaw_sweep, _anchor_z1 + 10)
+    # Insert bore, and it goes STRAIGHT THROUGH the boss rather than stopping
+    # short. It used to be a blind hole 0.8 mm deeper than the insert, on the
+    # theory that 0.8 mm was somewhere for displaced plastic to go. It is not:
+    # setting a brass insert with an iron pushes a surprising volume of melt
+    # ahead of it, a blind hole packs solid, and the insert then either stops
+    # high or splits the boss -- which is one insert already lost. Through, the
+    # melt has the whole hole and then open air, the insert seats on nothing but
+    # its own knurl, and there is 17 mm of clear space under the boss for
+    # anything that runs out. A screw a size too long is harmless too.
+    block -= Pos(_screw_x, _screw_y, (_boss_z0 - 1 + _anchor_z1 + 1) / 2) * Cylinder(
+        INSERT_D / 2, (_anchor_z1 + 1) - (_boss_z0 - 1)
     )
     # Print this ROOF DOWN -- the face the yoke's feet land on against the bed.
     # That puts this boss and both tie tabs on the build plate; mouth down leaves
@@ -488,6 +628,389 @@ def socket() -> Part:
             -TOWER_Y / 2, TOWER_Y / 2, 0, TOWER_H,
         )
     return body - _slab(-CARD_L / 2, CARD_L / 2, -CARD_T, CARD_T, -SOCKET_H + 2, TOWER_H)
+
+
+# --- Card components. TRM "VRAM [2M] PCB ASSEMBLY", drg 0197,004/A. ---------
+# Context, like card() and socket() -- but not decoration: these are what
+# CLEAR_END is spending its margin against, so they are measured rather than
+# sketched, and the report below checks the printed parts against them.
+#
+# The drawing is 1:1. It was rendered at 600 dpi and every figure here is the
+# centre of one of its outlines, scaled so the card outline it draws
+# (27.90 x 102.74) maps onto the 28.0 x 102.87 of Fig 2.18 -- the scan is true
+# to 0.35 %, and dividing that out costs nothing.
+#
+# Two datums, both of which the drawing gives directly:
+#   u  mm along the card, from the end the drawing puts C12 and IC24 at
+#   v  mm DOWN from the card's top edge -- the edge the TSOPs sit flush with
+#
+# Side A is the 6.5 mm envelope (TSOPs, electrolytics, beads); side B is the
+# 4.00 mm one (TSOPs and chip caps only). The 1M card, drg 0197,003/A, is this
+# card with side B bare and nothing else changed -- set POPULATE_B False.
+POPULATE_B = True
+CARD_FLIP = True       # OBSERVED on the machine: the card sits with side A --
+                       # the electrolytics -- facing the VIDC20, which is +Y.
+                       # The TRM assembly drawing was transcribed the other way
+                       # up, so the whole card assembly turns 180 degrees about
+                       # Z to match.
+                       #
+                       # A turn, NOT a mirror: that is the only way a card can
+                       # actually go in, and it swaps which END sits at which
+                       # tower as well as which face points where. Nothing about
+                       # the retainer changes -- the jaws are symmetric and
+                       # CLEAR_END already takes the tighter face at each end --
+                       # but the report's side A / side B stack heights swap
+                       # over, and so does which end of the drawing is at the
+                       # C73 tower.
+
+# The VRAM itself: HM538253BTT/HM538254BTT, 2 Mbit dual-port video RAM, 44-pin
+# TSOP-II (TTP-44/40DA) -- body 18.41 x 10.16 x 1.20 max, 0.10 standoff, leads
+# out to an 11.76 span. Eight of them are the 2M card's 16 Mbit.
+#
+# The drawing's outline is the LAND PATTERN, 19.1 x 13.2, which is 0.7 wider
+# each side than the leads actually reach. Checking the jaw against that would
+# throw away 0.7 mm of real clearance at each end, so the model uses the
+# datasheet body and lead span and the outline only for position.
+TSOP_L, TSOP_W, TSOP_H = 18.41, 10.16, 1.20   # across the card, along it, tall
+TSOP_LEAD = 11.76          # lead span, along the card
+TSOP_STAND = 0.10          # standoff under the body
+# 47uF SMD aluminium electrolytics. The drawn outline is 6.74 along the card by
+# 7.90 across, chamfered at one end with a "+" beside it: a 6.3 mm can whose
+# terminals run ACROSS the card, which is why the can models are spun 90 deg.
+# 6.3 x 5.4 is the tallest 6.3 mm case that stays inside the TRM's 6.5 envelope.
+CAN_D, CAN_H = 6.3, 5.4
+# L1-L4. The one population the drawing does not identify: a 9.35 x 2.92
+# outline, long axis across the card, in the supply to each side-A VRAM -- so,
+# ferrite beads. Height is ASSUMED; nothing else here is.
+BEAD_X, BEAD_Z, BEAD_H = 2.92, 9.35, 2.0
+# C1-C8 and C13-C16, decoupling. Drawn as ref-des boxes of a fixed ~4 x 3.3
+# rather than as lands, so only the centre and the long axis are readable off
+# them; 1206 is the size that fits the boxes and the era.
+CHIP_L, CHIP_W, CHIP_H = 3.2, 1.6, 1.3
+
+# (u, side). Every TSOP is flush with the top edge -- drawn 19.1 deep from
+# v = 0.13 on both sides -- so v is one number for all eight.
+TSOP_V = 9.70
+_TSOPS = [(24.20, "A"), (45.99, "A"), (67.73, "A"), (89.22, "A"),    # IC4 2 3 1
+          (13.38, "B"), (35.04, "B"), (56.97, "B"), (78.54, "B")]    # IC24 22 23 21
+_CANS = [(13.29, "A"), (35.07, "A"), (56.86, "A"), (78.60, "A")]     # C12 11 10 9
+CAN_V = 4.58
+_BEADS = [(13.33, "A"), (35.16, "A"), (56.86, "A"), (78.48, "A")]    # L4 3 2 1
+BEAD_V = 16.10
+_CHIPS = [  # (u, v, side, spin) -- spin 90 puts the chip's length across the card
+    (23.63, 20.25, "A", 0), (45.42, 20.25, "A", 0),                  # C4 C3
+    (67.12, 20.18, "A", 0), (88.65, 20.22, "A", 0),                  # C2 C1
+    (14.64, 20.22, "B", 0), (36.46, 20.22, "B", 0),                  # C8 C7
+    (58.18, 20.22, "B", 0), (79.84, 20.22, "B", 0),                  # C6 C5
+    (23.06, 2.63, "B", 90), (44.86, 3.25, "B", 90),                  # C16 C15
+    (67.87, 3.29, "B", 90), (87.98, 3.33, "B", 90),                  # C14 C13
+]
+# Not modelled: the item-8 label on side A, 14.94 x 5.93 at u 96.3-102.3. It is
+# paper, and it is the one thing that reaches into a jaw's end zone -- its edge
+# lands within 0.05 mm of the jaw's inner face. GAP is 0.30 per face and the
+# label is ~0.1 thick, so the jaw rides over it; worth knowing, not worth a solid.
+
+# KiCad ships exact 3D models for three of these four packages, and this machine
+# has them. Where the library is found they are used verbatim; where it is not,
+# each falls back to a block built to the same datasheet numbers, so the model
+# runs anywhere and the clearance check is unchanged either way. KiCad's
+# convention is the one wanted here: origin at the footprint centre, part
+# sitting on z = 0, +Z out of the board.
+_KICAD = next((p for p in (
+    Path("/Applications/KiCad/KiCad.app/Contents/SharedSupport/3dmodels"),
+    Path("/usr/share/kicad/3dmodels"),
+    Path.home() / ".local/share/kicad/3dmodels",
+) if p.is_dir()), None)
+
+
+@lru_cache(maxsize=None)
+def _package(rel: str | None) -> Part | None:
+    """One KiCad 3D package, imported once and reused. None if unavailable."""
+    if rel is None or _KICAD is None:
+        return None
+    try:
+        return import_step(str(_KICAD / rel))
+    except Exception as exc:
+        print(f"  note: {rel} would not import ({exc.__class__.__name__}); using a block")
+        return None
+
+
+def _tsop() -> Part:
+    return _package("Package_SO.3dshapes/TSOP-II-44_10.16x18.41mm_P0.8mm.step") or (
+        Pos(0, 0, 0.15) * Box(TSOP_LEAD, TSOP_L, 0.30)
+        + Pos(0, 0, TSOP_STAND + TSOP_H / 2) * Box(TSOP_W, TSOP_L, TSOP_H)
+    )
+
+
+def _can() -> Part:
+    return _package("Capacitor_SMD.3dshapes/C_Elec_6.3x5.4.step") or (
+        Pos(0, 0, 0.15) * Box(7.8, 6.6, 0.30)
+        + Pos(0, 0, CAN_H / 2) * Cylinder(CAN_D / 2, CAN_H)
+    )
+
+
+def _chip() -> Part:
+    return _package("Capacitor_SMD.3dshapes/C_1206_3216Metric.step") or (
+        Pos(0, 0, CHIP_H / 2) * Box(CHIP_L, CHIP_W, CHIP_H)
+    )
+
+
+def _bead() -> Part:
+    return Pos(0, 0, BEAD_H / 2) * Box(BEAD_X, BEAD_Z, BEAD_H)
+
+
+def _on_card(part: Part, u: float, v: float, side: str, spin: float = 0.0) -> Part:
+    """Stand a component on one face of the card. It arrives in KiCad's frame --
+    on z = 0, +Z out of the board -- and is tipped so that +Z becomes the card's
+    outward normal: -Y for side A, +Y for side B."""
+    return (
+        Pos(u - CARD_L / 2, (CARD_T / 2) * (1 if side == "B" else -1), CARD_FREE - v)
+        * Rot(-90 if side == "B" else 90, 0, 0)
+        * Rot(0, 0, spin)
+        * part
+    )
+
+
+def components() -> dict[str, Part]:
+    """The card's population, grouped by type so each shows in its own colour.
+    Fit checking and display only -- never exported."""
+    def group(items):
+        out = None
+        for p in items:
+            out = p if out is None else out + p
+        return out
+
+    on_b = POPULATE_B
+    turn = Rot(0, 0, 180 if CARD_FLIP else 0)
+    return {k: turn * v for k, v in {
+        "VRAM": group([_on_card(_tsop(), u, TSOP_V, s)
+                       for u, s in _TSOPS if s == "A" or on_b]),
+        "electrolytics": group([_on_card(_can(), u, CAN_V, s, spin=90)
+                                for u, s in _CANS]),
+        "beads": group([_on_card(_bead(), u, BEAD_V, s) for u, s in _BEADS]),
+        "chip caps": group([_on_card(_chip(), u, v, s, spin=sp)
+                            for u, v, s, sp in _CHIPS if s == "A" or on_b]),
+    }.items()}
+
+
+# --- The motherboard around SK9. TRM "MAIN PCB ASSEMBLY", drg 0197,000/A. ---
+# Context, and one answer: this drawing settles the measurement HANDOVER.md has
+# been carrying as the last open question -- whether there is board beside a
+# tower for the screw boss. See the report at the bottom; the short version is
+# that one tower has it and the other does not.
+#
+# Like the card drawing, this one is 1:1 -- SK9 is drawn 110.62 long against the
+# 110.36 measured with calipers, and IC29 comes out 27.69 x 27.81 against the
+# 28 x 28 of a 160-pin PQFP. Rendered at 600 dpi and measured the same way.
+#
+# Frame: the drawing's own, so a view down -Z reproduces the drawing. +X runs
+# along the socket toward the end the drawing puts on the right (C151, C36,
+# LK13); +Y is CAP_SIDE, the VIDC/RP14 flank; the board's top face is the
+# motherboard datum at z = -SOCKET_H.
+BOARD_T = 1.6              # FR4, nominal -- the drawing is a plan view
+BOARD_X, BOARD_Y0, BOARD_Y1 = 88.0, -32.0, 38.0   # the window modelled
+
+# SK9's own plan outline, which is NOT the 6.5 the calipers gave for its body.
+# The calipers spanned the moulding around the card slot, up where the anchor
+# grips; the drawing is the whole footprint, flanges and all. Both are true and
+# the difference matters here, because clearance to a neighbour is measured from
+# the footprint, not from the part the anchor touches.
+SOCKET_PLAN_W = 9.86
+# And how little there is past its ends. C151 and R213 stand this far off the
+# right end; C73 is 1.14 off the left. The anchors' outer end walls want 1.40.
+SOCKET_PLAN_END = 0.30
+# Which is worth stating on its own: the anchor is 9.80 across, so it is very
+# slightly NARROWER than the socket's own footprint. Nothing about the anchor's
+# flanks can foul the board that the socket does not foul already. Only the
+# screw boss reaches past, out to |Y| = 9.09.
+
+# Neighbours, as (ref, X, Y, along X, along Y) -- the centre and size of each
+# outline the drawing draws, for everything within about 62 x 22 mm of SK9.
+# HEIGHTS ARE NOT IN THIS DRAWING. It is a plan view, so these are extruded to
+# one nominal depth and are keep-out prisms for PLAN clearance only; the report
+# below measures in plan and says so. A part could be 3 mm tall and irrelevant
+# at the boss's height (18.3 to 23.8 above the board) or 20 mm and fatal, and
+# nothing here can tell you which.
+NEIGHBOUR_H = 4.0
+_NEIGHBOURS = [
+    # +Y -- the VIDC flank, the one CAP_SIDE puts the screw boss on
+    ("SK4",  -58.75,  15.12, 55.39, 11.39),
+    ("R148", -32.26,   7.56,  2.41,  1.35),
+    ("C91",  -22.31,  10.03,  4.70,  6.56),
+    ("C99",  -17.21,   7.54,  1.78,  3.17),
+    ("IC29",   1.72,  22.78, 27.69, 27.81),   # VIDC20, 160-pin PQFP
+    ("C118",  16.30,   6.27,  3.17,  1.91),
+    ("R184",  20.70,   6.86,  1.40,  2.75),
+    ("RP14",  27.05,  11.35,  5.21, 10.79),
+    ("RP15",  40.26,  11.35,  5.21, 10.79),
+    ("R213",  56.92,   6.69,  2.88,  5.46),
+    ("C36",   61.13,   1.91,  4.70,  3.34),
+    # -Y -- the flank carrying the SO packages
+    ("LK5",  -59.90,  -5.00,  2.16,  2.16),
+    ("RP6",  -58.63, -12.57,  5.21, 10.71),
+    ("IC22", -42.19, -12.62,  7.28, 12.32),
+    ("C83",  -33.42,  -8.21,  1.78,  3.17),
+    ("C84",  -33.42, -17.02,  1.78,  3.09),
+    ("IC26", -25.40, -12.62,  7.24, 12.32),
+    ("RP11", -12.76, -12.62,  5.33, 10.79),
+    ("C107",  -5.19,  -8.25,  1.86,  3.26),
+    ("C108",  -4.55, -17.70,  1.86,  3.17),
+    ("IC30",   4.30, -12.64,  7.28, 12.28),
+    ("C115",  13.12,  -6.33,  3.17,  1.78),
+    ("RP13",  18.18, -12.64,  5.25, 10.75),
+    ("C126",  25.80, -16.43,  1.69,  3.17),
+    ("IC33",  34.59, -12.62,  7.24, 12.32),
+    ("C142",  43.43,  -6.29,  3.17,  1.86),
+    ("RP16",  51.05, -12.62,  5.21, 10.79),
+    ("C160",  59.25, -10.73,  1.78,  3.13),
+    ("SK6",   -8.23, -25.32,115.24,  9.77),
+    # off the right end, which is why there is nothing to grip out there
+    ("C151",  56.92,   0.11,  2.88,  5.84),
+]
+# KiCad packages for the neighbours whose drawn outline matches a standard body.
+# This drawing draws BODIES, not land patterns -- IC29 comes out 27.69 x 27.81
+# against a 28 x 28 PQFP and SK9 110.62 x 9.86 against its measured 110.36 -- so
+# a body that matches to half a millimetre is a real identification rather than a
+# guess, which is why these are assigned and the other seven are not.
+#
+# What this buys is HEIGHT, which the drawing does not have. Read the warning on
+# NEIGHBOUR_H before believing any of it: a KiCad model's height is that
+# package's nominal, not this board's part. It matters most for C152, which
+# decides the right tower, and it is exactly the kind of number that a caliper
+# settles in ten seconds and a library cannot settle at all -- KiCad's D10 can is
+# 10 mm tall and real 10 mm cans run to 20.
+_SO20 = "Package_SO.3dshapes/SOIC-20W_7.5x12.8mm_P1.27mm.step"
+_SO16 = "Package_SO.3dshapes/SOIC-16W_5.3x10.2mm_P1.27mm.step"
+_CHIPC = "Capacitor_SMD.3dshapes/C_1206_3216Metric.step"
+_CHIPR = "Resistor_SMD.3dshapes/R_1206_3216Metric.step"
+_CAN10 = "Capacitor_THT.3dshapes/CP_Radial_D10.0mm_P5.00mm.step"
+_PACKAGE = {
+    "C73": _CAN10, "C152": _CAN10,          # radial electrolytics, drawn as circles
+    "IC29": "Package_QFP.3dshapes/PQFP-160_28x28mm_P0.65mm.step",   # VIDC20
+    "IC22": _SO20, "IC26": _SO20, "IC30": _SO20, "IC33": _SO20,     # 7.3 x 12.3
+    "RP6": _SO16, "RP11": _SO16, "RP13": _SO16,                     # 5.2 x 10.8
+    "RP14": _SO16, "RP15": _SO16, "RP16": _SO16,
+    "C83": _CHIPC, "C84": _CHIPC, "C99": _CHIPC, "C107": _CHIPC,
+    "C108": _CHIPC, "C115": _CHIPC, "C118": _CHIPC, "C126": _CHIPC,
+    "C142": _CHIPC, "C160": _CHIPC,
+    "R148": _CHIPR, "R184": _CHIPR,
+}
+# Left as prisms, because nothing standard is 5.2 x 10.8 or 55 x 11 and inventing
+# a package would be worse than admitting the height is unknown: SK4, SK6, LK5,
+# C91, C36 -- and C151 and R213, which is a pity, because those two are what the
+# anchors' end walls run into.
+
+# The two radial electrolytics, as (ref, X, Y, diameter). C73 is the one the
+# HANDOVER already knew about: it stands off the socket's LEFT end, and the
+# drawing puts it 1.0 mm away rather than the 3.3 scaled off a photograph.
+_ROUND = [("C73", -61.83, 2.14, 11.01), ("C152", 54.19, 12.57, 9.86)]
+
+
+def board() -> Part:
+    """The motherboard local to SK9. Fit checking and display only."""
+    return _slab(-BOARD_X, BOARD_X, BOARD_Y0, BOARD_Y1,
+                 -SOCKET_H - BOARD_T, -SOCKET_H)
+
+
+def _neighbour_parts() -> dict[str, Part]:
+    """Each neighbour as its own solid, keyed by reference. A KiCad package where
+    the outline identifies one, a keep-out prism where it does not."""
+    z0 = -SOCKET_H                      # the board's top face
+    out = {}
+    for ref, X, Y, w, h in _NEIGHBOURS + [(r, X, Y, d, d) for r, X, Y, d in _ROUND]:
+        pkg = _package(_PACKAGE.get(ref))
+        if pkg is None:
+            out[ref] = _slab(X - w / 2, X + w / 2, Y - h / 2, Y + h / 2,
+                             z0, z0 + NEIGHBOUR_H)
+            continue
+        # The package arrives in KiCad's frame -- on z = 0, +Z out of the board,
+        # any through-leads below it. Spun a quarter turn when its footprint is
+        # the other way up from the outline the drawing gives, which is decided
+        # by comparing which way round each is longer rather than by hand.
+        bb = pkg.bounding_box()
+        spin = 0 if (w >= h) == (bb.size.X >= bb.size.Y) else 90
+        spun = Rot(0, 0, spin) * pkg
+        # ...and centred on its OWN bounds rather than dropped on its origin. A
+        # KiCad model's origin is the footprint's, which for the two-pad radial
+        # cans is a pad and not the middle -- C73 landed 2.5 mm out before this.
+        # The drawing gives body centres, so match body centres.
+        c = spun.bounding_box().center()
+        out[ref] = Pos(X - c.X, Y - c.Y, z0) * spun
+    return out
+
+
+def neighbours() -> Part:
+    """What is on the board beside the socket."""
+    part = None
+    for p in _neighbour_parts().values():
+        part = p if part is None else part + p
+    return part
+
+
+def _fouls(printed: Part):
+    """Which neighbours the printed parts run into, and by how much. Per part, so
+    the answer names the component; bounding boxes screen first so only the few
+    that can possibly touch cost a boolean.
+
+    This is a real 3D check for the 25 neighbours that carry a KiCad package and
+    a plan check for the seven that do not, since those are prisms of an invented
+    height. The report says which is which rather than pretending otherwise."""
+    pb = printed.bounding_box()
+    out = []
+    for ref, part in _neighbour_parts().items():
+        bb = part.bounding_box()
+        if (bb.min.X > pb.max.X or bb.max.X < pb.min.X
+                or bb.min.Y > pb.max.Y or bb.max.Y < pb.min.Y
+                or bb.min.Z > pb.max.Z or bb.max.Z < pb.min.Z):
+            continue
+        try:
+            hit = printed & part
+        except Exception:
+            continue
+        if hit.volume > 1e-6:
+            h = hit.bounding_box()
+            out.append((ref, h.size.X, h.size.Y, hit.volume, ref in _PACKAGE))
+    out.sort(key=lambda t: -t[3])
+    return out
+
+
+def _plan_clearance():
+    """For each tower and each flank, the nearest neighbour OUTLINE to SK9's
+    footprint, in plan. Bounding boxes throughout, so a round part is measured
+    at its square -- pessimistic, which is the right way to be wrong here."""
+    edge = SOCKET_PLAN_W / 2
+    boxes = [(r, X - w / 2, X + w / 2, Y - h / 2, Y + h / 2)
+             for r, X, Y, w, h in _NEIGHBOURS]
+    boxes += [(r, X - d / 2, X + d / 2, Y - d / 2, Y + d / 2) for r, X, Y, d in _ROUND]
+    out = {}
+    for end, x0, x1 in (("left", -SOCKET_L / 2, -SOCKET_L / 2 + TOWER_X),
+                        ("right", SOCKET_L / 2 - TOWER_X, SOCKET_L / 2)):
+        for flank, sign in (("+Y", 1), ("-Y", -1)):
+            best, who = 99.0, "nothing"
+            for r, bx0, bx1, by0, by1 in boxes:
+                if bx1 < x0 or bx0 > x1:
+                    continue
+                near = by0 if sign > 0 else -by1
+                if near < edge:            # straddles the socket -- not a flank
+                    continue
+                if near - edge < best:
+                    best, who = near - edge, r
+            out[end, flank] = (best, who)
+    return out
+
+
+# Colours for the viewer. The printed parts share one filament colour so they
+# read as the one assembly; the card is board green and the socket is the black
+# of the real SK9 moulding. The TSOPs are black plastic too, but a real black
+# against a black socket is unreadable on screen, so they are lifted a couple of
+# shades -- the only colour here that is chosen for legibility over likeness.
+COLOURS = {
+    "yoke": "#d98a2b", "anchor R": "#d98a2b", "anchor L": "#d98a2b",
+    "card": "#1e7a3c", "socket": "#141416",
+    "VRAM": "#33333a", "electrolytics": "#42424a",
+    "beads": "#55555e", "chip caps": "#b99a6b",
+    "board": "#0d4423", "neighbours": "#3a3a42",
+}
 
 
 if __name__ == "__main__":
@@ -537,20 +1060,119 @@ if __name__ == "__main__":
           f"(SEAT_GAP {SEAT_GAP} + ANCHOR_DROP {ANCHOR_DROP}); "
           f"screw spans {SEAT_GAP + ANCHOR_DROP + FOOT_T - SCREW_CBORE + INSERT_L:.1f} mm "
           f"head-face to insert bottom")
+    _travel = SEAT_GAP + ANCHOR_DROP
+    _anch = parts["anchor_right"] + parts["anchor_left"]
+    _checks = [(d, ((Pos(0, 0, -d) * parts["yoke"]) & _anch).volume)
+               for d in (SEAT_ERROR, SEAT_ERROR + _travel)]
+    print(f"seating    card top measured {CARD_SEATED} above the socket, "
+          f"{CARD_FREE - CARD_SEATED:+.1f} on the model; SEAT_ERROR {SEAT_ERROR:.1f} off the "
+          f"anchor's roof puts it back under the yoke, and the grip is untouched at "
+          f"{CARD_SEATED - (_jaw_z0 - SEAT_ERROR):.1f} mm because both moved together")
+    print(f"           anchor roof {_jaw_z0 - 0.6 - _anchor_z1:.1f} mm lower than the first "
+          f"print ({SEAT_ERROR:.1f} of card + {ANCHOR_DROP - 0.6:.1f} "
+          f"of SEAT_GAP moved off the yoke), so the anchor is that much shorter")
+    print(f"           yoke vs anchors: "
+          + ",  ".join(f"{'seated' if i == 0 else 'preloaded'} {v:.2f} mm3"
+                       for i, (d, v) in enumerate(_checks))
+          + ("   CLEAR" if all(v < 1e-6 for _, v in _checks) else "   FOULING"))
     print(f"press fit  {2 * PRESS:.2f} mm interference across {TOWER_Y} of tower, "
           f"over 2 x {TOWER_X * _grip_h:.0f} mm2 of flank")
     print(f"           sticks out {_cap_hw - 3.25:.2f} mm past the socket body, "
           f"both flanks (the screw boss needs {abs(_foot_y) - 3.25:.2f} on one)")
     print(f"anchor U   {2 * _cap_hw:.2f} mm across, pocket {2 * _grip_hw:.2f} "
-          f"onto a {TOWER_Y} tower")
+          f"onto a {TOWER_Y} tower, lidded {LID_CLEAR:.2f} above its top "
+          f"(the jaw itself comes to {_jaw_z0 - SEAT_ERROR - SEAT_GAP - ANCHOR_DROP - TOWER_H:.2f})")
     print(f"stands     {top_h:.1f} mm above the motherboard "
           f"({CARD_H - CARD_SUNK + SOCKET_H:.1f} for the bare card)"
           if (top_h := CARD_FREE + BAR_H + SOCKET_H) else "")
 
+    # What the components are here for. CLEAR_END was picked off photographs at
+    # "~8 mm side A, ~7 mm side B"; the assembly drawing says 6.74 at one end and
+    # 7.08 at the other, and the two are on OPPOSITE faces -- so the jaws have to
+    # clear the tighter of the pair at each end whichever way round the card goes.
+    # Checked as a boolean against the real packages rather than against the
+    # drawing's land outlines, which are 0.7 mm/side wider than the leads reach.
+    comps = components()
+    printed = parts["yoke"] + parts["anchor_right"] + parts["anchor_left"]
+    every = None
+    for grp in comps.values():
+        every = grp if every is None else every + grp
+    try:
+        fouled = (printed & every).volume
+    except Exception:
+        fouled = 0.0
+    boxes = [s.bounding_box() for grp in comps.values() for s in grp.solids()]
+    reach = max(max(abs(bb.min.X), abs(bb.max.X)) for bb in boxes)
+    print(f"components {len(boxes)} on the card "
+          f"(drg 0197,004/A" + ("" if POPULATE_B else ", side B bare") + f"), "
+          f"{'KiCad packages' if _KICAD else 'datasheet blocks'}")
+    print(f"           nearest reaches X {reach:.2f}; the jaws start at "
+          f"{_jaw_x0:.2f}, so {_jaw_x0 - reach:.2f} mm to spare -- "
+          f"{'CLEAR the card' if fouled < 1e-6 else f'FOULING {fouled:.1f} mm3'}")
+    _upY = max(bb.max.Y for bb in boxes) - CARD_T / 2
+    _dnY = max(-bb.min.Y for bb in boxes) - CARD_T / 2
+    print(f"           side A faces {'+Y, the VIDC20' if CARD_FLIP else '-Y'}; stack "
+          + ",  ".join(f"{f} {h:.2f} vs the TRM's {e}" for f, h, e in (
+              ("A", _upY if CARD_FLIP else _dnY, 6.5),
+              ("B", _dnY if CARD_FLIP else _upY, 4.00)))
+          + " -- envelope, not clearance: the jaws never cross the card's faces")
+
+    # The board beside the socket -- the last open measurement in HANDOVER.md.
+    # Plan only: the assembly drawing has no heights, so this says where there is
+    # board, not how much air there is at the boss's own height.
+    gaps = _plan_clearance()
+    need = abs(_foot_y) - SOCKET_PLAN_W / 2
+    _n = len(_NEIGHBOURS) + len(_ROUND)
+    _pkg = sum(1 for r in _neighbour_parts() if r in _PACKAGE)
+    print(f"board      drg 0197,000/A, {_n} neighbours -- {_pkg} as KiCad packages "
+          f"(real heights, nominal ones), {_n - _pkg} as prisms (height invented); "
+          f"SK9's footprint is {SOCKET_PLAN_W} across, not the {2 * 3.25} the "
+          f"calipers gave for its body")
+    print(f"           anchor flanks {2 * _cap_hw:.2f} -- inside that footprint, so only "
+          f"the boss reaches past it, by {need:.2f} mm")
+    for end in ("left", "right"):
+        cells = []
+        for flank in ("+Y", "-Y"):
+            mm, who = gaps[end, flank]
+            cells.append(f"{flank} {mm:5.2f} ({who})"
+                         + (" OK" if mm >= need else " NO"))
+        print(f"           {end:5s} tower  " + "   ".join(cells))
+    print(f"           so the boss goes on the LEFT tower and the RIGHT one has "
+          f"nowhere in plan -- but heights are unknown, see the comment")
+    fouls = _fouls(printed)
+    if fouls:
+        print("           the anchors' OUTER END WALLS also hit: "
+              + ",  ".join(f"{r} by {dx:.2f}" + ("" if pkg else " [prism]")
+                           for r, dx, dy, v, pkg in fouls))
+        _small = [(r, w - b.size.X, h - b.size.Y)
+              for r, X, Y, w, h in _NEIGHBOURS + [(r, X, Y, d, d) for r, X, Y, d in _ROUND]
+              if r in _PACKAGE and (b := _neighbour_parts()[r].bounding_box())
+              and (w - b.size.X > 0.3 or h - b.size.Y > 0.3)]
+    if _small:
+        print("           NOTE a package model smaller than the outline drawn hides "
+              "fouls: " + ",  ".join(f"{r} by {max(dx, dy):.2f}" for r, dx, dy in _small)
+              + " -- the plan table above uses the drawn size and is the one to trust")
+    print(f"           each wants {_cap_x1 - SOCKET_L / 2:.2f} mm past the socket's "
+              f"end and the drawing leaves {SOCKET_PLAN_END:.2f}. The anchor stands "
+              f"{1.5} mm off the board, so this is only real for a part taller than that.")
+
     try:
         from ocp_vscode import show
 
-        show(parts["yoke"], anchor(True), anchor(False), card(), socket(),
-             names=["yoke", "anchor R", "anchor L", "card", "socket"])
+        # The card, its population and the yoke are drawn SEATED -- dropped by
+        # SEAT_ERROR onto where the card really sits -- while the anchors, socket
+        # and board stay put. Without that the viewer shows the gap under the
+        # yoke's foot as SEAT_GAP + ANCHOR_DROP + SEAT_ERROR and it looks far too
+        # big, because the yoke is cut to a card height that turned out to be
+        # 0.8 mm out. Seated, what you see is the 1.00 mm the screw pulls through.
+        seated = Pos(0, 0, -SEAT_ERROR)
+        shown = [("yoke", seated * parts["yoke"]),
+                 ("anchor R", parts["anchor_right"]),
+                 ("anchor L", parts["anchor_left"]), ("card", seated * card()),
+                 ("socket", socket()), ("board", board()),
+                 ("neighbours", neighbours()),
+                 *((n, seated * g) for n, g in comps.items())]
+        show(*[p for _, p in shown], names=[n for n, _ in shown],
+             colors=[COLOURS[n] for n, _ in shown])
     except Exception as exc:
         print(f"viewer not connected ({exc.__class__.__name__})")

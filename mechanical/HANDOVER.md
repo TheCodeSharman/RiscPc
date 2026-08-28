@@ -42,37 +42,153 @@ matters.
 | | value | source |
 |---|---|---|
 | Card overall | 102.87 × 28.0 × 1.27 mm | TRM Fig 2.18, p.2-27 |
-| Card components | 6.5 max side A, 4.00 max side B | TRM Fig 2.18 |
+| Card components | 6.5 max side A, 4.00 max side B (actual **6.04** / **1.60**) | TRM Fig 2.18; drg 0197,004/A |
 | Card mounting holes | ø3.18, 3.38 in from each end, 6.35 up | TRM Fig 2.18 |
-| Card top edge, seated | **31.0 mm** | calipers |
+| Card top edge, seated | 31.0 mm — **superseded**, see `CARD_SEATED` | calipers |
+| Card top edge above the **socket's** top face | **25.0 mm** | calipers, seated |
 | Tower top | **18.90 mm** | calipers |
 | Socket body top | **5.2 mm** | calipers |
 | Tower plan | **7.7 × 7.7 mm** (square) | calipers |
 | Socket overall, tower outer to tower outer | **110.36 mm** | calipers |
-| Clear card at each end (no components) | ~8 mm side A, ~7 mm side B | photo vs TRM length |
-| Clear card above the top components | **~0** — TSOPs flush, electrolytics 0.8 below | photo vs TRM length |
-| Clear board beyond left tower | 3.3 mm, then C73 | photo, ~19 px/mm |
-| Clear board beyond right tower | ~0 | photo |
+| Clear card at each end (no components) | **6.74** one end (side B, IC24), **7.08** the other (side A, IC1) | drg 0197,004/A |
+| Clear card above the top components | **0.49** TSOPs, **0.68** electrolytics | drg 0197,004/A |
+| SK9 plan footprint | **110.62 × 9.86 mm** (body alone is 6.5) | drg 0197,000/A |
+| Clear board beyond left tower | **1.14 mm**, then C73 | drg 0197,000/A |
+| Clear board beyond right tower | **0.30 mm**, then C151 / R213 | drg 0197,000/A |
+| Clear board beside left tower | **4.49** +Y (SK4), **15.51** −Y (SK6) | drg 0197,000/A |
+| Clear board beside right tower | **2.71** +Y (C152), **2.29** −Y (RP16) | drg 0197,000/A |
 
 Derived: card sits **2.2 mm** into the socket; jaw grips **6.6 mm** of card face;
 assembly stands **36.0 mm** above the board against 31.0 for the bare card.
 
+The card's population is modelled from the TRM's **VRAM [2M] PCB ASSEMBLY**
+(drg 0197,004/A), which is drawn 1:1 — eight HM538253BTT VRAMs in 44-pin
+TSOP-II, four 6.3 mm electrolytics, four ferrite beads and twelve chip caps,
+all measured off the drawing at 600 dpi and checked against the printed parts
+as a boolean. That replaces the photo estimates in the two rows above, and it
+moves one number the right way: the free zone at each end is set by the tighter
+FACE, not the tighter end, and the two are on opposite faces (side B at one end,
+side A at the other), so `CLEAR_END` has to clear 6.74 whichever way round the
+card goes. It does — the nearest package reaches X 43.89 against a jaw starting
+at 44.94, so **1.05 mm to spare**, because the drawing's outlines are land
+patterns 0.7 mm/side wider than the TSOP leads actually reach.
+
+The one thing that does reach into a jaw's end zone is the item-8 **paper label**
+on side A, whose edge lands within 0.05 mm of the jaw's inner face. It is ~0.1
+thick against 0.30 of `GAP` per face, so the jaw rides over it.
+
+## First test fit — what it changed
+
+Printed, pressed on and dry-fitted. Five things came back, four of them changes
+to the model. **Everything needs reprinting.**
+
+**The press fit is right.** `PRESS` 0.15/flank goes on hard and holds. Do not
+touch it.
+
+**The card sits 0.8 mm lower than the calipers first said.** Measured directly:
+25.0 mm from the card's top edge to the socket's top face, against 25.8 modelled
+(`CARD_TOP` 31.0 − `SOCKET_H` 5.2). It pushes further home in circuit than it did
+when measured out of it. That is now `CARD_SEATED`, and `SEAT_ERROR` is derived
+from it rather than typed — it comes off the anchor's **roof**, which is what the
+yoke lands on, so the yoke that already fits keeps fitting and the card grip
+stays at 6.6 mm. `CARD_TOP` is deliberately left at 31.0: it is the datum the
+yoke's jaws are cut to, and correcting it there would reshape the yoke for
+nothing.
+
+Symptom this explains: the bar stood ~1.2 mm off the card instead of resting on
+it. 0.8 was the card; the other 0.4 was the anchors not yet pressed fully home.
+
+**The tie tabs were stealing the preload.** They and the middle of the outer end
+wall topped out level with the roof — but the yoke's jaw hung `SEAT_GAP` below
+its foot, so the jaw landed on *them* after 0.6 mm and the foot never reached the
+roof. Worth 0.4 mm of the 1.0 the screw is there to deliver, and invisible from
+outside. Fixed by moving `SEAT_GAP` onto the anchor (0.4 → 0, `ANCHOR_DROP`
+0.6 → 1.0): the yoke's underside is now **one plane**, so the anchor's top can be
+one plane too and there is no second surface left to become the wrong stop.
+
+That single move also settled three cosmetic complaints at once — the screw hole
+now breaks out on the yoke's own underside instead of a raised island, the
+anchor's top face is flush instead of stepped, and `JAW_CLEAR` fell to zero.
+
+**The anchor's pocket is lidded.** With the yoke down you were looking through
+the clearance beside the jaw into a 3.3 mm well. The lid sits flush in the top
+face, slotted for the card's end, and leaves `LID_CLEAR` 2.7 mm over the tower —
+less than the yoke's own jaw already passes, so it assumes nothing new.
+
+**The insert bore goes straight through.** It was blind, 0.8 mm deeper than the
+insert, which is not enough: setting a brass insert pushes real volume of melt
+ahead of it, the hole packs solid and the insert stops high or splits the boss.
+One insert was lost that way. Through, the melt has 1.5 mm of clear hole and then
+17 mm of open air under the boss.
+
+Also cosmetic, both parts: the screw holders now run out flush with the end
+faces instead of stopping 0.25 mm short.
+
 ## Still outstanding
 
-**One measurement blocks nothing else.** The screw boss needs **5.84 mm of clear
-board past the socket body** on the flank it sits on. That was scaled off a
-photograph at roughly 5 mm, so it is unverified and may not fit.
+**The board question is answered, and the answer changed the question.** The
+TRM's **MAIN PCB ASSEMBLY** (drg 0197,000/A) is drawn 1:1 — SK9 comes out 110.62
+long against the 110.36 measured with calipers, and IC29 27.69 × 27.81 against
+the 28 × 28 of a 160-pin PQFP — so the board around the socket is now modelled
+from it rather than from photographs, and `vram_retainer.py` checks the printed
+parts against it. Three things fell out.
 
-Measure: clear board beside a **tower** (not mid-span), each flank, from the
-socket body's edge outward. If it is under 5.9 mm, in increasing order of what
-they cost:
+**1. SK9's footprint is 9.86 mm across, not the 6.5 the calipers gave.** The
+calipers spanned the moulding around the card slot, up where the anchor grips;
+the drawing is the whole footprint. Both are true, and the difference is worth
+1.68 mm of clearance in every sum below. It also means the anchor, at 9.80
+across, is *narrower than the socket's own footprint* — nothing about its flanks
+can foul the board that the socket does not foul already.
 
-1. ~~`INSERT_D`/`SCREW_*` to M2~~ — **spent**. The move to M2 bought 0.45 mm
-   (6.29 → 5.84) and is already in the model.
-2. `WALL` 2.0 → 1.5 on the jaw — saves 0.5 mm.
-3. Flip `CAP_SIDE` to put the boss on the other flank.
+**2. The screw boss fits at one tower and not the other.** It reaches
+|Y| = 9.09, i.e. 4.16 mm past that footprint. Clear board beside each tower, in
+plan, outline to outline:
 
-The anchor's U itself only needs 1.70 mm per flank and is fine either way.
+| | +Y (VIDC / RP14 flank) | −Y (SO packages) |
+|---|---|---|
+| **left tower** | **4.49** — SK4 ✔ | **15.51** — nothing until SK6 ✔ |
+| **right tower** | **2.71** — C152 ✘ | **2.29** — RP16 ✘ |
+
+So `CAP_SIDE` is right for the left tower, with 0.33 mm to spare, and the right
+tower has nowhere in plan on either flank. Note the −Y flank at the *left* tower
+is the roomiest place on the board by a factor of three — the photograph that
+picked +Y ("~5 mm on the RP14/RP15 side, ~2 on the SO package side") was reading
+mid-span, not beside the tower.
+
+**3. Both anchors' outer end walls overlap something in plan.** Each wants
+1.40 mm past the socket's end; the drawing leaves **0.30**. R213 and C151 sit off
+the right end (1.10 mm of overlap each) and C73 off the left (0.26). C73 is 1.14
+off the socket, not the 3.3 scaled off a photograph.
+
+**Which end is which on the real board.** The model's `anchor_left` is the −X
+end: the one with **C73** — a ~11 mm radial electrolytic — hard against it. The
+`anchor_right` end is the one with **LK13** and the battery **BT1** beyond it.
+Get this the wrong way round and the boss goes to the tower that has no room.
+
+**What actually blocks now: five heights, all a caliper job on the real board.**
+The assembly drawing is a plan view and has no heights, so every number above is
+a plan screen and is *pessimistic by construction*. The anchor stands 1.5 mm off
+the board and the boss sits 18.3–23.8 mm above it, so:
+
+- **C152** and **RP16** decide the right tower's boss. C152 is a ~10 mm radial
+  electrolytic and RP16 a SIL pack; if either is shorter than 18.3 mm the boss
+  passes clean over it and the plan foul is not a foul at all.
+- **C73**, **C151** and **R213** decide the end walls. Anything under 1.5 mm tall
+  passes under the anchor.
+
+Measure those five and the design is either finished or needs one change. If it
+does need one, in increasing order of cost:
+
+1. `WALL` 2.0 → 1.5 on the jaw — saves 0.5 mm on the boss.
+2. `CAP_WALL` on the outer end face only — the end walls need 1.10 mm off to
+   clear C151/R213, which is most of the 1.2 they have.
+3. Flip `CAP_SIDE` to −Y. Best at the left tower (15.51 mm), no help at the
+   right (2.29).
+4. Screw only the left anchor and let the right one be press-fit alone. The
+   preload is set by the yoke's bar deflecting, so one screw still preloads —
+   asymmetrically, and the report's stiffness figure would need redoing.
+
+The anchor's U itself only needs 1.70 mm per flank and is fine everywhere.
 
 `SOCKET_L` is measured, but the screw holes stay slotted ±1 mm because the
 anchors are pressed onto real towers by hand, not placed at modelled
@@ -108,9 +224,12 @@ PETG. `FIT = 0.2` at the top of the model is the single printer-tolerance knob.
 | file | qty | notes |
 |---|---|---|
 | `vram_coupon.stl` | 1 | **print first** — 15.6 mm, one end of the yoke |
-| `vram_yoke.stl` | 1 | 113.2 × 12.0 × 11.6, 4.3 cm³ |
-| `vram_anchor_left.stl` | 1 | 1.1 cm³, 22.3 tall |
-| `vram_anchor_right.stl` | 1 | 1.1 cm³, 22.3 tall |
+| `vram_yoke.stl` | 1 | 113.2 × 12.0 × 11.6, 4.5 cm³ |
+| `vram_anchor_left.stl` | 1 | 1.0 cm³, 21.1 tall |
+| `vram_anchor_right.stl` | 1 | 1.0 cm³, 21.1 tall |
+
+**All four changed after the first test fit — reprint everything.** The anchors
+are 1.2 mm shorter and the yoke's foot moved; see below.
 
 The anchors are a **chiral pair** — both hands are exported, do not mirror in
 the slicer and do not print two of one.
