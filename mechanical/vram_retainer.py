@@ -73,7 +73,12 @@ CLEAR_END = 6.5        # component-free zone at each end. Measured off photos:
 # Socket length and width are scaled off the SK9 close-up against the 1.27 mm
 # contact pitch, so roughly +/- 2 mm. The tower figures are eyeballed off the
 # same photo; see the docstring for why that is survivable.
-SOCKET_L = 105.0       # socket body, end tower to end tower
+SOCKET_L = 110.36      # MEASURED. Socket overall, outer face of one end tower
+                       # to the other. The photo-scaled estimate was 105, which
+                       # would have put each anchor 2.7 mm out of position --
+                       # nearly three times what the slotted screw holes absorb.
+                       # It also means the towers stand 3.75 mm proud of the
+                       # card's ends rather than sitting flush with them.
 # Two heights referenced to the motherboard, which is how they are actually
 # measured -- and the only two that decide whether the jaw has anything to grip.
 # The socket's own height cancels out of that calculation entirely: the grip is
@@ -121,9 +126,20 @@ GAP = FIT + 0.1        # per-face clearance to the card. Deliberately looser
                        # than FIT: this slides onto a thirty-year-old PCB whose
                        # edge may carry burrs, residue or a little swelling,
                        # and a slot that grips is worse than one that doesn't.
-EPOXY = 0.4            # deliberate slop in the cap pockets, filled with
-                       # adhesive -- this is where the tower's unmeasured
-                       # dimensions go
+PRESS = 0.10           # interference per flank, so the pocket is 0.2 narrower
+                       # than the tower and the anchor presses on rather than
+                       # being bonded. The U puts the printed part in tension
+                       # and the 30-year-old tower in compression, which is the
+                       # right way round for the old plastic. Adhesive is still
+                       # available as a belt-and-braces addition; it is no
+                       # longer what holds the part on.
+                       #
+                       # PETG creeps, so an interference fit relaxes over years.
+                       # The margin is large enough to absorb that: flank
+                       # contact is ~350 mm2, and even a fraction of the initial
+                       # contact pressure leaves friction far above the few
+                       # newtons this has to resist. If it ever does loosen, a
+                       # drop of epoxy in the same joint recovers it.
 BAR_H = 5.0            # bar depth above the card's top edge
 FOOT_T = 3.0           # yoke's foot, sitting on the anchor's roof
 SEAT_GAP = 0.4         # designed gap under the foot. The yoke's height is set
@@ -163,11 +179,11 @@ TOWER_CLEAR = INSERT_L + 1.5   # jaw stops this far above the tower. Sized by
                        # providing anyway.
 
 _jaw_hw = CARD_T / 2 + GAP + WALL            # jaw half-width
-_cap_in = -CAP_SIDE * (TOWER_Y / 2 + EPOXY)             # cap's open flank
-_cap_out = CAP_SIDE * (TOWER_Y / 2 + EPOXY + CAP_WALL)  # cap's bonded flank
+_grip_hw = TOWER_Y / 2 - PRESS               # pocket half-width; undersize
+_cap_hw = _grip_hw + CAP_WALL                # anchor half-width, both flanks
 _slot_hw = CARD_T / 2 + GAP                  # card slot half-width
-_cap_x1 = SOCKET_L / 2 + EPOXY + CAP_WALL    # cap outer face
-_cap_x0 = SOCKET_L / 2 - TOWER_X - EPOXY     # cap inner face
+_cap_x1 = SOCKET_L / 2 + FIT + CAP_WALL      # cap outer face
+_cap_x0 = SOCKET_L / 2 - TOWER_X             # cap inner face
 _jaw_x0 = CARD_L / 2 - CLEAR_END             # jaw reaches this far in
 _jaw_z0 = TOWER_H + TOWER_CLEAR              # jaw bottom, clear of the tower
 # The anchor runs almost to the motherboard rather than stopping at the socket's
@@ -213,6 +229,21 @@ def _slotted(x, y, z, length, dia, height) -> Part:
         + _slab(x - length / 2, x + length / 2, y - dia / 2, y + dia / 2,
                 z - height / 2, z + height / 2)
     )
+
+
+def _bevel(part: Part, length: float, test, axis=None) -> Part:
+    """Chamfer, selected by position the same way as _round."""
+    edges = part.edges().filter_by(axis) if axis else part.edges()
+    picked = [e for e in edges if test(e.center())]
+    if not picked:
+        return part
+    for L in (length, length * 0.6, length * 0.35):
+        try:
+            return chamfer(picked, L)
+        except Exception:
+            pass
+    print(f"  note: no chamfer fitted those {len(picked)} edges; left square")
+    return part
 
 
 def _round(part: Part, radius: float, test, axis=None) -> Part:
@@ -292,13 +323,17 @@ def anchor(right: bool = True) -> Part:
     The pocket is open at the bottom and open on the inner face, and oversized
     by EPOXY on every side, so nothing bottoms out on the tower and its
     unmeasured dimensions are absorbed by the adhesive."""
+    # A U in plan: both flanks plus the outer end wall tying them together, so
+    # the flanks cannot splay and the grip is real. Open at the bottom and open
+    # on the inner face, so it presses straight down over the tower and nothing
+    # crosses whatever stands on top of it.
     block = _slab(  # outer end wall
-        SOCKET_L / 2 + EPOXY, _cap_x1, _cap_in, _cap_out, _anchor_z0, _jaw_z0
+        SOCKET_L / 2 + FIT, _cap_x1, -_cap_hw, _cap_hw, _anchor_z0, _jaw_z0
     )
-    block += _slab(  # flank
-        _cap_x0, _cap_x1, CAP_SIDE * (TOWER_Y / 2 + EPOXY), _cap_out,
-        _anchor_z0, _jaw_z0,
-    )
+    for f in (-1, 1):
+        block += _slab(
+            _cap_x0, _cap_x1, f * _grip_hw, f * _cap_hw, _anchor_z0, _jaw_z0
+        )
     # No roof over the tower. It would have to cross whatever posts and latch
     # arms stand up from it, which are the one thing no photograph has shown me
     # clearly. It turns out to be doing no work: the load path is yoke -> screw
@@ -315,6 +350,12 @@ def anchor(right: bool = True) -> Part:
     # somewhere to go rather than lifting it proud of the face the yoke lands on.
     block -= Pos(_screw_x, _screw_y, _jaw_z0 - (INSERT_L + 0.8) / 2) * Cylinder(
         INSERT_D / 2, INSERT_L + 0.8
+    )
+    # Lead-in at the mouth, so a press fit starts square instead of catching a
+    # corner on the tower and shearing a flank off.
+    block = _bevel(
+        block, CAP_WALL * 0.6,
+        lambda c: abs(c.Z - _anchor_z0) < 0.05 and abs(abs(c.Y) - _grip_hw) < 0.05,
     )
     return block if right else mirror(block, Plane.YZ)
 
@@ -363,15 +404,13 @@ if __name__ == "__main__":
     ) + f"   (CARD_TOP -> mm of grip; at or below "
         f"{TOWER_TOP + TOWER_CLEAR:.1f} there is none)")
     print(f"bar        {2 * _jaw_hw:.2f} mm across, vs 6.5 for the socket body")
-    _bond_h = _jaw_z0 - _anchor_z0
-    print(f"bonded     {TOWER_Y * _bond_h:.0f} mm2 end face + {TOWER_X * _bond_h:.0f} "
-          f"mm2 flank = {(TOWER_Y + TOWER_X) * _bond_h:.0f} mm2 over {_bond_h:.1f} mm "
-          f"of tower")
-    print(f"           sticks out {abs(_cap_out) - 3.25:.2f} mm past the socket body "
-          f"on the bonded flank, {abs(_cap_in) - 3.25:.2f} on the open one")
-    print(f"cap        {abs(_cap_out - _cap_in):.2f} mm across "
-          f"({abs(_cap_out) - TOWER_Y / 2:.2f} beyond the tower, one side only), "
-          f"{EPOXY} slop")
+    _grip_h = _jaw_z0 - _anchor_z0
+    print(f"press fit  {2 * PRESS:.2f} mm interference across {TOWER_Y} of tower, "
+          f"over 2 x {TOWER_X * _grip_h:.0f} mm2 of flank")
+    print(f"           sticks out {_cap_hw - 3.25:.2f} mm past the socket body, "
+          f"both flanks (the screw boss needs {abs(_foot_y) - 3.25:.2f} on one)")
+    print(f"anchor U   {2 * _cap_hw:.2f} mm across, pocket {2 * _grip_hw:.2f} "
+          f"onto a {TOWER_Y} tower")
     print(f"stands     {top_h:.1f} mm above the motherboard "
           f"({CARD_H - CARD_SUNK + SOCKET_H:.1f} for the bare card)"
           if (top_h := CARD_FREE + BAR_H + SOCKET_H) else "")
