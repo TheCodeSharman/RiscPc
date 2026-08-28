@@ -57,6 +57,7 @@ socket's top face. +X along the card, +Y toward Side B (the 4.00 mm component
 side; the TRM has Side A facing the front of the main PCB), +Z up.
 """
 
+import re
 from pathlib import Path
 
 from build123d import *
@@ -399,7 +400,16 @@ if __name__ == "__main__":
         "coupon": coupon(),
     }
     for name, p in parts.items():
-        export_step(p, str(here / f"vram_{name}.step"))
+        step = here / f"vram_{name}.step"
+        export_step(p, str(step))
+        # STEP writes the wall-clock time into its header, so an unchanged model
+        # still produces a changed file and every regeneration shows up as a
+        # diff. Pinning it makes the artifacts reproducible: `git status` then
+        # only reports geometry that actually moved.
+        step.write_text(
+            re.sub(r"'\d{4}-\d{2}-\d{2}T[\d:]+'", "'1970-01-01T00:00:00'",
+                   step.read_text(), count=1)
+        )
         export_stl(p, str(here / f"vram_{name}.stl"))
         bb = p.bounding_box()
         print(f"{name:10s} {bb.size.X:6.1f} x {bb.size.Y:5.1f} x {bb.size.Z:5.1f} mm"
