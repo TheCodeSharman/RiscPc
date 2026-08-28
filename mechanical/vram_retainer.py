@@ -388,7 +388,16 @@ def socket() -> Part:
 
 if __name__ == "__main__":
     here = Path(__file__).parent
-    parts = {"yoke": yoke(), "anchor": anchor(), "coupon": coupon()}
+    # Both hands exported. The U is symmetric across the flanks, but the part
+    # is not: the end wall is at one end and the screw boss on one flank, so the
+    # pair is chiral and no rotation turns one into the other. Shipping both
+    # beats a note in a README that says "mirror this one".
+    parts = {
+        "yoke": yoke(),
+        "anchor_right": anchor(True),
+        "anchor_left": anchor(False),
+        "coupon": coupon(),
+    }
     for name, p in parts.items():
         export_step(p, str(here / f"vram_{name}.step"))
         export_stl(p, str(here / f"vram_{name}.stl"))
