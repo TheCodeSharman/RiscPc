@@ -27,3 +27,6 @@
 ds-view/sa110-bad-full.csv
 ds-view/sa110-bad-lowslice.csv
 ds-view/sa110-bad-highslice.csv
+
+# uv venv for the build123d models (mechanical/); rebuild with `uv sync`.
+mechanical/.venv/

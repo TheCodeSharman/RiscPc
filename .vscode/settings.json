@@ -8,6 +8,11 @@
     "**/external/Kernel/Changes": "plaintext",
     "**/external/Kernel/Version": "plaintext"
   },
+  // build123d models live in mechanical/ and run out of a uv venv rather than
+  // the nix dev shell, because cadquery-ocp ships only as wheels. Naming it
+  // here is what lets the OCP CAD Viewer extension find a `show()`-capable
+  // interpreter without picking one by hand in every new window.
+  "python.defaultInterpreterPath": "${workspaceFolder}/mechanical/.venv/bin/python",
   "[aasm]": {
     "editor.tabSize": 8,
     "editor.insertSpaces": true,

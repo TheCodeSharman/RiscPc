@@ -40,6 +40,24 @@
             '';
           };
 
+          # Code-CAD for the printed parts in mechanical/. Separate from
+          # `default` because none of it comes from nixpkgs: build123d rests on
+          # cadquery-ocp, an OpenCascade binding published only as prebuilt
+          # wheels, so the environment is a uv venv pinned by mechanical/uv.lock
+          # rather than a nix closure. uv fetches its own CPython too -- on
+          # NixOS that interpreter and the wheels' bundled shared objects run
+          # under nix-ld (see nix-config modules/nixos/nix-ld.nix).
+          cad = pkgs.mkShell {
+            packages = [
+              pkgs.uv
+              pkgs.librsvg       # rsvg-convert — rasterise exported .svg views
+            ];
+            shellHook = ''
+              echo "RiscPc cad shell — uv $(uv --version | cut -d' ' -f2)."
+              echo "  cd mechanical && uv sync   # then select .venv in VS Code"
+            '';
+          };
+
           # Kept separate from `default` so the everyday shell stays lean: this
           # is only for the tscircuit evaluation in
           # repair/riscpc-sound-repair/schematic/tscircuit/, which pulls its

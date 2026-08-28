@@ -1,0 +1,18 @@
+# Code-CAD for the RISC PC's printed parts. Not a package -- just a pinned
+# environment for the model scripts beside it, so `uv sync` reproduces the
+# exact build123d/OpenCascade pair a model was drawn against.
+[project]
+name = "riscpc-mechanical"
+version = "0.1.0"
+description = "build123d models for 3D-printed RISC PC parts"
+requires-python = "==3.13.*"
+dependencies = [
+    "build123d==0.11.1",
+    # The Python half of the OCP CAD Viewer VS Code extension. Its version must
+    # match the extension pinned in nix-config home/msharman/default.nix --
+    # the two talk over a localhost port with a versioned protocol.
+    "ocp-vscode==4.0.1",
+]
+
+[tool.uv]
+package = false
