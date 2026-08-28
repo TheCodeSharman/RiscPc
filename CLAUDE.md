@@ -145,28 +145,22 @@ Before writing a new script, look here — these already exist. Don't reimplemen
 - **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
 - **`acorn-post/decoders/`** — sigrok POST decoders (see above).
 
-## Workflow: feature branches + self-review PRs
+## Workflow: commit straight to `main`
 
-This branch-and-PR discipline applies to the **code subprojects** —
-`tools/raster-lab/`, `acorn-post/decoders/`, and the customised RPCEmu fork (which has
-its own, more elaborate model; see below).  It does **not** apply to routine
-work on the main repo such as `docs/`, `Dev Diary.md`, `ACORN_POST.md`, or
-other single-file note/markdown tweaks — those can go straight to `main`.
+**This repo does not use feature branches.**  Commit directly to `main` and
+push.  Keep commits self-contained and well-described — the commit message is
+the whole record, since there is no PR to carry the reasoning.
 
-For non-trivial changes within those subprojects:
+That is a deliberate reversal of an earlier rule that asked for a
+`feature/`-branched, self-reviewed PR per non-trivial change.  In practice it
+produced a branch per session for a repo with one author, no reviewer and no
+CI, so the branches were merged immediately and their only lasting effect was
+a list to clean up and a working tree that looked dirty after a push.
 
-1. **Branch off `main`.**  Name with a `feature/` or `fix/` prefix
-   (e.g. `feature/raster-lab-phase1`, `fix/setup-script-shebang`).
-2. **Commit incrementally** on the branch.  Exploratory commits are fine —
-   they're documentation of how the design evolved.
-3. **Push the branch** and open a self-review **PR against `main`**.
-   The PR description is the place to document *why* and the journey;
-   commit messages document *what*.
-4. **Rebase / squash before merge** when the design has stabilised so
-   `main` ends up with a clean, narrated history.
-
-This keeps `main` linear and review-ready, while feature branches serve
-as the design-discussion record.
+**Feature branches live in the RPCEmu fork only**, where they earn their keep:
+that repo's `upstream` / `integration` / `feature/*` model exists so each patch
+can be extracted as a clean upstream diff, which is a real requirement this
+repo has no equivalent of.  See its own `CLAUDE.md`, and the section below.
 
 ## Customised RPCEmu fork
 
