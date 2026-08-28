@@ -15,7 +15,8 @@ specific to any one scaler.
 | `PatLib.bas` | The test cards, as a library. Shared by `TestPat` and `ModeServ`. |
 | `TestPat.bas` | The capture-geometry card, standalone. Draws into whatever mode is current. |
 | `ModeSweep.bas` | Cycles the stock AKF50 modes on a timer, 15.6–37.9 kHz. |
-| `ModeTest.bas` | 24 checks over `ModeServ`'s parsing. No networking. |
+| `ModeTest.bas` | 8 checks over `ModeServ`'s pure string helpers. No networking. |
+| `checksrc.py` | **Host side.** Structural check of the line-numbered sources. Run it after any edit. |
 | `modeserv_soak.py` | **Host side.** Cycles modes until ModeServ stops answering, then says whether ModeServ or the machine went. |
 | `Build.obey`, `BuildIn.exec` | Tokenise `src/` on the RISC OS side. |
 
@@ -80,10 +81,37 @@ Needs the Internet module.
 
 ## Testing off the machine
 
-`ModeTest` runs the parsing under [Matrix
+`ModeTest` runs the string helpers under [Matrix
 Brandy](https://github.com/stardot/MatrixBrandy) on a Linux host
 (`nix run nixpkgs#matrix-brandy`), which is a real BASIC V/VI interpreter and
-tokenises the whole program on load.
+tokenises the whole program on load. On **macOS** the nixpkgs build is the SDL
+one, which writes to its own window rather than to stdout, so a headless
+`brandy -quit ModeTest` there prints nothing and proves nothing; run it in the
+guest instead, which is a better test anyway because it is real RISC OS BASIC:
+
+```sh
+# needs the CSD set, because ModeTest's LIBRARY "ModeServ" is a relative path
+# and every HostCmd command is its own OS_CLI
+rpcemu-run --socket hostcmd.sock -- Obey HostFS::HostFS.$.video.runtest
+```
+
+### checksrc.py — run this after every edit
+
+These files are edited **by line number**, and a block written over an existing
+range destroys what was there silently. It has happened twice: once taking out
+`FNlisten`'s `DEF`, once taking out `PROCcol`'s `ENDPROC` — the latter making
+`PROCcol` fall through into `PROCanimstep`, which called back into `PROCcol`,
+reported as `No room for function/procedure call` in a procedure that was
+innocent. `checksrc.py` checks the *structure* rather than the names, so both
+shapes show up before the file is tokenised:
+
+```sh
+./checksrc.py --library PatLib.bas --library ModeServ.bas *.bas
+```
+
+It also caught its own author writing a comment block over line 70, and caught
+`ModeTest` still calling an `FNparse`/`FNdepth` that `dfd8932` had deleted from
+`ModeServ` months earlier — a test that had been dead on its first line since.
 
 **What that cannot catch is the shape of a `SYS` argument list.** RISC OS BASIC
 parses those at execution, and Brandy is more lenient than it — blank *input*

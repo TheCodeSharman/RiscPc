@@ -31,21 +31,24 @@
   266 REM 7/16 is the radius measured off the Philips card, whose circle is
   267 REM 87.5% of picture height -- 12 of its 42-pixel grid cells.
   270 DEF PROCpm5544
-  280 LOCAL r%,cx%,cy%
+  280 LOCAL r%
   290 PROCpatinit
   295 ANIMKIND%=1
-  300 cx%=W% DIV 2:cy%=H% DIV 2
+  300 REM The centre is CX%/CY%, set by PROCpatinit on the line above. Holding it
+  302 REM again in cx%/cy% meant one value under two names differing only in case.
+  304 REM The helpers still take the centre as parameters rather than reading the
+  306 REM globals, and their formals are lowercase because formals are local.
   310 r%=(H%*UY%*7) DIV 16
   320 PROCgrid
   330 PROCcastell
   340 PROCcol(&FFFFFF00)
-  350 PROCfdisc(cx%,cy%,r%)
+  350 PROCfdisc(CX%,CY%,r%)
   360 PROCsidebars
-  370 PROCbandbars(cx%,cy%,r%)
-  380 PROCbandgrate(cx%,cy%,r%)
-  390 PROCbandstair(cx%,cy%,r%)
-  400 PROCidents(cx%,cy%,r%)
-  410 PROCcentre(cx%,cy%,r%)
+  370 PROCbandbars(CX%,CY%,r%)
+  380 PROCbandgrate(CX%,CY%,r%)
+  390 PROCbandstair(CX%,CY%,r%)
+  400 PROCidents(CX%,CY%,r%)
+  410 PROCcentre(CX%,CY%,r%)
   420 ENDPROC
   430 :
   440 REM The grey field, ruled into squares by white lines. NX% across is chosen so
@@ -278,7 +281,7 @@
  2070 REM exit and callees still see them, so PROCgrating gets its GX%/GW% without
  2080 REM either name outliving the draw.
  2090 DEF PROCpatdraw
- 2100 LOCAL I%,GX%,GW%,R%,CH%
+ 2100 LOCAL I%,GX%,GW%,R%,RH%
  2105 ANIMKIND%=0
  2110 VDU 19,0,24,255,0,255
  2120 :
@@ -315,8 +318,8 @@
  2430 REM in a 256-colour one. R3 bit 7 set selects the background.
  2440 SYS "ColourTrans_SetTextColour",&FFFFFF00,0,0,0
  2450 SYS "ColourTrans_SetTextColour",&00000000,0,0,128
- 2460 CH%=H% DIV (TY%+1)
- 2470 PRINT TAB(TX% DIV 2-5, (H%-(CY%-4*B%)) DIV CH%);"BAND ";B%
+ 2460 RH%=H% DIV (TY%+1)
+ 2470 PRINT TAB(TX% DIV 2-5, (H%-(CY%-4*B%)) DIV RH%);"BAND ";B%
  2480 :
  2490 REM ---- green frame on the outermost pixels, drawn last -------------
  2500 PROCframe
@@ -379,6 +382,8 @@
  3070 REM Nearest palette entry to a &BBGGRR00 colour, in any mode.
  3080 DEF PROCcol(c%)
  3090 SYS "ColourTrans_SetGCOL",c%,0,0,0,0
+ 3092 ENDPROC
+ 3094 :
  3100 REM ONE frame of the liveness flip, so a caller with its own loop can drive
  3102 REM it. ModeServ has to sit in a socket poll and cannot give up its thread
  3104 REM to PROCanimate's REPEAT, which is why nothing flipped there.
