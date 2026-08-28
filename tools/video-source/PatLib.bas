@@ -24,11 +24,17 @@
   240 REM Bands inside the circle are clipped to the chord, scanline by scanline,
   250 REM which is what makes them meet the circle rather than stop short of it.
   260 :
+  262 REM r% is in OS UNITS, so the height it is a fraction of has to be in OS
+  263 REM units too -- H%*UY%, not H%. Without the UY% the circle came out half
+  264 REM size in every mode with non-square pixels and full size in the rest,
+  265 REM which is precisely the aspect error this card exists to reveal.
+  266 REM 7/16 is the radius measured off the Philips card, whose circle is
+  267 REM 87.5% of picture height -- 12 of its 42-pixel grid cells.
   270 DEF PROCpm5544
   280 LOCAL r%,cx%,cy%
   290 PROCpatinit
   300 cx%=W% DIV 2:cy%=H% DIV 2
-  310 r%=(H%*45) DIV 100
+  310 r%=(H%*UY%*7) DIV 16
   320 PROCgrid
   330 PROCcastell
   340 PROCcol(&FFFFFF00)
@@ -62,26 +68,49 @@
   620 :
   630 REM Black blocks on the top and bottom rows, every other cell. The overscan
   640 REM check: count how many survive at each edge.
+  645 REM
+  646 REM A THIRD of a cell deep, not a half: on the Philips card the strip is
+  647 REM 14 pixels against a 42-pixel cell. At half a cell it stops reading as
+  648 REM a strip laid over the grid and starts reading as a black grid row,
+  649 REM which is a different thing to count.
   650 DEF PROCcastell
-  660 LOCAL i%
+  660 LOCAL i%,d%
+  665 d%=CH% DIV 3:IF d%<1 THEN d%=1
   670 PROCcol(&00000000)
   680 FOR i%=0 TO NX%-1 STEP 2
-  690  PROCpix(i%*CW%+1,1,CW%-2,CH% DIV 2)
-  700  PROCpix(i%*CW%+1,H%-CH% DIV 2-1,CW%-2,CH% DIV 2)
+  690  PROCpix(i%*CW%+1,1,CW%-2,d%)
+  700  PROCpix(i%*CW%+1,H%-d%-1,CW%-2,d%)
   710 NEXT
   720 ENDPROC
   730 :
-  740 REM Vertical colour columns left and right, outside the circle.
-  750 DEF PROCsidebars
-  760 LOCAL x1%,x2%,bw%,q%
-  770 bw%=CW%*2:q%=H% DIV 3
-  780 x1%=CW%*2:x2%=W%-CW%*4
-  790 PROCcol(&808000A0):PROCpix(x1%,q%*2,bw%,q%)
-  800 PROCcol(&A0408000):PROCpix(x1%,q%,bw%,q%)
-  810 PROCcol(&0080A000):PROCpix(x1%,0,bw%,q%)
-  820 PROCcol(&FF804000):PROCpix(x2%,q%*2,bw%,q%)
-  830 PROCcol(&F0808000):PROCpix(x2%,q%,bw%,q%)
-  840 PROCcol(&0080A000):PROCpix(x2%,0,bw%,q%)
+  740 REM The chroma bars flanking the circle, and the reference blocks inboard
+  741 REM of them. Geometry and colours are measured off the Philips card.
+  742 REM
+  743 REM Each bar is ONE cell wide, in the second column in from the edge, and
+  744 REM stops a row short of the castellations rather than running the full
+  745 REM height. Inboard of it sit two blocks two rows deep, one at the top and
+  746 REM one at the bottom: those are what make each side read as a right angle
+  747 REM rather than a plain stripe, and they were what this card was missing.
+  748 REM
+  749 REM The halves of each bar are the phase-inversion pair the card labels 90
+  750 REM and 270 degrees, so they have to stay a matched pair of hues at one
+  751 REM luminance -- not the arbitrary three-colour stack this used to draw.
+  752 DEF PROCsidebars
+  753 LOCAL y0%,ht%,bh%,xa%,xb%,ba%,bb%
+  754 y0%=CH%:ht%=H%-2*CH%
+  755 xa%=CW%:xb%=(NX%-2)*CW%
+  756 ba%=2*CW%:bb%=(NX%-3)*CW%
+  757 bh%=2*CH%
+  758 REM Upper half then lower half of each bar.
+  760 PROCcol(&7A9A3C00):PROCpix(xa%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
+  770 PROCcol(&7A5AB800):PROCpix(xa%+1,y0%,CW%-2,ht% DIV 2)
+  780 PROCcol(&0B907A00):PROCpix(xb%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
+  790 PROCcol(&E9647A00):PROCpix(xb%+1,y0%,CW%-2,ht% DIV 2)
+  800 REM The right-angle blocks: the same pair of hues on both sides.
+  810 PROCcol(&D67A5700)
+  820 PROCpix(ba%+1,(NY%-3)*CH%,CW%-2,bh%):PROCpix(bb%+1,(NY%-3)*CH%,CW%-2,bh%)
+  830 PROCcol(&1E7A9D00)
+  840 PROCpix(ba%+1,CH%,CW%-2,bh%):PROCpix(bb%+1,CH%,CW%-2,bh%)
   850 ENDPROC
   860 :
   870 REM One horizontal run clipped to the circle, at pixel row y%.
