@@ -2731,3 +2731,52 @@ The Ai summary is moistly us goung around in circles, the conclusion is the foll
       - Randomly the VRAM reads enough to survive boot.
       - When there is less corruption, something is causing the machine to hang responding to network activity. Cursor stops flashing udrin g IO - this is the least understood but plausible because a bad ROM module can corrupt anything,
       - Pressing down hard on the VRAM board clears the error, so a permanent fix is to print a 3d printed clip that screws on to prevent the board wiggling free. 
+
+### Aug 28 — the VRAM clip is fitted, and the 100 %-reproducible fault has stopped
+
+The printed retainer from `mechanical/` is **on the machine**, and so far **no failures on
+boot**. The design, its measurements and the whole reasoning chain are in
+`mechanical/HANDOVER.md` and `mechanical/vram_retainer.py` — this entry records the fit and
+what the result is worth, and points at that record rather than paraphrasing it.
+
+**The board was washed and dried first**: over four hours in front of a fan heater. The
+bodges were glued down beforehand and came through looking intact. Worth saying explicitly
+that this is **not** a retirement of the Jul 29 trapped-liquid finding — four hours of fan
+heater dries *surfaces*, and the thing that entry convicted was the **stacked-daughterboard
+capillary trap**, which "can't drain or dry once assembled", plus the sockets, which wick.
+If damp residue is still in there it recurs with humidity, on that entry's own evidence.
+
+**It fits, but it is snug with the second slice installed.** The assembly stands
+**36.0 mm** above the motherboard against 31.0 for the bare card, and the case closes on
+that with little to spare. The model has no case in it, so that 36.0 is now a **ceiling
+that has been spent** — anything that grows the bar or raises the card eats a clearance
+nobody has measured.
+
+#### What the clean boots are worth, and what they are not
+
+Taken at face value this is a strong result, and the reason is the baseline. The Aug 23
+finding was not "sometimes it crashes" — it was **100 % of boots with the VRAM fitted**,
+clean with it removed, and clearing when the card was pressed down by hand. Against a fault
+that reproduced every single time, boots that do not crash are a real change, not noise.
+
+**But it cannot yet say the clip is why.** The board was washed, dried, reassembled and the
+card reseated in the same intervention. Every one of those acts on the *same mechanism* —
+contact quality at SK9 — so "the clip holds the card down" and "reseating a cleaned card
+into a cleaned socket fixed the contact" both predict exactly what was observed. There is
+no A/B, by choice: **run it and watch, rather than instrument it first.** Recorded as a
+decision, not an oversight.
+
+What that costs is only the attribution, and the experiment stays available: pulling the
+clip later and seeing whether the fault returns settles it whenever it is worth doing.
+
+#### What would count as evidence from here
+
+- **A recurrence is informative and cheap.** It says the clip is not sufficient, and — given
+  the fault was keyed to the network-card ROM copy landing in marginal VRAM — it would put
+  the marginal contacts back in the frame rather than the mechanical fix.
+- **A long clean run is weakly positive and stays confounded** until the clip comes off, for
+  the reason above. Length helps: the fault was per-boot, so boot count is the unit.
+- **Watch for the two known confounders, not just the crash.** Trapped-residue leakage
+  recurs with humidity (Jul 29), and the bodges have gone marginal before — the ROM-socket
+  pin-37 wire was suspected cracked once already. Both produce bus garbage, which is what
+  the VRAM fault also produces. A recurrence is not automatically the VRAM socket.

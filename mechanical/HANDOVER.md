@@ -50,7 +50,7 @@ matters.
 | Socket body top | **5.2 mm** | calipers |
 | Tower plan | **7.7 × 7.7 mm** (square) | calipers |
 | Socket overall, tower outer to tower outer | **110.36 mm** | calipers |
-| Assembly height, and it clears the 2nd partition | **36.0 mm** | case reassembled |
+| Assembly height, and it clears the 2nd slice | **36.0 mm** | case reassembled |
 | Clear card at each end (no components) | **6.74** one end (side B, IC24), **7.08** the other (side A, IC1) | drg 0197,004/A |
 | Clear card above the top components | **0.49** TSOPs, **0.68** electrolytics | drg 0197,004/A |
 | SK9 plan footprint | **110.62 × 9.86 mm** (body alone is 6.5) | drg 0197,000/A |
@@ -136,12 +136,13 @@ and both are clear.**
   rigged on the real board: there is room. The numbers below stay as the record
   of *why* it was a worry and of what to re-check if an anchor ever will not seat
   flush, but they are not a live constraint.
-- **The case closes.** The assembly stands **36.0 mm** above the motherboard
-  against 31.0 for the bare card, and with the case reassembled the yoke clears
-  the **second partition**. This was never modelled — there is no case in
-  `vram_retainer.py` — so treat it as a hard 36.0 mm ceiling that has now been
-  spent, not as headroom. Anything that grows `BAR_H` or `CARD_TOP` eats into a
-  clearance nobody has measured.
+- **The case closes, but it is SNUG.** The assembly stands **36.0 mm** above the
+  motherboard against 31.0 for the bare card, and with the case reassembled the
+  yoke clears the **second slice** with little to spare — fitted and
+  confirmed, not modelled; there is no case in `vram_retainer.py`. Treat 36.0 as
+  a ceiling that has now been **spent**, not as headroom. `BAR_H` 5.0 is the
+  whole of the margin over the bare card, so anything that grows it, or raises
+  `CARD_TOP`, eats a clearance nobody has measured.
 
 The rest of this section is how that was arrived at, and what to re-check if
 any of it ever stops being true.
