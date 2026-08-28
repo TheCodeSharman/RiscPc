@@ -98,7 +98,7 @@ thick against 0.30 of `GAP` per face, so the jaw rides over it.
 ## First test fit — what it changed
 
 Printed, pressed on and dry-fitted. Five things came back, four of them changes
-to the model. **Everything needs reprinting.**
+to the model — which is why everything was reprinted before the fit that stuck.
 
 **The press fit is right.** `PRESS` 0.15/flank goes on hard and holds. Do not
 touch it.
@@ -268,9 +268,11 @@ PETG. `FIT = 0.2` at the top of the model is the single printer-tolerance knob.
 | `vram_anchor_left.stl` | 1 | 1.0 cm³, 21.1 tall |
 | `vram_anchor_right.stl` | 1 | 1.0 cm³, 21.1 tall |
 
-**All four changed after the first test fit — reprint everything.** The anchors
-are 1.2 mm shorter, the yoke's foot moved, and `CAP_SIDE` has since flipped the
-screw boss to the other flank; see below.
+**These four are the ones on the machine.** They are the second set: the first
+test fit made the anchors 1.2 mm shorter and moved the yoke's foot, and
+`CAP_SIDE` then flipped the screw boss to the other flank. Nothing has changed
+since they were printed and fitted, so a reprint is only for a spare or a
+replacement, not a pending revision.
 
 **The exported files are already in print orientation** — yoke and coupon on the
 bar's top face, anchors roof-down, all sitting on Z = 0. Load and slice; do not
@@ -351,9 +353,11 @@ than absolutes:
 
 5 N is the "few newtons this has to resist" the press-fit note assumes, so the
 current bar is adequate rather than generous. Going stiffer costs a 4.3 cm³
-yoke reprint and height above the board, and **nothing here records what
-clearance there is above SK9 with the case on** — measure that before spending
-it. Raising `ANCHOR_DROP` is the cheap alternative (anchors are 1.1 cm³), but it
+yoke reprint and height above the board, and **that height is already spent**:
+the assembly stands 36.0 mm and the second slice closes on it with little to
+spare (Aug 28, fitted — not modelled). Do not add a millimetre to `BAR_H`
+without re-measuring above SK9 with the case on.
+Raising `ANCHOR_DROP` is the cheap alternative (anchors are 1.1 cm³), but it
 buys force by winding up travel the press fit has to hold, where a stiffer bar
 buys it for free at the same travel.
 
@@ -387,9 +391,10 @@ symptom is errors only while the board is flexed.
    Note step 3 now threads the card through the anchors' own slots as well, so
    they want to be square on their towers before the card goes in. `TIE_CLEAR`
    opens those slots 0.25 per face wider than the yoke's for exactly this.
-5. Screw down. The gap under each foot — `SEAT_GAP` 0.4 plus `ANCHOR_DROP` 0.6,
-   **1.0 mm** total — means the screws close it and **preload the bar onto the
-   card**, rather than the foot bottoming out and holding the bar off it.
+5. Screw down. The gap under each foot — `ANCHOR_DROP` **1.0 mm**, with
+   `SEAT_GAP` now 0 so the whole of it is on the anchor — means the screws close
+   it and **preload the bar onto the card**, rather than the foot bottoming out
+   and holding the bar off it.
 
    The joint is **displacement-controlled**: once the foot lands on the anchor's
    roof, more torque clamps foot to anchor and adds nothing to the card. So
@@ -424,9 +429,10 @@ STEP exports carry a pinned timestamp, so regenerating an unchanged model leaves
 
 ## Repo state
 
-All of this is merged to `main` and pushed. `feature/vram-retainer`,
-`feature/sound-schematic` and `feature/modeserv-mode-string` are merged and can
-be deleted.
+All of this is merged to `main` and pushed, and the working tree is clean.
+`feature/vram-retainer`, `feature/sound-schematic` and
+`feature/modeserv-mode-string` have been merged and deleted; `main` is the only
+branch, per the repo's commit-straight-to-`main` rule.
 
 Gotcha: `ds-view/postexample.dsl` disappears on checkout of branches predating
 `03727bb`, because macOS cannot distinguish it from the old `POSTexample.dsl`.
