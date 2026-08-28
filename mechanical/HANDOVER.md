@@ -50,6 +50,7 @@ matters.
 | Socket body top | **5.2 mm** | calipers |
 | Tower plan | **7.7 × 7.7 mm** (square) | calipers |
 | Socket overall, tower outer to tower outer | **110.36 mm** | calipers |
+| Assembly height, and it clears the 2nd partition | **36.0 mm** | case reassembled |
 | Clear card at each end (no components) | **6.74** one end (side B, IC24), **7.08** the other (side A, IC1) | drg 0197,004/A |
 | Clear card above the top components | **0.49** TSOPs, **0.68** electrolytics | drg 0197,004/A |
 | SK9 plan footprint | **110.62 × 9.86 mm** (body alone is 6.5) | drg 0197,000/A |
@@ -124,7 +125,26 @@ One insert was lost that way. Through, the melt has 1.5 mm of clear hole and the
 Also cosmetic, both parts: the screw holders now run out flush with the end
 faces instead of stopping 0.25 mm short.
 
-## Still outstanding
+## Status — clear to build
+
+**Nothing blocks. Both remaining risks were checked on the machine (2026-08-28)
+and both are clear.**
+
+- **The end walls fit.** The model's last worry was the outer end walls against
+  C151 and R213 off the right end and C73 off the left — 1.10, 1.10 and 0.26 mm
+  of plan overlap, from parts whose heights the drawing does not give. Test
+  rigged on the real board: there is room. The numbers below stay as the record
+  of *why* it was a worry and of what to re-check if an anchor ever will not seat
+  flush, but they are not a live constraint.
+- **The case closes.** The assembly stands **36.0 mm** above the motherboard
+  against 31.0 for the bare card, and with the case reassembled the yoke clears
+  the **second partition**. This was never modelled — there is no case in
+  `vram_retainer.py` — so treat it as a hard 36.0 mm ceiling that has now been
+  spent, not as headroom. Anything that grows `BAR_H` or `CARD_TOP` eats into a
+  clearance nobody has measured.
+
+The rest of this section is how that was arrived at, and what to re-check if
+any of it ever stops being true.
 
 **The board question is answered, and the answer changed the question.** The
 TRM's **MAIN PCB ASSEMBLY** (drg 0197,000/A) is drawn 1:1 — SK9 comes out 110.62
@@ -174,20 +194,14 @@ end: the one with **C73** — a ~11 mm radial electrolytic — hard against it. 
 `anchor_right` end is the one with **LK13** and the battery **BT1** beyond it.
 Get this the wrong way round and the boss goes to the tower that has no room.
 
-**What actually blocks now: three heights, a caliper job on the real board.**
-The boss is settled by the `CAP_SIDE` flip. What is left is the **outer end
-walls**, and the anchor stands 1.5 mm off the board, so:
+The heights that drove the worry, if it ever needs re-opening: C151 and R213
+identify as no standard package (2.9 × 5.5 and 2.9 × 5.8), so they are prisms of
+an invented height and still show as fouls in the report. C73's 3D foul vanishes
+only because KiCad's D10 can is 1.0 mm smaller than the ø11.01 drawn — the plan
+figure, 0.26 mm, is the one to trust there. The anchor stands 1.5 mm off the
+board, so anything shorter than that passes under it regardless.
 
-- **C151** and **R213**, off the right end. Neither identifies as a standard
-  package (2.9 × 5.5 and 2.9 × 5.8), so both are still prisms of an invented
-  height and both still show as fouls. Anything under 1.5 mm tall passes under
-  the anchor.
-- **C73**, off the left end. Its 3D foul vanished only because KiCad's D10 can is
-  1.0 mm smaller than the ø11.01 drawn — the plan figure, 0.26 mm of overlap, is
-  the one to trust. It is a radial can and certainly taller than 1.5 mm, so this
-  one is real.
-
-If they do foul, in increasing order of cost:
+If an end wall ever does foul, in increasing order of cost:
 
 1. `CAP_WALL` on the outer end face only — the end walls need 1.10 mm off to
    clear C151/R213, which is most of the 1.2 they have.
