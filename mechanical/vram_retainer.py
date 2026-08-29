@@ -435,13 +435,21 @@ _KICAD = next((p for p in (
 # models/README.md for where each came from.
 _MODELS = Path(__file__).resolve().parent / "models"
 
-# Where the board's top face sits in a file's OWN frame. KiCad puts it at 0, so
-# a KiCad package needs no entry. A vendor STEP need not: TE datums 5535070-5 on
-# the body's TOP face, 11.5 above the board, with the pins running 3.3 below
-# that -- so it lands 11.5 low unless shifted. Measured by slicing the solid,
-# not read off a datasheet: the section is 8.8 mm2 of pin up to z = -11.50 and
-# 139 mm2 of standoff foot from there.
-_DATUM = {"5535070-5.STEP": 11.5}
+# How a vendor file is turned, and where the board's top face sits in it. KiCad's
+# convention -- board top at z = 0, +Z out of the board -- needs no entry; a
+# vendor file follows its own, and neither of ours follows KiCad's:
+#   5535070-5   +Z is out of the board already, but the datum is the body's TOP
+#               face, so the part lands 11.5 low.
+#   5822030-3   lies on its side. The file's +Y is what points out of the board,
+#               and it needs standing up before the datum means anything.
+# Both measured by SLICING the solid rather than read off a datasheet, because
+# neither file says. Section area gives the board plane away: on 5535070-5 it is
+# 8.8 mm2 of pin section up to z = -11.50 and 139 of standoff foot after it; on
+# 5822030-3, 18 mm2 of pin up to y = -4.80 and 851 of body after it.
+_DATUM = {                      # file: (degrees about X to stand it up, board plane after)
+    "5535070-5.STEP": (0, -11.50),
+    "5822030-3.stp": (90, -4.80),
+}
 
 
 @lru_cache(maxsize=None)
@@ -460,8 +468,8 @@ def _package(rel: str | None) -> Part | None:
     except Exception as exc:
         print(f"  note: {rel} would not import ({exc.__class__.__name__}); using a block")
         return None
-    dz = _DATUM.get(path.name, 0.0)
-    return Pos(0, 0, dz) * part if dz else part
+    rx, z0 = _DATUM.get(path.name, (0, 0.0))
+    return Pos(0, 0, -z0) * (Rot(rx, 0, 0) * part) if (rx or z0) else part
 
 
 def _tsop() -> Part:
@@ -592,9 +600,14 @@ _CAN10 = "Capacitor_THT.3dshapes/CP_Radial_D10.0mm_P5.00mm.step"
 # 94.9. KiCad's own DIN41612 models are all that full body whatever the variant
 # says, so this one is TE's, from models/.
 _DIN41612 = "5535070-5.STEP"
+# SK6 is a 72-way SIMM socket at 1.27 pitch, vertical -- which the drawn 9.77 of
+# depth already implied, an angled socket sprawling much further across the
+# board. KiCad has no SIMM or DIMM socket at all, so this one is TE's too.
+_SIMM72 = "5822030-3.stp"
 _PACKAGE = {
     "C73": _CAN10, "C152": _CAN10,          # radial electrolytics, drawn as circles
     "SK4": _DIN41612,                       # network slot, 48-way eurocard
+    "SK6": _SIMM72,                         # the SIMM socket alongside SK9
     "IC29": "Package_QFP.3dshapes/PQFP-160_28x28mm_P0.65mm.step",   # VIDC20
     "IC22": _SO20, "IC26": _SO20, "IC30": _SO20, "IC33": _SO20,     # 7.3 x 12.3
     "RP6": _SO16, "RP11": _SO16, "RP13": _SO16,                     # 5.2 x 10.8
@@ -604,8 +617,8 @@ _PACKAGE = {
     "C142": _CHIPC, "C160": _CHIPC,
     "R148": _CHIPR, "R184": _CHIPR,
 }
-# Left as prisms, height unknown: SK6, LK5, C91, C36 -- and C151 and R213,
-# which is a pity, since those are what the anchors' end walls run into.
+# Left as prisms, height unknown: LK5, C91, C36 -- and C151 and R213, which is a
+# pity, since those are what the anchors' end walls run into.
 
 # The two radial electrolytics, as (ref, X, Y, diameter).
 _ROUND = [("C73", -61.83, 2.14, 11.01), ("C152", 54.19, 12.57, 9.86)]
@@ -640,12 +653,28 @@ def _neighbour_parts() -> dict[str, Part]:
     return out
 
 
-def neighbours() -> Part:
-    """What is on the board beside the socket."""
+# Drawn in their own colour rather than folded into the rest: the two card
+# sockets flanking SK9. They are the only neighbours carrying a vendor STEP, and
+# white reads them as the cream plastic they are in life.
+_SOCKETS = ("SK4", "SK6")
+
+
+def _merge(refs) -> Part | None:
     part = None
-    for p in _neighbour_parts().values():
+    for r in refs:
+        p = _neighbour_parts()[r]
         part = p if part is None else part + p
     return part
+
+
+def neighbours() -> Part:
+    """What is on the board beside the socket, less the two card sockets."""
+    return _merge([r for r in _neighbour_parts() if r not in _SOCKETS])
+
+
+def sockets() -> Part:
+    """SK4 and SK6 -- the network slot and the SIMM socket."""
+    return _merge(_SOCKETS)
 
 
 def _fouls(printed: Part):
@@ -703,7 +732,7 @@ COLOURS = {
     "card": "#1e7a3c", "socket": "#141416",
     "VRAM": "#33333a", "electrolytics": "#42424a",
     "beads": "#55555e", "chip caps": "#b99a6b",
-    "board": "#0d4423", "neighbours": "#3a3a42",
+    "board": "#0d4423", "neighbours": "#3a3a42", "sockets": "#ffffff",
 }
 
 
@@ -864,7 +893,7 @@ if __name__ == "__main__":
                  ("anchor R", parts["anchor_right"]),
                  ("anchor L", parts["anchor_left"]), ("card", seated * card()),
                  ("socket", socket()), ("board", board()),
-                 ("neighbours", neighbours()),
+                 ("neighbours", neighbours()), ("sockets", sockets()),
                  *((n, seated * g) for n, g in comps.items())]
         show(*[p for _, p in shown], names=[n for n, _ in shown],
              colors=[COLOURS[n] for n, _ in shown])
