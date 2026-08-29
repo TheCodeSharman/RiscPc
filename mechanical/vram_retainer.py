@@ -616,9 +616,33 @@ _PACKAGE = {
     "C108": _CHIPC, "C115": _CHIPC, "C118": _CHIPC, "C126": _CHIPC,
     "C142": _CHIPC, "C160": _CHIPC,
     "R148": _CHIPR, "R184": _CHIPR,
+    # FITTED, not identified -- see _FITTED below.
+    "C91": "Capacitor_Tantalum_SMD.3dshapes/CP_EIA-7343-31_Kemet-D.step",
+    "C36": "Capacitor_SMD.3dshapes/C_1812_4532Metric.step",
+    "C151": "Capacitor_SMD.3dshapes/C_2512_6332Metric.step",
+    "R213": "Resistor_SMD.3dshapes/R_2010_5025Metric.step",
 }
-# Left as prisms, height unknown: LK5, C91, C36 -- and C151 and R213, which is a
-# pity, since those are what the anchors' end walls run into.
+# The four above are a weaker claim than the rest of _PACKAGE. Everything else
+# there matches a standard BODY to within half a millimetre, which is an
+# identification; these were picked by running the candidate EIA sizes against
+# the drawn outline and taking the smallest error, which is a fit. The drawing
+# gives no height either way, so their height is the generic package's -- and
+# for C36, C151 and R213 that height lands right where the anchors are, so the
+# foul report keeps saying so rather than letting a guess retire a warning.
+#
+# How good each fit is, drawn against chosen: C36 1812, out by 0.34 total, is
+# convincing. C91 7343 "D", out by 1.14, is the right class -- the drawing gives
+# it a chamfered corner and a "+", so a rectangular POLARISED surface-mount part,
+# and the radial cans on this board are drawn as circles instead. C151 2512 and
+# R213 2010, out by 0.78 and 0.84, are the weak ones: the two are drawn the same
+# width and within 0.4 mm of the same length, so the fit is splitting hairs, and
+# the drawing overprints both their refs ON their outlines, which is exactly the
+# contamination that would move a figure by a few tenths.
+_FITTED = {"C91", "C36", "C151", "R213"}
+# Left a prism: LK5 alone. It is a two-pin link -- the drawing crosses one pad
+# and notes a shunt fitted across pins 1 to 2 -- so the 2.16 x 2.16 recorded for
+# it below looks like ONE pad rather than the pair. Correcting that would move a
+# plan clearance input, so it is left alone and flagged here instead.
 
 # The two radial electrolytics, as (ref, X, Y, diameter).
 _ROUND = [("C73", -61.83, 2.14, 11.01), ("C152", 54.19, 12.57, 9.86)]
@@ -630,9 +654,15 @@ def board() -> Part:
                  -SOCKET_H - BOARD_T, -SOCKET_H)
 
 
+@lru_cache(maxsize=None)
 def _neighbour_parts() -> dict[str, Part]:
     """Each neighbour as its own solid: a KiCad package where the outline
-    identifies one, a keep-out prism where it does not."""
+    identifies one, a keep-out prism where it does not.
+
+    Cached because the callers below index it inside comprehensions, one call
+    per component, which rebuilt all 32 solids each time. Harmless while they
+    were all small blocks; once SK4 and SK6 became real STEP it dominated the
+    run. Callers only read the dict."""
     z0 = -SOCKET_H                      # the board's top face
     out = {}
     for ref, X, Y, w, h in _NEIGHBOURS + [(r, X, Y, d, d) for r, X, Y, d in _ROUND]:
@@ -680,7 +710,9 @@ def sockets() -> Part:
 def _fouls(printed: Part):
     """Which neighbours the printed parts run into, and by how much, per part so
     the answer names the component. A real 3D check for the neighbours carrying a
-    KiCad package; a plan check for the prisms, whose height is invented."""
+    KiCad package; a plan check for the prisms, whose height is invented. A
+    package in _FITTED is checked in 3D like any other, but the report marks it,
+    because its height came off a fitted package rather than an identified one."""
     pb = printed.bounding_box()
     out = []
     for ref, part in _neighbour_parts().items():
@@ -846,7 +878,9 @@ if __name__ == "__main__":
                and (_MODELS / v).is_file())
     print(f"board      drg 0197,000/A, {_n} neighbours -- {_pkg} as packages "
           f"({_pkg - _own} KiCad, {_own} vendor STEP; real heights, nominal ones), "
-          f"{_n - _pkg} as prisms (height invented); "
+          f"of which {len(_FITTED)} fitted to the outline rather than identified, "
+          f"{_n - _pkg} as {'a prism' if _n - _pkg == 1 else 'prisms'} "
+          f"(height invented); "
           f"SK9's footprint is {SOCKET_PLAN_W} across, not the {2 * 3.25} the "
           f"calipers gave for its body")
     print(f"           anchor flanks {2 * _cap_hw:.2f} -- inside that footprint, so only "
@@ -866,7 +900,9 @@ if __name__ == "__main__":
     fouls = _fouls(printed)
     if fouls:
         print("           the anchors' OUTER END WALLS also hit: "
-              + ",  ".join(f"{r} by {dx:.2f}" + ("" if pkg else " [prism]")
+              + ",  ".join(f"{r} by {dx:.2f}"
+                           + (" [fitted height]" if r in _FITTED else
+                              "" if pkg else " [prism]")
                            for r, dx, dy, v, pkg in fouls))
     # Independent of whether anything fouled: a package model narrower than the
     # outline the drawing gives can hide a foul from the 3D check above.
@@ -878,6 +914,19 @@ if __name__ == "__main__":
         print("           NOTE a package model smaller than the outline drawn hides "
               "fouls: " + ",  ".join(f"{r} by {max(dx, dy):.2f}" for r, dx, dy in _small)
               + " -- the plan table above uses the drawn size and is the one to trust")
+    # And the other way round: a model BIGGER than the drawn outline invents a
+    # foul rather than hiding one. Listed only for parts that actually fouled,
+    # because that is the only case where it costs anything -- and unfiltered it
+    # would name most of the board, since a KiCad model carries the leads and
+    # this drawing draws bodies.
+    _big = [(r, b.size.X - w, b.size.Y - h)
+            for r, X, Y, w, h in _NEIGHBOURS + [(r, X, Y, d, d) for r, X, Y, d in _ROUND]
+            if r in {f[0] for f in fouls} and (b := _neighbour_parts()[r].bounding_box())
+            and (b.size.X - w > 0.3 or b.size.Y - h > 0.3)]
+    if _big:
+        print("           NOTE and of those, bigger than the outline drawn, so the "
+              "foul is partly the model's: "
+              + ",  ".join(f"{r} by {max(dx, dy):.2f}" for r, dx, dy in _big))
     print(f"           each wants {_cap_x1 - SOCKET_L / 2:.2f} mm past the socket's "
               f"end and the drawing leaves {SOCKET_PLAN_END:.2f}. The anchor stands "
               f"{1.5} mm off the board, so this is only real for a part taller than that.")
