@@ -2797,14 +2797,20 @@ the ARM exception vector table.
 pressing the card down alternates between `00000000` and `00080008`: bit 3 clears under
 pressure and returns when released.
 
-**Which physical pin carries that line is not established.** The card sits in the RISC
-PC's dedicated network slot, `SK4`, which the TRM lists as **48-way** — three rows of
-sixteen, with pins named like `B14` and `C9`. That is not the 96-way podule connector, so
-the expansion bus pinout does not apply to it. The TRM gives no pinout for `SK4` and
-refers to the **Network Card Mk II Specification, part 0472,208**, which is not in
-`docs/`. Cleaning the whole connector sidesteps the question, and is the better repair
-anyway: the fault has already moved between sessions, so one line failing today is the one
-with least margin rather than the only one at risk.
+**`Bd<3>` is pin `a1` of `SK4`.** The card sits in the RISC PC's dedicated network slot,
+not a podule slot: `SK4` is a 48-way DIN socket, three rows of sixteen, and the expansion
+bus pinout does not apply to it. From the Medusa Main PCB circuit diagram, sheet 4/7, row
+`a` runs
+
+    a1 Bd<3>   a2 Bd<2>   a3 Bd<1>   a4 Bd<7>   a5 NC   a6 Bd<10>
+    a7 Bd<12>  a8 Bd<15>  a9 NC      a11 La<4>  a12 La<7>  a13 La<9>
+    a14 Tc     a15 Ready  a16 Iow*
+
+with `Bd<0>` over on row `c` at `c3`. **`a1` is a corner pin** — the position that loses
+contact first when a card sits at a slight angle, which is exactly how this one has been
+sitting. Clean the whole connector regardless: the fault has already moved between
+sessions, so one line failing today is the one with least margin rather than the only one
+at risk.
 
 #### The chain from one bit to a boot hang
 

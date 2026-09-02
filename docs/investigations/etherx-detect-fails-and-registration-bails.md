@@ -33,6 +33,13 @@ Reading `MAR0` at `&302B820` repeatedly while pressing the card down alternates 
 AX88796, the module and the machine are all sound; the card had simply stopped making
 reliable contact on one data line.
 
+**That line is `Bd<3>`, pin `a1` of `SK4`.** The card is in the RISC PC's dedicated
+network slot — a 48-way DIN socket of three rows of sixteen, not a podule slot, so the
+expansion bus pinout does not apply. Medusa Main PCB circuit diagram sheet 4/7 gives row
+`a` as `Bd<3>` `Bd<2>` `Bd<1>` `Bd<7>` `NC` `Bd<10>` `Bd<12>` `Bd<15>` from `a1`, with
+`Bd<0>` on row `c` at `c3`. `a1` is a corner pin, which is the first to lose contact when
+a card sits at an angle.
+
 The rest of this page is the mechanism, which stands regardless of the cause, and the
 reasoning that got there — including two conclusions that had to be withdrawn.
 
