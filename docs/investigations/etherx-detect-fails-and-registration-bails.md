@@ -27,7 +27,16 @@ directional.** Page 1 registers `PAR0`-`PAR5`, `CURR`, `MAR0` and `MAR1` read
 driver never programmed because it gave up at detect. With the twenty page-0 bytes that
 is 29 of 29.
 
-**Where the fault sits is not settled, and a contact is the leading candidate.** The ROM
+**The cause is a bad contact on `D3` at the podule connector, confirmed by hand.**
+Reading `MAR0` at `&302B820` repeatedly while pressing the card down alternates between
+`00000000` and `00080008` — bit 3 clears under pressure and returns when released. The
+AX88796, the module and the machine are all sound; the card had simply stopped making
+reliable contact on one data line.
+
+The rest of this page is the mechanism, which stands regardless of the cause, and the
+reasoning that got there — including two conclusions that had to be withdrawn.
+
+**Why the ROM stayed clean while the registers did not.** The ROM
 comes back clean — 32616 bytes off this card carry `D3` clear in 23.1% of them, the module
 title renders as `EtherX` rather than `M|hmzX`, and the code executes. That looks like it
 excludes anything the two windows share, including the connector. It does not, because
@@ -41,8 +50,9 @@ when the VRAM board was refitted, which is mechanical sensitivity rather than a 
 part. The VRAM board, the retainer and the podule's own fixing screw are all currently
 absent.
 
-A stuck node on the card's local `D3` remains possible. It is no longer the first thing
-to test.
+**`D3` in a register dump is now the test for podule seating**, and it is far sharper than
+asking whether networking works: one `*Memory 302B800 +64`, and every byte carrying bit 3
+means the card is not connected properly.
 
 A consequence worth stating: because reads are corrupted as well, **nothing measured here
 distinguishes a write that arrives wrong from a read that reports wrong**. The OR mask is
@@ -188,16 +198,9 @@ below the hit.
 
 ## Open
 
-- **Whether reassembly clears it.** VRAM board in, retainer in, card screwed down, then
-  re-read `*Memory 302B800 +64`. Every measurement here was taken on a partly dismantled
-  machine with the card unsecured, and `D3` in that dump is a five-second test for the
-  physical connection — far sharper than asking whether networking works.
-- **Where on the card `D3` is held high**, if reassembly does not clear it. With the power
-  off and the card out,
-  resistance from `D3` to Vcc at the AX88796 against `D0`, `D2` and `D4` is the cheap
-  first pass; a shorted input clamp reads far lower than its neighbours. A scope on `D3`
-  at the podule connector during a register read says whether the line is held high at the
-  connector or only past the card's buffer.
+- **Whether reassembly holds.** VRAM board in, retainer in, card screwed down, then
+  `*Memory 302B800 +64` and `*RMReInit EtherX`. Contact faults recur, and cleaning the
+  connector is worth doing while the card is out.
 - **Whether `ne2000_detect` ran at all.** `0` is also the "not yet probed" sentinel that
   `&3F28` tests, so a detect that never ran and one that ran and failed are
   indistinguishable from the stored value. A stuck `D3` makes the memory test fail
