@@ -67,6 +67,19 @@ To run one under the customised RPCEmu, symlink a `.rom` into the
 emulator's `roms/` directory (RPCEmu concatenates everything there
 alphabetically; a single 4MB file is a valid ROM on its own).
 
+### The EtherX podule ROM
+
+`roms/podule/etherx/` holds the expansion-card ROM from the EtherX NIC in slot 8 — the
+four module chunks read off the card with `tools/risc-pc-diag/PodSave.bas`, plus the
+EtherX module as loaded. Its `README.md` carries the module map, the runtime layout of
+the driver's state, and why `*EXInfo` can print a null location pointer.
+
+**Read it before disassembling anything on that card.** Two traps are already paid for:
+the SharedCLibrary calls all read as `mov pc, #0` in the ROM image and only resolve in
+the RAM copy, and the driver's unit array lives in the C data segment reached through
+the module's private word — anchoring to the module's code base instead lands on the
+stub table's tail and a `DEADDEAD` guard, which reads as a plausible empty array.
+
 ## External Submodules
 
 Most are pulled from gitlab.riscosopen.org (`Kernel`, `HdrSrc`, `FileCore`, `ADFS`, `ADFS4`, `BASIC`, `Desktop`, `Wimp`); `Internet6` and `NetworkManager` come from RISC OS Developments' own GitLab. The two most-used:
@@ -133,6 +146,50 @@ Before writing a new script, look here — these already exist. Don't reimplemen
   `--minimal`, `--[no-]packages-in-rafs`. Consumed by the rpcemu repo's
   `tools/setup-install.sh` to produce `installs/<name>/`. See that repo for details.
 
+- **`tools/risc-pc-diag/`** — RISC OS BASIC diagnostics that run on the machine itself,
+  no disc or desktop needed. VIDC palette / data-line walks (`VIDCbits`, `oneliners.txt`),
+  March-U RAM and VRAM tests with hand-written ARM inner loops (`RAMtestD`, `VRAMtestA`),
+  the CF/SD transfer torture test (`ADFStort`), podule ROM extraction (`PodSave`,
+  `PodChunks`) and EtherX driver state (`EtherXDump`). Sources are plain text: `*BASIC`,
+  then `*EXEC $.Diag.<name>`, then `RUN`. Its `README.md` says what each one proves and
+  how to read a result.
+
+  **`*Save` sizes are hexadecimal** — `+32616` writes `&32616` bytes, so a saved region
+  is four times the length asked for and the tail is whatever followed it in memory.
+
+- **`tools/filecore-image/`** — FileCore forensics for the SD card: disc record, the 127
+  zone checksums, both map copies, the boot block, directory sequence numbers. It answers
+  whether the filing system is damaged, and **it cannot read file contents** — only
+  directory entries, because fragment resolution through the map is unwritten.
+
+  **Reading the card on Linux is read-only, and that is the kernel, not a choice.**
+  `sudo modprobe adfs`, then
+  `sudo mount -t adfs -o ro,uid=$(id -u) /dev/mmcblk0 <dir>`. `CONFIG_ADFS_FS_RW` is
+  unset here, so nothing writes through it. **Image the card whenever it is in the host** —
+  `sudo dd if=/dev/mmcblk0 of=~/riscpc-archive/sd-images/riscpc-<date>-<state>.hdf bs=4M
+  count=500 iflag=fullblock` — because the alternative is another trip to the machine for
+  bytes that were already in your hand.
+
+  **To WRITE to the card, point RPCEmu at the raw device.** RPCEmu hardcodes
+  `hd4.hdf` / `hd5.hdf` (`tree/src/ide.c`), so a symlink is the only way in:
+
+  ```sh
+  sudo chown $USER /dev/mmcblk0
+  cd ~/Projects/rpcemu/installs/riscos-370
+  mv hd5.hdf hd5.hdf.aside && ln -s /dev/mmcblk0 hd5.hdf
+  cd ~/Projects/rpcemu
+  QT_QPA_PLATFORM=xcb direnv exec ~/Projects/rpcemu ./installs/riscos-370/run &
+  direnv exec ~/Projects/rpcemu ./tree/src/tools/rpcemu-run \
+    --socket installs/riscos-370/hostcmd.sock \
+    -- 'Copy HostFS::HostFS.$.X ADFS::5.$.Diag.X ~C~VF'
+  ```
+
+  Finish with `*ADFS` then `*Dismount 5` — `*Dismount` is not recognised until ADFS is the
+  current filing system, and reports *File 'Dismount' not found* rather than saying so.
+  Then kill the emulator, restore `hd5.hdf`, and hand the device back to root.
+  **Both discs are named `RiscPC`**, so address the card as `ADFS::5`; a path by name
+  gives *Ambiguous disc name*.
+
 - **`tools/video-source/`** — RISC OS BASIC that makes this machine a *controllable*
   video source for testing an external scaler: `ModeServ` sets the screen mode over
   TCP 6502, `PatLib`/`TestPat` draw the capture-geometry and PM5544 cards,
@@ -145,22 +202,29 @@ Before writing a new script, look here — these already exist. Don't reimplemen
 - **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
 - **`acorn-post/decoders/`** — sigrok POST decoders (see above).
 
-## Workflow: commit straight to `main`
+## Committing
 
-**This repo does not use feature branches.**  Commit directly to `main` and
-push.  Keep commits self-contained and well-described — the commit message is
-the whole record, since there is no PR to carry the reasoning.
+**Commit straight to `main`.** No feature branches, no self-review PRs. This is a solo
+repo, and the ceremony buys nothing where there is no second reviewer.
 
-That is a deliberate reversal of an earlier rule that asked for a
-`feature/`-branched, self-reviewed PR per non-trivial change.  In practice it
-produced a branch per session for a repo with one author, no reviewer and no
-CI, so the branches were merged immediately and their only lasting effect was
-a list to clean up and a working tree that looked dirty after a push.
+An earlier rule asked for a `feature/`-branched, self-reviewed PR per non-trivial change.
+It produced a branch per session for a repo with one author, no reviewer and no CI, so
+every branch was merged immediately and their only lasting effect was a list to clean up
+and a working tree that looked dirty after a push. **Do not reinstate it.**
 
-**Feature branches live in the RPCEmu fork only**, where they earn their keep:
-that repo's `upstream` / `integration` / `feature/*` model exists so each patch
-can be extracted as a clean upstream diff, which is a real requirement this
-repo has no equivalent of.  See its own `CLAUDE.md`, and the section below.
+The discipline lives in how commits are *split*, not in branch topology:
+
+- **One commit, one theme** — a feature or a finding, never one file or one working
+  session.
+- **Separate the kinds.** Notes (`Dev Diary.md`, `docs/`), tooling (`tools/`), captured
+  artefacts (`roms/`) and project conventions (`CLAUDE.md`) each get their own commit,
+  landing as an adjacent run rather than one mixed blob.
+- **Say why, with the evidence.** Lowercase area prefix (`roms:`, `tools:`, `docs:`),
+  then what changed and what measurement supports it.
+
+**The RPCEmu fork is the exception, and it is a different repo.**
+`TheCodeSharman/rpcemu` tracks upstream, so its `upstream` / `integration` /
+`feature/*` model is load-bearing there. Follow its own `CLAUDE.md`, not this section.
 
 ## Customised RPCEmu fork
 
