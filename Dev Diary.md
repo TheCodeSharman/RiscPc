@@ -2795,9 +2795,16 @@ the ARM exception vector table.
 
 **It is a bad contact on one data line.** Reading `MAR0` at `&302B820` repeatedly while
 pressing the card down alternates between `00000000` and `00080008`: bit 3 clears under
-pressure and returns when released. `BD[3]` is **row a, pin 28** of the DIN 41612
-connector — the low byte runs descending, `BD[7]` at pin 24 to `BD[0]` at pin 31 (Acorn
-Enhanced Expansion Card Specification, Issue 5, Table 2).
+pressure and returns when released.
+
+**Which physical pin carries that line is not established.** The card sits in the RISC
+PC's dedicated network slot, `SK4`, which the TRM lists as **48-way** — three rows of
+sixteen, with pins named like `B14` and `C9`. That is not the 96-way podule connector, so
+the expansion bus pinout does not apply to it. The TRM gives no pinout for `SK4` and
+refers to the **Network Card Mk II Specification, part 0472,208**, which is not in
+`docs/`. Cleaning the whole connector sidesteps the question, and is the better repair
+anyway: the fault has already moved between sessions, so one line failing today is the one
+with least margin rather than the only one at risk.
 
 #### The chain from one bit to a boot hang
 
@@ -2850,7 +2857,7 @@ VRAM was refitted was the strongest single clue and sat unused for hours.
 
 #### Durable
 
-- **`BD[3]` in a register dump is a five-second test for podule seating.** One
+- **`BD[3]` in a register dump is a five-second test for network-card seating.** One
   `*Memory 302B800 +64`; every byte carrying bit 3 means the card is not making contact.
   Far sharper than waiting to see whether networking comes up.
 - **BASIC cannot touch I/O space in either direction** — a read aborts on privilege.
