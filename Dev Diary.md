@@ -2044,11 +2044,16 @@ in 256 colours, no shimmer** — better than pre-saga. Faults, in the order they
   `NoDRAMPanic` before the keyboard lamp-test, so "no keyboard LED" was a *side effect
   of empty RAM sockets*, not a second fault. Blinking keyboard LEDs later = POST
   *running and reporting* — the board core was alive throughout.
-- **Network card no-boot / no link.** The **parallel-port D-sub jackpost (hex pillar)
-  was fouling — and probably shorting — the EtherX podule**, so the podule couldn't
-  seat square (POST podule-scan hangs) or link (LED off). Removed the jackpost, screwed
-  the podule down to hold clearance → boots + links. (My "maybe something's shorting"
-  hunch was right *here* — just a jackpost, not IPA.)
+- **Network card no-boot / no link — FIXED, but the cause is UNPROVEN.** Removing the
+  parallel-port D-sub jackpost (hex pillar) *and* screwing the podule down to hold
+  clearance → boots + links. The account that the jackpost was fouling, and possibly
+  shorting, the EtherX podule so it couldn't seat square (POST podule-scan hangs, LED
+  off) is a **hypothesis that was never tested**: the jackpost was never refitted to see
+  the fault return. Two changes were made at once, and either alone could explain it —
+  removing the jackpost, or screwing the podule down — as could the power cycle that
+  came with them. **Do not cite this as evidence that the jackpost caused it.** What
+  the entry does support is narrower and still useful: *an unsecured podule in this
+  machine has been associated with no-boot and no-link, and securing it cleared them.*
 - **VRAM not detected.** Repeated in/out fatigued the **fragile VRAM socket** (two pins
   already snapped, contacts bent-outward per the earlier repair). Re-formed the flattened
   contact under magnification, seated once, left it alone → detected. `VRAMtestA` clean.
@@ -2780,3 +2785,80 @@ clip later and seeing whether the fault returns settles it whenever it is worth 
   recurs with humidity (Jul 29), and the bodges have gone marginal before — the ROM-socket
   pin-37 wire was suspected cracked once already. Both produce bus garbage, which is what
   the VRAM fault also produces. A recurrence is not automatically the VRAM socket.
+
+### Sep 3 — RESOLVED: the EtherX failure is one podule contact, BD[3]
+
+The network card stopped working four days after months of good service — sustained
+transfers, pings, days of ModeServ, PackMan downloads. `!Boot` hangs loading the Internet
+module whenever EtherX is present, and `*EXInfo` prints its `Interface location` field as
+the ARM exception vector table.
+
+**It is a bad contact on one data line.** Reading `MAR0` at `&302B820` repeatedly while
+pressing the card down alternates between `00000000` and `00080008`: bit 3 clears under
+pressure and returns when released. `BD[3]` is **row a, pin 28** of the DIN 41612
+connector — the low byte runs descending, `BD[7]` at pin 24 to `BD[0]` at pin 31 (Acorn
+Enhanced Expansion Card Specification, Issue 5, Table 2).
+
+#### The chain from one bit to a boot hang
+
+`ne2000_detect` writes 32 bytes into the card's buffer memory at `&2000` and reads them
+back. Every byte comes back with bit 3 set, both widths fail, and it returns 0. The
+configuration routine dispatches that through a jump table straight to an error carrying
+the string **"where did the card go?"** — which nothing ever surfaces. Registration then
+bails, leaving a unit that holds a valid EUI48 and nothing else: `+12` (the SWI chunk),
+`+16`, `+20`, `+24`, `+28` and `+36` are never written. `*EXInfo` reads the null at `+32`
+and hands it to the string printer with no check, which renders address zero. Internet
+meeting a unit that advertises SWI chunk 0 is the leading explanation for the boot hang.
+
+So the visible defect was three steps downstream of the fault, and the driver's own
+diagnosis was correct and invisible.
+
+#### What this retires
+
+- **The D8–D15 question.** The dead line is `BD[3]`, in the low byte. That is why *both*
+  bus widths failed; a dead upper byte would have left the 8-bit probe passing.
+- **`*EXTest` as a hardware signal.** It never reaches the chip, because the driver has
+  already given up.
+- **"The hardware reads sound at every level that can be read."** True, and it never
+  exercised buffer memory. Reads through the podule ROM are clean — 32616 bytes carry
+  `BD[3]` clear in 23.1% of them, the module title renders as `EtherX` rather than
+  `M|hmzX`, and the code executes.
+
+#### Where the reasoning went wrong, three times
+
+**The ROM/register asymmetry is the trap.** Podule ROM cycles are slower than register
+cycles, so a high-resistance contact settles for one and not the other. The ROM reading
+perfectly while the register window read bit 3 set in 29 of 29 bytes looked like proof of
+a failed part, and produced two conclusions that had to be withdrawn: first that the write
+path specifically was broken, then that the fault had to be on the card because the
+machine drives an identical bus cycle for both windows.
+
+**A malloc failure was proposed first and was never what happened.** The location field is
+stored before its null check, so a failed allocation would land there — real in the code,
+not the cause here.
+
+**Two experiments could not have distinguished anything.** Comparing the register block
+across `*RMReInit` is worthless, because a second init writes the same values and leaves
+the same state whether the writes land or not. And checking `PAR0`–`PAR5` against the
+known MAC proves nothing, because the driver bails long before it programs the station
+address.
+
+**What broke the deadlock was the physical history, not more measurement.** A new card
+developing a stuck data line is unlikely; a fault appearing after the VRAM board, the
+retainer and the podule's fixing screw all came out is not. That the symptom moved when
+VRAM was refitted was the strongest single clue and sat unused for hours.
+
+#### Durable
+
+- **`BD[3]` in a register dump is a five-second test for podule seating.** One
+  `*Memory 302B800 +64`; every byte carrying bit 3 means the card is not making contact.
+  Far sharper than waiting to see whether networking comes up.
+- **BASIC cannot touch I/O space in either direction** — a read aborts on privilege.
+  `*Memory` reads it and `*MemoryA [B] <addr> <data>` writes it, both in SVC. `*MemoryA`
+  reports the value read back after writing, which is how the OR mask was spotted.
+- **The card's driver state is unreachable by pointer chase.** The unit array is at a
+  relocated literal plus a static base taken from the module's private word, and that word
+  sits in kernel workspace user mode cannot read. Scanning the RMA for the EUI48 finds the
+  unit with no offsets at all.
+- The podule ROM chunks are now in the repo at `roms/podule/etherx/`, with the module map
+  and the full analysis in `docs/investigations/etherx-detect-fails-and-registration-bails.md`.
