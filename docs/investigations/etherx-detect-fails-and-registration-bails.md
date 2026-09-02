@@ -21,15 +21,22 @@ leaving a unit in the array that carries a real MAC and nothing else.
 Bit 1 on `CR` is `STA`, which the chip holds set once started, and it clears normally on
 `MAR0` — so only one line is faulty.
 
-**The fault is direction-dependent, and that localises it.** A bidirectional wire has a
-driver and a receiver at each end; a read uses the card's driver and the machine's
-receiver, a write uses the machine's driver and the card's receiver. Those sets are
-disjoint, so a fault that spares reads cannot be in anything the two directions share —
-not the connector contact, the track or the solder joint. The podule ROM confirms the
-shared path is sound: 32616 bytes read off this card have `D3` clear in 23.1% of them,
-against 100% in the register window. What remains is the machine's output driver or the
-card's input stage. Podule buses are pulled up, so "stuck high" is also what a driver
-that has stopped driving looks like.
+**Reads through the register window are stuck high too, so the fault is not
+directional.** Page 1 registers `PAR0`-`PAR5`, `CURR`, `MAR0` and `MAR1` read
+`9C FB 9F ED 9C FB 59 08 1F` — nine values, every one with bit 3 set, on registers the
+driver never programmed because it gave up at detect. With the twenty page-0 bytes that
+is 29 of 29.
+
+**That places the fault on the card.** The machine drives the same bus cycle for the
+register window and the ROM window, so nothing on the motherboard can corrupt reads from
+one and not the other. The ROM comes back clean — 32616 bytes off this card carry `D3`
+clear in 23.1% of them — which puts the ROM on the far side of whatever is broken. One
+stuck node on the card's local `D3`, between its bus buffer and the AX88796 or at the
+chip's pin itself, accounts for the corrupted reads and the corrupted writes together.
+
+A consequence worth stating: because reads are corrupted as well, **nothing measured here
+distinguishes a write that arrives wrong from a read that reports wrong**. The OR mask is
+what the CPU observes, not necessarily what reaches the chip.
 
 **Which gate fails is not the one it first appears.** Bit 3 is `RD0`, and gate 1 masks the
 `CR` readback with `&27` — which does not include bit 3. So `CR` reads back `&29`, masks
@@ -171,11 +178,11 @@ below the hit.
 
 ## Open
 
-- **Whether the stuck line is the machine's driver or the card's input.** A scope on `D1`
-  at the podule connector during a write settles it: never pulled low means the
-  motherboard, pulled low but latched high means the card. With a meter and the power off,
-  resistance from `D3` to Vcc at the AX88796 against `D0`, `D2` and `D4` is the cheaper
-  first pass.
+- **Where on the card `D3` is held high.** With the power off and the card out,
+  resistance from `D3` to Vcc at the AX88796 against `D0`, `D2` and `D4` is the cheap
+  first pass; a shorted input clamp reads far lower than its neighbours. A scope on `D3`
+  at the podule connector during a register read says whether the line is held high at the
+  connector or only past the card's buffer.
 - **Whether `ne2000_detect` ran at all.** `0` is also the "not yet probed" sentinel that
   `&3F28` tests, so a detect that never ran and one that ran and failed are
   indistinguishable from the stored value. A stuck `D3` makes the memory test fail
