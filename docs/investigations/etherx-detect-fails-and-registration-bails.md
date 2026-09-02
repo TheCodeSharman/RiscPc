@@ -5,6 +5,40 @@ cosmetic fallout. The driver's `ne2000_detect` fails, its configuration takes an
 path that reports nothing, and registration stops part-way through building the unit —
 leaving a unit in the array that carries a real MAC and nothing else.
 
+**The cause is `D3` stuck high on the write path.** Reads are unaffected. Measured with
+`*MemoryA`, which runs in SVC and so reaches I/O space that BASIC cannot:
+
+| register | before | written | read back |
+|---|---|---|---|
+| `CR` `&302B800` | `&2A` | `&21` | `&2B` |
+| `CR` | `&2B` | `&00` | `&0A` |
+| `CR` | `&0A` | `&30` | `&3A` |
+| `CR` | `&3A` | `&40` | `&4A` |
+| `MAR0` `&302B820` (page 1) | `&08` | `&00` | `&08` |
+| `MAR0` | `&08` | `&FF` | `&FF` |
+
+`MAR0` is plain storage with no side effects, and it isolates the mask to **bit 3 alone**.
+Bit 1 on `CR` is `STA`, which the chip holds set once started, and it clears normally on
+`MAR0` — so only one line is faulty.
+
+**The fault is direction-dependent, and that localises it.** A bidirectional wire has a
+driver and a receiver at each end; a read uses the card's driver and the machine's
+receiver, a write uses the machine's driver and the card's receiver. Those sets are
+disjoint, so a fault that spares reads cannot be in anything the two directions share —
+not the connector contact, the track or the solder joint. The podule ROM confirms the
+shared path is sound: 32616 bytes read off this card have `D3` clear in 23.1% of them,
+against 100% in the register window. What remains is the machine's output driver or the
+card's input stage. Podule buses are pulled up, so "stuck high" is also what a driver
+that has stopped driving looks like.
+
+**Which gate fails is not the one it first appears.** Bit 3 is `RD0`, and gate 1 masks the
+`CR` readback with `&27` — which does not include bit 3. So `CR` reads back `&29`, masks
+to `&21`, and gate 1 **passes**. Gate 3 is what fails: `ne2000_detect` writes 32 bytes
+into buffer memory at `&2000` and reads them back, every written byte has bit 3 forced
+high, and the comparison fails. **Both widths fail because `D3` is in the low byte**,
+which 8-bit and 16-bit transfers use alike — so a result of `0` says nothing about
+`D8-D15`, and never did.
+
 All addresses are offsets into the 32616-byte EtherX chunk in
 `roms/podule/etherx/`, which is how `arm-none-eabi-objdump -D -b binary -m arm` reads it.
 
@@ -137,10 +171,15 @@ below the hit.
 
 ## Open
 
-- **Which of the three gates fails**, which is what the replay above answers.
+- **Whether the stuck line is the machine's driver or the card's input.** A scope on `D1`
+  at the podule connector during a write settles it: never pulled low means the
+  motherboard, pulled low but latched high means the card. With a meter and the power off,
+  resistance from `D3` to Vcc at the AX88796 against `D0`, `D2` and `D4` is the cheaper
+  first pass.
 - **Whether `ne2000_detect` ran at all.** `0` is also the "not yet probed" sentinel that
   `&3F28` tests, so a detect that never ran and one that ran and failed are
-  indistinguishable from the stored value.
+  indistinguishable from the stored value. A stuck `D3` makes the memory test fail
+  whenever it does run.
 - **What sets `softc+64`.** No instruction in the module stores to it, and `&42` is a
   plausible `IFF_BROADCAST | IFF_RUNNING`, which would make the `tst #2` at `&B78` mean
   something other than a driver-private flag.
