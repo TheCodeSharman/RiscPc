@@ -114,4 +114,10 @@ The failure path then always returns success. Both guards on the way out —
 constant, so Z can never be set, the `BEQ` is never taken, and the `MOV r0, #0` return at
 `&BBC` is unreachable. Registration continues with a null location pointer either way.
 
-Reading `softc+64` bit 1 on a live unit is what separates the two.
+On this machine it is the **first** route, and the cause is upstream of both: the unit
+reads `softc+64` = `&42` so bit 1 is set, `softc+&168` — `ne2000_detect`'s stored result —
+is `0`, and result `0` is dispatched to an error return carrying the string
+`"where did the card go?"` at `&4208`. `malloc` is never called.
+
+`docs/investigations/etherx-detect-fails-and-registration-bails.md` has the measurement,
+the three gates inside `ne2000_detect`, and the register addresses for replaying it.
