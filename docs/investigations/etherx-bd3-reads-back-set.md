@@ -19,11 +19,14 @@ machine.
 **The fault is a solder joint on the card's `74HC245`, on one row of the package.** Probing those pins clears the fault; reflowing the package
 fixes it.
 
-**Inspection is inconclusive.** There is no visible damage and no cracking under
-magnification — the solder is sparse but not obviously defective. That does not refute a
+**Inspection found no visible defect** — no damage, no cracking. That does not refute a
 bad joint, since poor wetting to a pad or a crack beneath a fillet does not show from
-above, but it is not confirmation either. The diagnosis rests on behaviour: the fault was
-pressure-sensitive, probing those pins cleared it, and a reflow has held.
+above, but there is no visual evidence either way and none should be read into the
+appearance of a fine-pitch package.
+
+The diagnosis rests on behaviour, and on one observation in particular: **a sharp probe on
+a pin is a targeted mechanical load on that joint**, and probing these pins is what cleared
+a fault that pressing the card had only ever toggled at random. A reflow has held since.
 
 A bridge or contamination on a pin, dislodged by the same probing, was considered and does
 not fit. Flexing the card changes the geometry of a joint; it does not dislodge debris. A

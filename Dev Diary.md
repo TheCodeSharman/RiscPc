@@ -2962,12 +2962,12 @@ where the symptom surfaced. The fault is a solder joint on the *card's* `74HC245
 package, one branch inside the card. Probing those pins clears the fault; reflowing the
 package fixes it.
 
-**Inspection was inconclusive, and the case rests on behaviour.** Under magnification there
-is no visible damage and no cracking — the solder is sparse but not obviously defective.
-That does not refute a bad joint, since poor wetting to a pad or a crack beneath a fillet
-is not visible from above, but it is not confirmation either. What carries the diagnosis is
-that the fault was pressure-sensitive, that probing those pins cleared it, and that a
-reflow has held. **Both rows were reflowed**, so which row mattered can no longer be
+**Inspection found no visible defect, and the case rests on behaviour.** No damage, no
+cracking. That does not refute a bad joint — poor wetting to a pad or a crack beneath a
+fillet does not show from above — but there is no visual evidence either way, and none
+should be read into the appearance of a fine-pitch package. What carries the diagnosis is
+that a sharp probe on a pin is a targeted mechanical load on that joint, and probing these
+pins cleared a fault that pressing the card had only ever toggled at random. **Both rows were reflowed**, so which row mattered can no longer be
 established. `*EXTest` now
 passes, which is the NE2000 buffer-memory pattern test and precisely what was failing.
 
