@@ -2786,7 +2786,12 @@ clip later and seeing whether the fault returns settles it whenever it is worth 
   pin-37 wire was suspected cracked once already. Both produce bus garbage, which is what
   the VRAM fault also produces. A recurrence is not automatically the VRAM socket.
 
-### Sep 3 — RESOLVED: the EtherX failure is one podule contact, BD[3]
+### Sep 3 — the EtherX failure is one podule contact, BD[3] — WITHDRAWN
+
+**The conclusion below is withdrawn.** A verified bodge around the `a1` contact makes no
+measurable difference and pressure still clears the bit with it fitted, so the contact at
+`a1` is excluded. The entry is kept for the measurements in it, which stand. See the
+entry that follows.
 
 The network card stopped working four days after months of good service — sustained
 transfers, pings, days of ModeServ, PackMan downloads. `!Boot` hangs loading the Internet
@@ -2875,3 +2880,76 @@ VRAM was refitted was the strongest single clue and sat unused for hours.
   unit with no offsets at all.
 - The podule ROM chunks are now in the repo at `roms/podule/etherx/`, with the module map
   and the full analysis in `docs/investigations/etherx-detect-fails-and-registration-bails.md`.
+
+### Sep 3 (later) — the contact at `a1` is not the fault, and 100K is not a pull-up
+
+The entry above concluded a bad contact on `Bd<3>` at `SK4 a1`, on the strength of
+pressure clearing the bit. That conclusion is withdrawn.
+
+**A bodge around the contact changes nothing.** A wire from the card's `a1` to `RP7`
+pin 11, continuity verified with the card out, makes no measurable difference to the
+fault — and pressure still clears the bit with it fitted. A parallel path around a bad
+contact would fix a bad contact. `a1` is excluded.
+
+**The pull-ups on this bus are not uniform, and they are far too weak to matter at bus
+speed.** `RP7` is a bussed 100K pack, common on pin 16 to +5V, covering fourteen of the
+sixteen data lines. `Bd<1>` and `Bd<7>` are not in it — they get discrete 4K7 resistors,
+`R62` and `R147`, landing on `SK4 a3` and `a4`. So exactly two pins on the connector read
+4K7 and that is by design, and two element pins of `RP7` read 200k to each other because
+every path between them goes through the common.
+
+**With no card fitted the register window reads `00820082`** — bits 1 and 7, exactly and
+only the two 4K7 lines. Every line on `RP7` reads 0. 100K into the bus capacitance never
+reaches a valid high inside a cycle; 4K7 just does. Two things follow, and the second
+overturns the reasoning in the entry above:
+
+- the bus behaves as sample-and-hold between drives, and `00820082` is the reference for
+  "nothing is driving it"
+- **an undriven `RP7` line reads 0, not 1.** A data bit stuck at 1 is not the signature of
+  an open circuit or a missing driver, which is what the contact theory required
+
+**`Bd<0..15>` reach the IOMD with nothing in between.** Sheet 1/7 brings them straight out
+of `IC13` on pins 56-67 and 72-75 — `Bd<3>` is pin 59 — and the "Buffered Data Bus" label
+means buffered inside the IOMD, not by an external part. The `74ACT573`s on sheet 4/7 are
+for `Bd<16..31>` only. So both the ROM window and the register window arrive over the same
+copper into the same pin, and nothing static on the motherboard can be selective between
+them.
+
+**`Bd<3>` has less noise margin than its neighbours, and nothing explains why.** 15 cm of
+wire soldered onto it holds it permanently high and produces data aborts. The same wire,
+same routing, on `Bd<2>` does nothing at all. Both measure 100k to +5V and sub-ohm through
+the connector.
+
+**The timing explanation in the entry above was never measured.** That podule ROM cycles
+are slower than register cycles is plausible and is the obvious candidate for the window
+split, but no capture has compared the two and nothing has been read out of the IOMD
+Functional Specification. It is an open question, not a finding.
+
+Also eliminated: `RP7` and its joints (pin 11 to 16 measures 100k, and a *missing*
+pull-up would make the line read 0, which is the good value); a lifted card ground
+(pressure works through insulating tape and a bamboo probe, `SK4` has six 0V pins, and the
+4K7 lines needing twenty times the sink current are driven low correctly while the 100K
+line fails); a low-resistance path to +5V (100k card in and card out); and pressure
+resetting the card (`CR` reads `0x22` when good, `STA` set and running, where the DP8390
+resets `CR` to `0x21` with `STP` set).
+
+The card is not permanently damaged — it has come up fully working, `ex0` up with the
+EUI48 read correctly, packets sent and all three protocol clients registered.
+
+#### Durable
+
+- **Do not bodge a `Bd` line with a flying wire.** 15 cm is enough to hold one permanently
+  high with no bridge and no connectivity change. Any bodge needs its return running
+  alongside it, twisted with a ground from `SK4` row `b`; any scope tap needs a series
+  isolation resistor and the fault state confirmed unchanged after fitting it.
+- **Direction decides which side to probe.** On a write the IOMD drives, so the card side
+  shows a fault; on a read the card drives, so the motherboard side does. Probing the wrong
+  side for the direction of traffic gives a clean trace on a broken line.
+- **`FF` is a useless test value** — bit 3 is already set in it. Use `F7`, and write it to
+  `&302B820` (`MAR0`, plain storage) rather than `&302B800` (`CR`, which page-switches).
+- **Do not replace `SK4`.** `a1`'s contact is excluded by measurement, and desoldering 48
+  through-hole pins from a board with corroded vias risks turning one bad line into
+  several.
+- The bus, the pinout and the acceptance-test resistance map are in
+  `docs/investigations/riscpc-bd-bus-and-the-network-slot.md`; the fault and its
+  eliminations in `docs/investigations/etherx-bd3-reads-back-set.md`.
