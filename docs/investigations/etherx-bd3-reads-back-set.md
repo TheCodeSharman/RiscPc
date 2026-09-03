@@ -41,10 +41,24 @@ Both sides account for one symptom each:
 | **input** side, resistive | the input cannot track the internal node inside a short cycle, so the transceiver emits a stale, indeterminate level — high. Register reads fail; ROM reads settle in time and pass |
 | **output** side, resistive | weak drive onto the bus, so 15 cm of added wire capacitance blows the settling where a healthy channel shrugs it off — the `Bd<2>` asymmetry |
 
-**The model's one soft spot: it requires the ROM and register windows to differ in cycle
-length.** That was asserted repeatedly during the hunt and **never measured** — nothing was
-read out of the IOMD Functional Specification and no capture compared the two. It is
-load-bearing here, so it is worth measuring before this page is treated as settled.
+**The model's one soft spot: it requires the two windows to differ in how long valid data
+is present at the node.** Cycle length is the obvious candidate — podule ROM space being
+slower than the network register space was asserted repeatedly during the hunt and **never
+measured**, with nothing read out of the IOMD Functional Specification and no capture
+comparing the two.
+
+Driver behaviour is a second contributor. The flash and the AX88796 drive that node in
+different windows, and a weaker driver takes longer to slew it against the node's own
+capacitance. Drive *strength* alone is not sufficient, though: the transceiver's input
+draws no steady current, so how fast it reaches a valid level is set by the series
+resistance of the joint, not by the driver — a difference of tens of ohms between two
+outputs is nothing against a joint in the kilohms, and a joint small enough for it to
+matter would not be causing a fault.
+
+So the operative variable is the **valid-data window at the node**, which folds cycle
+length, driver strength and the flash's 70 ns access time together. One capture settles it:
+the node against `Ior*` for a ROM read and for a register read, comparing how long each
+holds valid. That is the measurement this page still wants.
 
 ### The line is driven high on `Ior*`, never held high
 
