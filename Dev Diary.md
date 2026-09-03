@@ -2993,4 +2993,14 @@ a fingertip walk or freeze spray as the *locator*.
   fixed it was indicated by evidence. On a board with corroded vias that ratio is worth
   remembering.
 - Verified over two cold boots plus a `*Memory` loop while flexing the card. Not ten, so
-  if it returns the count was never established.
+  if it returns the count was never established. End to end since: the cable is in and
+  `ping google.com` works, so DMA, interrupts and the whole stack are exercised, not just
+  a hand-run test.
+- **The VRAM was a red herring for this fault.** The withdrawn entry calls the symptom
+  moving when VRAM was refitted "the strongest single clue"; it was not a clue at all. The
+  retainer is now out and the card is unaffected. The reasoning that produced it — a new
+  card developing a stuck data line is unlikely, a fault appearing right after the VRAM
+  board, the retainer and the fixing screw all came out is not — is the sort of plausible
+  causal story that reads as evidence and is not. It pointed at the connector and cost the
+  day. The VRAM socket's own marginal contacts are a real and separate fault, documented
+  in the earlier entries; they have nothing to do with `Bd<3>`.
