@@ -153,6 +153,7 @@ ROM reads pass through channel 5 at all.
 | 4K7 at `a3`/`a4` being anomalous | `R62` and `R147`, by design |
 | permanent damage to the card | it has come up fully working |
 | pressure resetting the card | `CR` reads `0x22` when good — `STP` clear, `STA` set, running. The DP8390 resets `CR` to `0x21` with `STP` set, so this is not a reset value |
+| the VRAM board or its socket | the fault returned and persisted with the VRAM card **removed**. The premise — marginal VRAM contacts corrupting the module as the kernel copies it into high memory — is refuted. The VRAM socket's own contacts are a real and separate fault |
 | an open circuit as the mechanism | on this bus an undriven `RP7` line reads **0**. A stuck **1** is not what an open produces |
 
 ## Established, and unexplained

@@ -2737,7 +2737,11 @@ The Ai summary is moistly us goung around in circles, the conclusion is the foll
       - When there is less corruption, something is causing the machine to hang responding to network activity. Cursor stops flashing udrin g IO - this is the least understood but plausible because a bad ROM module can corrupt anything,
       - Pressing down hard on the VRAM board clears the error, so a permanent fix is to print a 3d printed clip that screws on to prevent the board wiggling free. 
 
-### Aug 28 — the VRAM clip is fitted, and the 100 %-reproducible fault has stopped
+### Aug 28 — the VRAM clip is fitted, and the 100 %-reproducible fault has stopped — SUPERSEDED
+
+**The premise is refuted and the retainer is off.** See the Sep 3 (end) entry. The
+measurements here stand, and this entry's own cautions about clean runs turned out to be
+the right ones.
 
 The printed retainer from `mechanical/` is **on the machine**, and so far **no failures on
 boot**. The design, its measurements and the whole reasoning chain are in
@@ -3018,3 +3022,48 @@ a fingertip walk or freeze spray as the *locator*.
   causal story that reads as evidence and is not. It pointed at the connector and cost the
   day. The VRAM socket's own marginal contacts are a real and separate fault, documented
   in the earlier entries; they have nothing to do with `Bd<3>`.
+
+### Sep 3 (end) — the VRAM retainer is off, and its premise is refuted
+
+The printed retainer is removed. It was cumbersome, and the reasoning that justified it
+does not survive: the premise was that marginal VRAM contacts corrupted the network card's
+module as the kernel copied it into high memory, making the boot failure really a VRAM
+fault. **The garbage came back with the VRAM card out**, which refutes that directly.
+
+So the Aug 23 summary's "the bad contacts in the VRAM socket were the fault all along" is
+withdrawn as an account of the network-card failure, and Aug 28's clean-boot run is
+explained by the fault being quiet rather than by the clip. **Aug 28's own caution was
+right** — it said a long clean run is weakly positive and stays confounded until the clip
+comes off, and that a recurrence is not automatically the VRAM socket. Both held.
+
+**The VRAM socket's marginal contacts remain a real and separate fault.** `VRAMtestA`'s
+March-U failures and the bent contacts are measured and are not retired by any of this.
+What is withdrawn is the link to the network card.
+
+**Nearly every attribution made across this fault was chance.** It is an intermittent that
+stays stable for long stretches, so whatever was done last collected the credit: the VRAM
+clip, a reflow of `SK4 a1`, a reflow of `RP7`, reflowing all 48 socket pins, refitting the
+VRAM board. None of them survived contact with a control, and several were followed by a
+clean run long enough to be convincing.
+
+**One physical mechanism might connect the VRAM work to the network card, and it is
+speculation.** Getting at the VRAM board means handling the machine right beside the
+network slot, so every VRAM intervention was also an unrecorded disturbance of the card.
+That would explain why VRAM work kept correlating with the fault changing state without the
+VRAM being involved at all — and it is exactly the shape of the thing that did eventually
+fix it, which was a probe tip on the card's transceiver pins.
+
+#### Durable
+
+- **An intermittent fault attributes itself to whatever you did last.** The only defence is
+  a control: does it clear on its own, given the same time and no intervention? That control
+  went unrun here for weeks and is what finally distinguished a real effect from a quiet
+  spell.
+- **Count boots, do not judge runs.** The fault was per-boot, so boot count is the unit, and
+  "it has been fine all evening" is not a measurement.
+- **A fix that cannot be undone cannot be tested.** The clip stayed on for days partly
+  because taking it off was the only way to test it and nobody wanted to. Prefer an
+  intervention you can reverse in a minute.
+- **Working near one subsystem disturbs its neighbours**, and the disturbance goes
+  unrecorded because it was not the point of the visit. When two faults keep correlating,
+  ask what physical access they share.
