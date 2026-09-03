@@ -35,7 +35,15 @@ The mechanism is why it never looked like a connection fault from the outside. T
 is a buffer, and a break on its **input** side does not leave anything floating on the
 bus — the buffer stays enabled and drives hard. It simply has nothing sensible on its
 input, and a floating CMOS input with no pull-down sits high. So the buffer transmits a 1
-it invented, and the scope sees a genuinely driven high inside the read window.
+it invented.
+
+**The line is never *held* high. It is driven high exactly as `Ior*` goes low**, and that
+timing is what identifies the mechanism. The `'245`'s output enable follows the read cycle,
+so it drives only during the read — and what it drives is its floating input. Anything
+static, a pull-up or a short or a stuck output, would be present between cycles and would
+take no notice of the strobe. Scoping `Bd<3>` against `Ior*` is therefore the measurement
+that separates "something is on this line" from "the buffer is faithfully reporting
+nonsense", and no register read can make that distinction.
 
 ```
 READ direction - the card drives:

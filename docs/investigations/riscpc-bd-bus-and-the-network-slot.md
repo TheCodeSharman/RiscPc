@@ -94,8 +94,8 @@ A **healthy** line takes 15 cm of flying wire without noticing. That is measured
 `Bd<2>`, and on `Bd<3>` once its fault was repaired.
 
 A line that is **not being properly driven** does not. On a faulty `Bd<3>`, 15 cm of wire —
-both ends on the same net, no bridge and no connectivity change — was enough to hold it
-permanently high and produce data aborts. The mechanism is the one above: between drives
+both ends on the same net, no bridge and no connectivity change — was enough to make every
+read of it return 1, and to produce data aborts. The mechanism is the one above: between drives
 the node is held only by 100K and cannot defend itself against the wire's capacitance and
 coupling.
 
