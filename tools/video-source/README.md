@@ -66,6 +66,7 @@ PING                      OK ModeServ 1
 MODE X320 Y256 C256 F50   OK <mode>, read back from the hardware
 MODES                     one line per mode this monitor definition allows
 PATTERN [CARD|PM5544]     OK, once drawn
+SYNC [0|1|3]              OK SYNC <n> <mode>; 0 separate, 1 composite, 3 auto
 QUIT                      OK, then the server stops
 ```
 
@@ -76,6 +77,12 @@ command that errors replies `FAIL` and the server keeps listening.
 `MODE` replies with what the hardware ended up in, never with the request. A
 monitor definition that cannot do what was asked would otherwise look, from the
 far end, exactly like a fault in the thing being tested.
+
+`SYNC` is **not** a mode-file setting. A monitor definition carries sync polarity
+per mode and nothing else; composite versus separate is one CMOS value for the
+machine (`*Configure Sync`, read back with `OS_ReadSysInfo 1`). The kernel reads
+it while programming VIDC20's external register, so `SYNC` re-applies the mode to
+make the change reach the wire -- no reboot.
 
 Needs the Internet module.
 

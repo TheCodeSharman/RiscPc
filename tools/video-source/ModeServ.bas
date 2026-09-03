@@ -12,6 +12,7 @@
   115 REM                             draws PM5544, so the reply means there is a picture
   120 REM   MODES                     one line per mode this monitor definition allows
   130 REM   PATTERN [CARD|PM5544]     OK, once drawn
+  135 REM   SYNC [0|1|3]              OK SYNC <n> <mode>; 0 separate, 1 composite, 3 auto
   140 REM   QUIT                      OK, then the server stops
   150 REM
   155 REM Any command that errors replies FAIL and the server keeps listening.
@@ -139,6 +140,7 @@
  1330 WHEN "PATTERN":PROCdrawcard(c%,FNupper(FNword(cmd$,2)))
  1340 WHEN "MODES":PROCmodes(c%)
  1350 WHEN "MODE":PROCsetmode(c%,cmd$)
+ 1355 WHEN "SYNC":PROCsync(c%,cmd$)
  1360 WHEN "":PROCsend(c%,"FAIL empty command")
  1370 OTHERWISE:PROCsend(c%,"FAIL unknown command "+w$)
  1380 ENDCASE
@@ -168,7 +170,39 @@
  1600 ENDWHILE
  1610 =MID$(s$,i%)
  1620 :
- 1830 DEF FNcolours(d%)
+ 1630 REM SYNC reports the configured sync type; SYNC <n> sets it.
+ 1636 REM
+ 1642 REM   0  separate -- HSYNC and VSYNC carry their own pulses
+ 1648 REM   1  composite -- VIDC20 puts NOR(H,V) on the HSYNC pin and XNOR(H,V)
+ 1654 REM      on the VSYNC pin, both inverted (VIDC20 data sheet 4.1.24, 11.3)
+ 1660 REM   3  auto, from the monitor lead
+ 1666 REM
+ 1672 REM NOT A MODE FILE FIELD. A monitor definition carries sync POLARITY per
+ 1678 REM mode and nothing else; the type is one CMOS value for the machine, so
+ 1684 REM it is set here rather than by choosing a mode.
+ 1690 REM
+ 1696 REM The mode is re-applied because the kernel reads this while it programs
+ 1702 REM VIDC20's external register, so nothing changes on the wire until the
+ 1708 REM next mode set. Reboot is not needed.
+ 1714 DEF PROCsync(c%,cmd$)
+ 1720 LOCAL a$,n%,s%,m$
+ 1726 a$=FNrest(cmd$)
+ 1732 IF a$<>"" THEN PROCsetsync(c%,VAL(a$)):IF badsync% THEN ENDPROC
+ 1738 SYS "OS_ReadSysInfo",1 TO ,,s%
+ 1744 PROCsend(c%,"OK SYNC "+STR$s%+" "+FNachieved)
+ 1750 ENDPROC
+ 1756 :
+ 1762 DEF PROCsetsync(c%,n%)
+ 1768 LOCAL m$
+ 1774 badsync%=FALSE
+ 1780 IF n%<>0 AND n%<>1 AND n%<>3 THEN badsync%=TRUE:PROCsend(c%,"FAIL sync is 0 separate, 1 composite or 3 auto"):ENDPROC
+ 1786 OSCLI("Configure Sync "+STR$n%)
+ 1792 m$=FNachieved
+ 1798 MODE m$
+ 1804 IF haslib% THEN PROCpaint("PM5544")
+ 1810 ENDPROC
+ 1816 :
+ 1822 DEF FNcolours(d%)
  1840 CASE d% OF
  1850 WHEN 0:="C2"
  1860 WHEN 1:="C4"
