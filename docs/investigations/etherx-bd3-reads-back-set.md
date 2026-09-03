@@ -21,6 +21,17 @@ buffer's input side.** Under magnification the fillets on that row are visibly t
 against the other row. Probing those pins clears the fault; reflowing the package fixes
 it.
 
+A bridge or contamination on a pin, dislodged by the same probing, was considered and does
+not fit. Flexing the card changes the geometry of a joint; it does not dislodge debris. A
+bridge between two adjacent pins ties two internal bus bits and corrupts a byte's worth of
+behaviour rather than one bit — for the buffer's input to be held high a bridge would have
+to reach a rail, and pin 15's neighbours are 14 and 16, not `VCC` (20) or `GND` (10). And a
+capacitive load slows an edge rather than holding a level, where the scope showed a clean
+driven high. The thin fillets are physical evidence for the joint and none for a bridge.
+
+Probing applied force *and* scraped, so the two cannot be fully separated after the fact.
+The reflow makes it moot for the repair.
+
 The mechanism is why it never looked like a connection fault from the outside. The `'245`
 is a buffer, and a break on its **input** side does not leave anything floating on the
 bus — the buffer stays enabled and drives hard. It simply has nothing sensible on its
