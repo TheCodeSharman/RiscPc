@@ -106,10 +106,13 @@ Two rules follow:
   point, and the fault state must be confirmed unchanged *after* fitting the tap and
   before trusting anything measured through it
 
-The asymmetry between lines is real and unexplained: the same 15 cm wire, same routing,
-on `Bd<2>` has no effect whatever. Whatever costs `Bd<3>` that margin has no DC
-signature — it measures 100k to +5V and sub-ohm through the connector like its
-neighbours.
+The asymmetry between lines is real: the same 15 cm wire, same routing, on `Bd<2>` has no
+effect whatever, and neither line shows any DC difference — both measure 100k to +5V and
+sub-ohm through the connector. In the one case traced to a cause, the line that could not
+tolerate the wire had a starved solder joint on the buffer driving it, which is consistent
+with series resistance turning added wire capacitance into a settling failure. So
+**wire intolerance on one line where its neighbours are unbothered is worth treating as a
+symptom**, not just as a bad probing technique.
 
 ## `SK4` pinout
 

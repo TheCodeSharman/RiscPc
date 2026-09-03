@@ -9,6 +9,45 @@ The electrical background is in `riscpc-bd-bus-and-the-network-slot.md`. Read it
 the pull-up map and the `00820082` idle reading change what several of the readings below
 mean.
 
+## Resolved: a starved joint on the buffer's input side
+
+**The fault is a solder joint on the card's `74HC245`, on the pins 11-20 row — the
+buffer's input side.** Under magnification the fillets on that row are visibly thin
+against the other row. Probing those pins clears the fault; reflowing the package fixes
+it.
+
+The mechanism is why it never looked like a connection fault from the outside. The `'245`
+is a buffer, and a break on its **input** side does not leave anything floating on the
+bus — the buffer stays enabled and drives hard. It simply has nothing sensible on its
+input, and a floating CMOS input with no pull-down sits high. So the buffer transmits a 1
+it invented, and the scope sees a genuinely driven high inside the read window.
+
+```
+READ direction - the card drives:
+
+AX88796 D3 ── internal node ── '245 pin 15 ══> pin 6 ── SK4 a1 ── IOMD pin 59
+                                 (input)      (output)
+                    ▲                                      ▲
+        break HERE: input floats,                 break HERE: bus floats,
+        buffer DRIVES the float out               held only by 100K
+        → reads 1, always                         → reads 0
+```
+
+That asymmetry is the whole thing, and it is what excludes the connector. **The socket is
+downstream of the buffer.** A bad contact there subtracts a signal; it cannot get in front
+of the buffer to fabricate one. Every reading below follows from it.
+
+Verified after reflow over two cold boots: the register window clean, `*EXTest` passing,
+and a `*Memory` loop stable while the card is flexed. `*EXTest` is the meaningful one - it
+runs the NE2000 buffer-memory pattern test, which is precisely what was failing.
+
+**The localisation came from probing the package, not from the reasoning.** A probe tip on
+a pin is a far better localiser than pressure on a corner: it is a few grams in one place
+rather than a bend across the whole card. Pressure never localised anything here - the
+most effective spot moved between sessions of trying - while one pass of probing found it.
+Reach for a tap test or a fingertip walk early, and treat "press the corner" as a fault
+detector rather than a locator.
+
 ## The symptom
 
 - **Register window corrupt.** Every byte from `&302B800` onward carries bit 3, across
@@ -75,17 +114,18 @@ motherboard can be selective between them.
 **The mechanical variable is real and is not at `a1`.** Pressure, corner leverage and
 wiggling all change the fault, through an insulator, and with the `a1` contact bypassed.
 
-## Open
+## Left open
 
-- **Where the mechanical variable lives**, now that `a1` is excluded.
-- **What costs `Bd<3>` its margin**, given no DC signature. Extra capacitance on the net is
-  the candidate that fits most of the evidence and is directly measurable — compare falling
-  edge rates on `Bd<3>` against `Bd<2>` in one capture, with matched taps.
-- **Why ROM reads survive.** A cycle-timing difference between the `Netrom*` and `Netcs*`
-  windows is the obvious candidate and is **unverified** — nothing has been read out of the
-  IOMD Functional Specification, and no capture has compared the two cycle lengths.
-- **Reconciling 0.8 Ω continuity with a bit that a fingertip flips.** Both are measurements
-  and no model accounts for both.
+- **Why ROM reads survive.** The resolution answers this without needing the cycle-timing
+  theory: during a ROM read the flash drives the internal node, so the buffer's input is
+  not floating and the starved joint does not matter. The claim that podule ROM cycles are
+  slower than register cycles was asserted repeatedly during the hunt and **was never
+  measured** — nothing was read out of the IOMD Functional Specification and no capture
+  compared the two. It is not needed and it is not established.
+- **Why `Bd<3>` tolerated 15 cm of bodge wire so much worse than `Bd<2>`.** Consistent with
+  the same joint adding series resistance to that channel, so that added wire capacitance
+  blows the settling time where a healthy channel shrugs it off. Which of the two rows
+  carried the thin solder would settle it, and that was not recorded before the reflow.
 
 ## Technique that works
 

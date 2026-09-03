@@ -2953,3 +2953,44 @@ EUI48 read correctly, packets sent and all three protocol clients registered.
 - The bus, the pinout and the acceptance-test resistance map are in
   `docs/investigations/riscpc-bd-bus-and-the-network-slot.md`; the fault and its
   eliminations in `docs/investigations/etherx-bd3-reads-back-set.md`.
+
+### Sep 3 (later still) — RESOLVED: a starved joint on the EtherX buffer's input side
+
+`Bd<3>` was a solder joint on the card's `74HC245`, on the pins 11-20 row — the buffer's
+input side. Under magnification the fillets on that row are visibly thin against the other
+row. Probing those pins clears the fault; reflowing the package fixes it. `*EXTest` now
+passes, which is the NE2000 buffer-memory pattern test and precisely what was failing.
+
+**A break on a buffer's input comes out as a hard-driven wrong level, and that is why this
+looked impossible from the outside.** The `'245` stays enabled and drives its output hard.
+It just has nothing sensible on its input, and a floating CMOS input with no pull-down
+sits high — so the buffer transmits a 1 it invented. The scope saw a genuinely driven high
+inside the read window, which no contact fault can produce.
+
+That single fact settles everything the day spent arguing about. **The socket is
+downstream of the buffer**: a bad contact there subtracts a signal, it cannot get in front
+of the buffer to fabricate one. A break downstream leaves the bus floating, and on this
+bus a floating line reads 0. ROM reads stayed clean because the flash drives that same
+internal node, so during a ROM read the buffer's input is not floating at all — no
+cycle-timing argument is needed, and the one asserted in the withdrawn entry was never
+measured.
+
+**The localisation came from probing the package, not from any of the reasoning.** A probe
+tip is a few grams in one place; pressing a corner bends the whole card. Pressure never
+localised anything — the most effective spot moved between attempts — while one pass of
+probing found it. Treat "press it and see" as a fault *detector* and reach for a tap test,
+a fingertip walk or freeze spray as the *locator*.
+
+#### Durable
+
+- **A buffer inverts the usual reasoning about breaks.** Upstream of one, a break gives a
+  hard-driven wrong level; downstream, a float. If a line is stuck at a level the bus
+  cannot produce on its own, look on the far side of whatever last drove it.
+- **Probing localises; pressing does not.** A moving "most effective pressure point" means
+  pressure has stopped telling you anything.
+- **Four soldering operations were done on hypotheses and all four were wasted** — `SK4 a1`,
+  `RP7`, all 48 socket pins, and a flying bodge that caused a regression. The one that
+  fixed it was indicated by evidence. On a board with corroded vias that ratio is worth
+  remembering.
+- Verified over two cold boots plus a `*Memory` loop while flexing the card. Not ten, so
+  if it returns the count was never established.
