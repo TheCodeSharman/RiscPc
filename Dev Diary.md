@@ -2959,8 +2959,16 @@ EUI48 read correctly, packets sent and all three protocol clients registered.
 **`Bd<3>` itself was never faulty.** The bus line, the `SK4 a1` contact and the motherboard
 net were all sound throughout and every measurement taken of them said so. `Bd<3>` is only
 where the symptom surfaced. The fault is a solder joint on the *card's* `74HC245`, on one row of the
-package, one branch inside the card. Under magnification the fillets on that row are visibly thin against the other
-row. Probing those pins clears the fault; reflowing the package fixes it. `*EXTest` now
+package, one branch inside the card. Probing those pins clears the fault; reflowing the
+package fixes it.
+
+**Inspection was inconclusive, and the case rests on behaviour.** Under magnification there
+is no visible damage and no cracking — the solder is sparse but not obviously defective.
+That does not refute a bad joint, since poor wetting to a pad or a crack beneath a fillet
+is not visible from above, but it is not confirmation either. What carries the diagnosis is
+that the fault was pressure-sensitive, that probing those pins cleared it, and that a
+reflow has held. **Both rows were reflowed**, so which row mattered can no longer be
+established. `*EXTest` now
 passes, which is the NE2000 buffer-memory pattern test and precisely what was failing.
 
 **A break on a buffer's input comes out as a hard-driven wrong level, and that is why this

@@ -16,9 +16,14 @@ net are sound, and every measurement taken of them says so. `Bd<3>` is where the
 surfaces, and naming the fault after it sends the next reader to the wrong end of the
 machine.
 
-**The fault is a solder joint on the card's `74HC245`, on one row of the package.** Under magnification the fillets on that row are visibly thin
-against the other row. Probing those pins clears the fault; reflowing the package fixes
-it.
+**The fault is a solder joint on the card's `74HC245`, on one row of the package.** Probing those pins clears the fault; reflowing the package
+fixes it.
+
+**Inspection is inconclusive.** There is no visible damage and no cracking under
+magnification — the solder is sparse but not obviously defective. That does not refute a
+bad joint, since poor wetting to a pad or a crack beneath a fillet does not show from
+above, but it is not confirmation either. The diagnosis rests on behaviour: the fault was
+pressure-sensitive, probing those pins cleared it, and a reflow has held.
 
 A bridge or contamination on a pin, dislodged by the same probing, was considered and does
 not fit. Flexing the card changes the geometry of a joint; it does not dislodge debris. A
@@ -26,7 +31,8 @@ bridge between two adjacent pins ties two internal bus bits and corrupts a byte'
 behaviour rather than one bit — for the buffer's input to be held high a bridge would have
 to reach a rail, and pin 15's neighbours are 14 and 16, not `VCC` (20) or `GND` (10). And a
 capacitive load slows an edge rather than holding a level, where the scope showed a clean
-driven high. The thin fillets are physical evidence for the joint and none for a bridge.
+driven high. Inspection contributes nothing either way — no visible defect, and none
+expected from contamination either.
 
 Probing applied force *and* scraped, so the two cannot be fully separated after the fact.
 The reflow makes it moot for the repair.
@@ -149,9 +155,10 @@ wiggling all change the fault, through an insulator, and with the `a1` contact b
   went away when the joint was disturbed, so it tracked the fault rather than the line.
   Consistent with the starved joint adding series resistance to that channel, so added wire
   capacitance blows the settling time where a healthy channel shrugs it off. **Which row of
-  the package carried the thin solder was not recorded**, and it would decide the
-  mechanism: a starved joint on the input side (pin 15) accounts for the stuck-high, one on
-  the output side (pin 6) accounts for the wire sensitivity, and nothing rules out both.
+  the package was at fault can no longer be established** — both were reflowed. It would
+  have decided the mechanism: a starved joint on the input side (pin 15) accounts for the
+  stuck-high, one on the output side (pin 6) accounts for the wire sensitivity, and nothing
+  rules out both.
 
 ## Technique that works
 
