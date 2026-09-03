@@ -16,8 +16,7 @@ net are sound, and every measurement taken of them says so. `Bd<3>` is where the
 surfaces, and naming the fault after it sends the next reader to the wrong end of the
 machine.
 
-**The fault is a solder joint on the card's `74HC245`, on the pins 11-20 row — the
-buffer's input side.** Under magnification the fillets on that row are visibly thin
+**The fault is a solder joint on the card's `74HC245`, on one row of the package.** Under magnification the fillets on that row are visibly thin
 against the other row. Probing those pins clears the fault; reflowing the package fixes
 it.
 
@@ -138,10 +137,13 @@ wiggling all change the fault, through an insulator, and with the `a1` contact b
   slower than register cycles was asserted repeatedly during the hunt and **was never
   measured** — nothing was read out of the IOMD Functional Specification and no capture
   compared the two. It is not needed and it is not established.
-- **Why `Bd<3>` tolerated 15 cm of bodge wire so much worse than `Bd<2>`.** Consistent with
-  the same joint adding series resistance to that channel, so that added wire capacitance
-  blows the settling time where a healthy channel shrugs it off. Which of the two rows
-  carried the thin solder would settle it, and that was not recorded before the reflow.
+- **Why `Bd<3>` tolerated 15 cm of bodge wire so much worse than `Bd<2>`.** The sensitivity
+  went away when the joint was disturbed, so it tracked the fault rather than the line.
+  Consistent with the starved joint adding series resistance to that channel, so added wire
+  capacitance blows the settling time where a healthy channel shrugs it off. **Which row of
+  the package carried the thin solder was not recorded**, and it would decide the
+  mechanism: a starved joint on the input side (pin 15) accounts for the stuck-high, one on
+  the output side (pin 6) accounts for the wire sensitivity, and nothing rules out both.
 
 ## Technique that works
 

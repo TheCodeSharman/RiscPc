@@ -88,22 +88,27 @@ So on this bus:
 - `00820082` is the reference for "nothing is driving the bus", and is worth taking
   before interpreting any other reading from that window
 
-## You cannot bodge a `Bd` line with a flying wire
+## Wire intolerance on one line is a symptom, not a property of the bus
 
-15 cm of wire soldered onto a `Bd` line that is not being actively driven is enough to
-hold it permanently high and to produce data aborts, with no bridge and no connectivity
-change — both ends of the wire on the same net. The same wire on a line that *is* driven
-from both ends has no effect at all.
+A **healthy** line takes 15 cm of flying wire without noticing. That is measured on
+`Bd<2>`, and on `Bd<3>` once its fault was repaired.
 
-The mechanism is the one above: between drives the node is held only by 100K and cannot
-defend itself against the wire's capacitance and coupling.
+A line that is **not being properly driven** does not. On a faulty `Bd<3>`, 15 cm of wire —
+both ends on the same net, no bridge and no connectivity change — was enough to hold it
+permanently high and produce data aborts. The mechanism is the one above: between drives
+the node is held only by 100K and cannot defend itself against the wire's capacitance and
+coupling.
 
-Two rules follow:
+The sensitivity tracked the fault and vanished with it. So the useful reading is
+diagnostic rather than prohibitive: **a `Bd` line that cannot tolerate a wire its
+neighbours shrug off is telling you something is wrong with it.**
 
-- any bodge on this bus needs its **return running alongside it** — twisted with a ground
-  wire from `SK4` row `b`, laid flat, and as short as will reach
-- a scope or probe tap needs a **series isolation resistor** (220R is ample) at the tap
-  point, and the fault state must be confirmed unchanged *after* fitting the tap and
+Two rules still worth following, because a fault is what you are usually bodging around:
+
+- keep a bodge's **return running alongside it** — twisted with a ground wire from `SK4`
+  row `b`, laid flat, and as short as will reach
+- a scope or probe tap wants a **series isolation resistor** (220R is ample) at the tap
+  point, and the fault state should be confirmed unchanged *after* fitting the tap and
   before trusting anything measured through it
 
 The asymmetry between lines is real: the same 15 cm wire, same routing, on `Bd<2>` has no

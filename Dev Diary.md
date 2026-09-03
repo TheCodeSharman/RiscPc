@@ -2958,8 +2958,8 @@ EUI48 read correctly, packets sent and all three protocol clients registered.
 
 **`Bd<3>` itself was never faulty.** The bus line, the `SK4 a1` contact and the motherboard
 net were all sound throughout and every measurement taken of them said so. `Bd<3>` is only
-where the symptom surfaced. The fault is a solder joint on the *card's* `74HC245`, on the
-pins 11-20 row — the buffer's input side, one branch inside the card. Under magnification the fillets on that row are visibly thin against the other
+where the symptom surfaced. The fault is a solder joint on the *card's* `74HC245`, on one row of the
+package, one branch inside the card. Under magnification the fillets on that row are visibly thin against the other
 row. Probing those pins clears the fault; reflowing the package fixes it. `*EXTest` now
 passes, which is the NE2000 buffer-memory pattern test and precisely what was failing.
 
