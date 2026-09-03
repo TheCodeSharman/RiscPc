@@ -11,6 +11,11 @@ mean.
 
 ## Resolved: a starved joint on the buffer's input side
 
+**`Bd<3>` is not the faulty thing.** The bus line, the `SK4 a1` contact and the motherboard
+net are sound, and every measurement taken of them says so. `Bd<3>` is where the symptom
+surfaces, and naming the fault after it sends the next reader to the wrong end of the
+machine.
+
 **The fault is a solder joint on the card's `74HC245`, on the pins 11-20 row — the
 buffer's input side.** Under magnification the fillets on that row are visibly thin
 against the other row. Probing those pins clears the fault; reflowing the package fixes
