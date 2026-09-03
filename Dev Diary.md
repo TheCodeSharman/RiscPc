@@ -2954,13 +2954,17 @@ EUI48 read correctly, packets sent and all three protocol clients registered.
   `docs/investigations/riscpc-bd-bus-and-the-network-slot.md`; the fault and its
   eliminations in `docs/investigations/etherx-bd3-reads-back-set.md`.
 
-### Sep 3 (later still) — RESOLVED: a starved joint on the EtherX buffer's input side
+### Sep 3 (later still) — FIXED at the EtherX bus transceiver; mechanism unconfirmed
+
+**What is established is the repair, not the mechanism.** Applying pressure to the pins of
+the card's bus transceiver clears the fault; reflowing both its rows fixes it; nothing else
+on that path was touched. The card has been perfect since — register window clean,
+`*EXTest` passing, a `*Memory` loop stable while the card is flexed, two cold boots, and
+`ping` over a real cable. Troubleshooting stopped there.
 
 **`Bd<3>` itself was never faulty.** The bus line, the `SK4 a1` contact and the motherboard
 net were all sound throughout and every measurement taken of them said so. `Bd<3>` is only
-where the symptom surfaced. The fault is a solder joint on the *card's* `74HC245`, on one row of the
-package, one branch inside the card. Probing those pins clears the fault; reflowing the
-package fixes it.
+where the symptom surfaced, one branch outside the card.
 
 **Inspection found no visible defect, and the case rests on behaviour.** No damage, no
 cracking. That does not refute a bad joint — poor wetting to a pad or a crack beneath a

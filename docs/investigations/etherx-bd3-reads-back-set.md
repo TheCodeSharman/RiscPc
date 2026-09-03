@@ -9,7 +9,7 @@ The electrical background is in `riscpc-bd-bus-and-the-network-slot.md`. Read it
 the pull-up map and the `00820082` idle reading change what several of the readings below
 mean.
 
-## Resolved: resistive joints on the card's bus transceiver
+## Fixed at the card's bus transceiver; the mechanism is not established
 
 **`Bd<3>` is not the faulty thing.** The bus line, the `SK4 a1` contact and the motherboard
 net are sound, and every measurement taken of them says so. `Bd<3>` is where the symptom
@@ -21,7 +21,14 @@ fault; reflowing both rows fixes it; nothing else on that path was touched. Insp
 found no visible defect, and none should be read into the appearance of a fine-pitch
 package.
 
-### The joints are resistive, not open
+That much is the repair, and it holds. **Everything below it is a model, and the model is
+on shaky ground** — it rests on an unmeasured premise (see the soft spot), the physical
+inspection contributed nothing, and the diagnosis changed more than once in the course of a
+single evening. Read the sections that follow as the best account available, not as
+established fact. The card has been working perfectly since the reflow and troubleshooting
+stopped there; a recurrence is what would earn further investigation.
+
+### Probably resistive joints, not open ones
 
 An open joint is ruled out by the ROM window. `SK4 a1` lands on one side of the
 transceiver; the flash and the AX88796 both hang off the **other** side, sharing the card's
