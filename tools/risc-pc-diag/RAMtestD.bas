@@ -147,10 +147,11 @@
  1465 bn$(0)="VRAM" : bn$(1)="SIMM0/bank0" : bn$(2)="SIMM0/bank1" : bn$(3)="SIMM1/bank0" : bn$(4)="SIMM1/bank1" : bn$(5)="other(unexpected)"
  1470 han% = -1
  1480 :
- 1490 logh% = OPENOUT(logfile$)
+ 1490 logh% = OPENUP(logfile$)
+ 1495 IF logh% = 0 THEN logh% = OPENOUT(logfile$) ELSE PTR#logh% = EXT#logh%
  1500 IF logh% = 0 THEN PRINT "WARNING: cannot open log '";logfile$;"'"
  1510 firstA% = -1 : errs% = 0
- 1520 PROClog("=== RAMtestD (ARM March-U over non-cacheable dynamic area) ===")
+ 1520 PROClog("=== RAMtestD (ARM March-U over non-cacheable dynamic area) "+TIME$+" ===")
  1530 :
  1540 SYS "OS_ReadMemMapInfo" TO pgsz%, npages%
  1550 totram% = pgsz% * npages%
