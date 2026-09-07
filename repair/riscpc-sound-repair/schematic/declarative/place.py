@@ -86,47 +86,71 @@ class Placer(Builder):
     def run(self) -> Sheet:
         y = MARGIN_Y
         width = 0.0
+        blocks = []
         for group in self.lay.groups:
-            if group.supply:
-                # Small disconnected blocks — flow them across to the width the
-                # signal already uses, then wrap, rather than one tall column.
-                y = self._flow(group.lanes, y, width) + ROW // 2
+            if group.head is None:
+                # No head joins its lanes, so each is an independent block —
+                # collected to flow, whatever kind of circuit it is.
+                blocks += [self._lane_block(lane) for lane in group.lanes]
             else:
                 y = self._group(group, y) + ROW // 2
-                width = self.sheet.bounds()[2] - MARGIN_X
-        self._spare_units(y + ROW // 2)
+                width = max(width, self.sheet.bounds()[2] - MARGIN_X)
+        # A package's spare supply unit is a block like any other.
+        blocks += [self._spare_block(sp) for sp in self._spares]
+        self._flow(blocks, y, width)
         self._wire_all()
         self._title()
         return self.sheet
 
-    # --- groups -------------------------------------------------------
-    def _flow(self, lanes, y0: float, max_width: float) -> float:
-        """Pack a run of small blocks left-to-right, wrapping at a width.
+    # --- block flow ---------------------------------------------------
+    def _flow(self, blocks, y0: float, max_width: float) -> float:
+        """Pack loose circuit blocks left-to-right, wrapping at a width.
 
-        A supply filter or a bare ground stub is a block a few columns wide; a
-        column of them wastes the sheet. Laid across to the width the signal
-        chain already spans and wrapped onto a new shelf when the next would
-        overflow, they take a strip instead. Each block is still a lane placed
-        the ordinary way — this only chooses where.
+        Anything that is not part of a connected, head-anchored group — a
+        supply filter, a bare ground stub, a package's spare supply unit — is a
+        small block a few columns wide. A column of them wastes the sheet; laid
+        across to the width the signal chain already spans and wrapped onto a
+        new shelf when the next would overflow, they take a strip. Nothing here
+        is specific to what a block *is* — each carries its own width and a
+        closure that places it; the flow only decides where.
         """
         if max_width <= 0:
             max_width = COL * 14
         x, y, shelf = MARGIN_X, y0, 0.0
-        for lane in lanes:
-            w = self._block_width(lane)
-            if x > MARGIN_X and x - MARGIN_X + w > max_width:
+        for width, place in blocks:
+            if x > MARGIN_X and x - MARGIN_X + width > max_width:
                 x = MARGIN_X
                 y += shelf + ROW // 2
                 shelf = 0.0
-            self._lane(lane, x, y + self._headroom(lane), None)
-            shelf = max(shelf, self._headroom(lane) + self._legroom(lane))
-            x += w
+            shelf = max(shelf, place(x, y))
+            x += width
         return y + shelf
+
+    def _lane_block(self, lane):
+        """A lane as a flow block: (width, place-at)."""
+        def place(x, y):
+            self._lane(lane, x, y + self._headroom(lane), None)
+            return self._headroom(lane) + self._legroom(lane)
+        return (self._block_width(lane), place)
+
+    def _spare_block(self, sp):
+        """A spare package unit as a flow block — pins up/down, so it is narrow."""
+        ref, unit = sp
+        def place(x, y):
+            self._globals_for(self.place(ref, x, y + TIER, unit=unit, angle=0.0))
+            return ROW // 2
+        return (COL * 2, place)
 
     @staticmethod
     def _block_width(lane) -> float:
-        """A block's footprint: its spine, plus room for a rail label each end."""
-        return len(lane.spine) * COL + COL * 2
+        """Footprint width: the spine, plus room for a side label where one is.
+
+        A filter carries a rail label off each end and needs the room; a bare
+        stub — a jack sleeve to ground — has its label below and packs tight.
+        A hung leg (a reservoir cap) is what tells the two apart.
+        """
+        pad = COL * 1.5 if lane.attachments else COL * 0.5
+        return len(lane.spine) * COL + pad
 
     def _group(self, group, y0: float) -> float:
 
@@ -252,23 +276,6 @@ class Placer(Builder):
             self._island.update(members)
             self._island_quiet.update(members[1:])
             self._island_tap.add(members[0])   # keeps the label; send it sideways
-
-    def _spare_units(self, y: float) -> float:
-        """Park each package's supply unit in a row at the foot of the sheet.
-
-        A quad op-amp's pins 4 and 11 are one pair shared by all four
-        sections, so KiCad draws them as a fifth, bodyless symbol. Left under
-        its own section it reads as an orphaned stalk hanging off nothing in
-        the middle of the drawing. Together at the bottom they read as what
-        they are: the package supply pins.
-        """
-        if not self._spares:
-            return y
-        x = MARGIN_X + COL
-        for ref, unit in self._spares:
-            self._globals_for(self.place(ref, x, y, unit=unit, angle=0.0))
-            x += COL * 3
-        return y + ROW // 2
 
     # --- wiring, once, over the whole sheet ----------------------------
     def _wire_all(self) -> None:

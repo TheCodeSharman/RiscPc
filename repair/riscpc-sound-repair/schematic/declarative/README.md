@@ -95,10 +95,19 @@ settle *where* a part sits:
   touches two pins of one lane, `place.py` draws that stretch as a real wire
   with a single tapped-out label — an *island* — instead of a symbol at each
   pin. Nowhere else in the corpus does a rail land twice in a lane, so only
-  the filters are touched; the signal sheet is untouched. The filter blocks
-  are then *flowed* — laid left to right across the width the signal chain
-  already spans and wrapped onto a new shelf when the next would overflow —
-  rather than stacked one to a tall column, so they take a strip.
+  the filters are touched; the signal sheet is untouched.
+- **Loose blocks flow; they do not stack.** Anything not part of a connected,
+  head-anchored group — a supply filter, a bare jack-sleeve ground, a
+  package's spare supply unit — is a small block a few columns wide. Stacked
+  one to a lane they run the sheet down; `run()` instead lays them left to
+  right across the width the signal chain already spans and wraps onto a new
+  shelf when the next would overflow, so they take a strip (the amp's four
+  drop from a 160 mm column to one row). The flow is keyed on nothing but
+  *headless* — a block carries its own width and a closure that places it, and
+  the packer decides only where — so it is not specific to power; any loose
+  sub-circuit of any kind flows the same way. Width is content-aware: a block
+  with a hung leg (a filter, rail-labelled each end) reserves the room, a bare
+  stub packs tight.
 
 And **one** rule settles *which way every part faces* — `place.py`'s `_orient`:
 
