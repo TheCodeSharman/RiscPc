@@ -100,6 +100,8 @@ class Renderer:
         ry = x * math.sin(th) + y * math.cos(th)
         if placed.mirror == "y":
             rx = -rx
+        elif placed.mirror == "x":
+            ry = -ry
         return (placed.x + rx, placed.y - ry)
 
     def P(self, x: float, y: float) -> tuple[float, float]:

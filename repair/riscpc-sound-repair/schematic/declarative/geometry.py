@@ -97,6 +97,8 @@ def pin_xy(placed: Placed, sym: symbols.Symbol, pin: str) -> tuple[float, float]
     ry = px * math.sin(th) + py * math.cos(th)
     if placed.mirror == "y":
         rx = -rx
+    elif placed.mirror == "x":
+        ry = -ry
     return (snap(placed.x + rx), snap(placed.y - ry))
 
 
@@ -115,6 +117,8 @@ def pin_dir(placed: Placed, sym: symbols.Symbol, pin: str) -> tuple[float, float
     ry = ox * math.sin(th) + oy * math.cos(th)
     if placed.mirror == "y":
         rx = -rx
+    elif placed.mirror == "x":
+        ry = -ry
     n = math.hypot(rx, ry) or 1.0
     return (round(rx / n, 6), round(-ry / n, 6))
 
@@ -132,6 +136,8 @@ def body_box(placed: Placed, sym: symbols.Symbol, pad: float = 0.0):
         ry = x * math.sin(th) + y * math.cos(th)
         if placed.mirror == "y":
             rx = -rx
+        elif placed.mirror == "x":
+            ry = -ry
         pts.append((placed.x + rx, placed.y - ry))
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]

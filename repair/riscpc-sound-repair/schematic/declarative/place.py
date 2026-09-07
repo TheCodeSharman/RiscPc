@@ -169,6 +169,11 @@ class Placer(Builder):
         for a, b in zip(lane.spine, lane.spine[1:]):
             self._orient(placed[a], placed[b])
 
+        # Now the inputs' handedness — before any attachment is placed, so its
+        # drop reads the mirrored pins.
+        for ref in lane.spine:
+            self._maybe_mirror_inputs(placed[ref], lane)
+
         below = defaultdict(int)
         for att in lane.attachments:
             if att.kind == "bridge":
@@ -442,6 +447,49 @@ class Placer(Builder):
         )
         if target and ys[target] == min(ys.values()) and len(set(ys.values())) > 1:
             placed.angle = (placed.angle + 180) % 360
+
+    def _maybe_mirror_inputs(self, placed, lane) -> None:
+        """Flip an op-amp top-to-bottom when its inputs are the wrong way up.
+
+        The driver's +in wires *down* to its bias leg while −in wires *up* to
+        the feedback. If the down-going input is the higher pin, those two
+        wires leave adjacent pins in opposite directions and must cross once,
+        right at the op-amp — the last crossings in the headphone amp. A
+        vertical mirror swaps the input pair; the output stays put on the tip,
+        so the crossing simply goes away. Only a same-column input pair is
+        touched, which leaves transistors and passives alone.
+        """
+        sym = self.sym(placed.ref)
+        pins = sym.units[placed.unit].pins
+        if len(pins) < 3:
+            return
+        up, down = self._attachment_pins(placed, lane)
+        for u in up:
+            for d in down:
+                pu, pd = pins.get(u), pins.get(d)
+                if not pu or not pd or abs(pu.x - pd.x) > 1e-6:
+                    continue
+                if pd.y > pu.y:          # the down-going input sits higher
+                    placed.mirror = "x"
+                    return
+
+    def _attachment_pins(self, placed, lane):
+        """This part's pins that feed something drawn above it, vs below."""
+        ref = placed.ref
+        up, down = set(), set()
+        for att in lane.attachments:
+            net = self._shared_net(att.ref, ref)
+            pin = self._pin_name_at(placed, net) if net else None
+            if pin:
+                (up if att.kind == "bridge" else down).add(pin)
+        for h in self.lay.stubs.get(ref, []):
+            if self.cir.parts[h].kind == "terminal":
+                continue
+            net = self._shared_net(h, ref)
+            pin = self._pin_name_at(placed, net) if net else None
+            if pin:
+                down.add(pin)
+        return up, down
 
     def _globals_for(self, placed, prefer_horizontal: bool = False) -> None:
         """Note every global pin. Where its symbol goes is decided later.

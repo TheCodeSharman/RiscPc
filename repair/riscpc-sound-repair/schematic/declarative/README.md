@@ -78,6 +78,15 @@ known — things `layout.py` cannot decide because it works on the graph alone:
   runs straight down through it to the power symbol. Two legs off one host
   stand side by side rather than stacking down one column — collinear vertical
   parts would each route a wire through the other's body.
+- **An op-amp is flipped when its inputs are the wrong way up.** The driver's
+  +in wires *down* to a bias leg while −in wires *up* to the feedback; if the
+  down-going input is the higher pin, those two wires leave adjacent pins in
+  opposite directions and cross right at the op-amp. A vertical mirror
+  (`mirror x`) swaps the input pair — the output stays on the tip — and the
+  crossing is gone. Only a same-column input pair is touched, so transistors
+  and passives are never flipped. This is the first genuine *placement
+  pattern* in the Weave sense: a fix applied outside the layout graph, keyed
+  on the geometry the graph cannot see.
 
 ## Symbols
 
@@ -136,21 +145,22 @@ routing is solved once and the KiCad writer is mostly translation.
    - `Cf_L` / `Cf_R` legs run a long way left to reach the op-amp's
      inverting input; a "keep these together" hint would place them better.
    - `U1A`'s supply unit (pins 4/11) floats below the row looking orphaned.
-3. **Placement is improving on measured crossings, not yet on all of them.**
-   The router draws what it is given without lying about the connectivity, so
-   improvement belongs in `place.py`. `--crossings` now counts wire-to-wire
-   crossings (nicer at zero, not a correctness check), and the two ordering
-   rules above took the headphone amp from 5 to 2 and the test ladder from 10
-   to 4. The two that remain are both the *complementary-input crossing*: on
-   the driver op-amp `+in` sits directly above `−in`, `+in` wires down to its
-   bias leg and `−in` wires up to the feedback — two wires leaving adjacent
-   pins in opposite directions must cross once. No horizontal nudge of the leg
-   removes it (measured); the structural fix is to **swap the op-amp's input
-   pins with a vertical mirror** when the topology wants `+in` low, which is a
-   real placement *pattern* and the next piece of work. The literature agrees
-   — *Weave* runs a layered (Sugiyama) engine for the signal chain and handles
-   feedback, divider legs, hanging shunts and supply corners as explicit
-   patterns outside that graph, which is what these rules are reaching towards.
+3. **The headphone amp draws with no crossings; two toy tests still cross.**
+   `--crossings` counts wire-to-wire crossings (nicer at zero, not a
+   correctness check). The lane-ordering, upright-leg and input-mirror rules
+   took `circuit.cir` from 5 crossings to **0**, and the test ladder from 10
+   to 2. The two that remain are `t05-inverting` and `t07-parallel-fb`: a
+   single op-amp with feedback and *no forward load*, so the output has to
+   wrap back over the top to the inverting input and crosses that node's wire.
+   The same I/V stage inside `circuit.cir` does not cross — the forward path
+   (Cac → Rin → driver) pulls the output out to the right and gives the loop
+   room. Fixing the bare case means routing the wrap-around on the far side of
+   the output, which needs the router to prefer that side; it is a genuinely
+   tighter problem than the input mirror and is not worth over-fitting two
+   synthetic circuits for. *Weave* runs a layered (Sugiyama) engine for the
+   signal chain and handles feedback, divider legs, hanging shunts and supply
+   corners as explicit patterns outside that graph; the input mirror above is
+   the first of those, and more of the same is where the next gains are.
 4. **The spare supply unit reads as two stalks.** A quad op-amp's pins 4 and
    11 are one pair shared by all four sections, so KiCad draws them as a
    fifth symbol with no body. They are parked together at the foot of the
