@@ -305,7 +305,13 @@ class Placer(Builder):
         lo, hi = placed.get(att.spans[0]), placed.get(att.spans[1])
         if lo is None or hi is None:
             return
-        y = row_y - (att.tier + 1) * TIER - TIER
+        # A self-bridge sits over a part's own body and must clear it, and any
+        # bridge stacked below. A bridge spanning *two* parts sits in the gap
+        # between them, over nothing but the wire on the row — so it drops a
+        # tier closer, and its risers stop reading as dog-legs. This is what
+        # was parking the output-to-input feedback resistor 30 mm up.
+        clearance = TIER if att.spans[0] == att.spans[1] else 0.0
+        y = row_y - (att.tier + 1) * TIER - clearance
         self._bridges[att.ref] = self._place_multi(
             att.ref, snap((lo.x + hi.x) / 2), y)
 

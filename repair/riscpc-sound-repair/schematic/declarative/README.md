@@ -82,6 +82,12 @@ known — things `layout.py` cannot decide because it works on the graph alone:
   faces, so the wire leaves the pin along its axis and turns down once — a
   clean L. Directly beneath such a pin, which can only be entered
   horizontally, the wire has to S back in to arrive.
+- **A feedback bridge sits in the gap, not the stratosphere.** A self-bridge
+  drawn over an op-amp's body must clear it; a bridge spanning *two* parts sits
+  in the gap between them, over nothing but the wire on the row, so it drops a
+  tier closer. The output-to-input feedback resistor round the driver stage
+  was being parked 30 mm up with long riser legs; it now sits just above the
+  row where it belongs.
 - **An op-amp is flipped when its inputs are the wrong way up.** The driver's
   +in wires *down* to a bias leg while −in wires *up* to the feedback; if the
   down-going input is the higher pin, those two wires leave adjacent pins in
