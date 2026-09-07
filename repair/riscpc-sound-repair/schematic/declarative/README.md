@@ -65,44 +65,50 @@ reading from four graph rules:
 Lanes come from cutting the source, so the two channels separate without
 anyone saying they are channels.
 
-Two placement rules then run once positions exist and the pin geometry is
-known — things `layout.py` cannot decide because it works on the graph alone:
+More rules then run once positions exist and the pin geometry is known —
+things `layout.py` cannot decide because it works on the graph alone. Some
+settle *where* a part sits:
 
 - **Lanes are ordered by the head pin that feeds them.** The DAC's pin 8 sits
   above pin 6 but feeds the *other* channel; drawn in lane order the two feeds
   swap over and cross at the DAC. Sorted by the height of their feeding pin,
   they run straight out. This is what put the three DAC-fan-out crossings to
   zero.
-- **A leg stands on end.** A part hanging to a rail is drawn vertically and
-  dropped from the *pin* it attaches to, not the host's centre, so the wire
-  runs straight down through it to the power symbol. Two legs off one host
-  stand side by side rather than stacking down one column — collinear vertical
-  parts would each route a wire through the other's body. A leg off a
-  *sideways-pointing* pin (an op-amp input) is set off to the side the pin
-  faces, so the wire leaves the pin along its axis and turns down once — a
-  clean L. Directly beneath such a pin, which can only be entered
-  horizontally, the wire has to S back in to arrive.
+- **A leg drops from its pin.** A part hanging to a rail is placed below its
+  host, at the *pin* it attaches to rather than the host's centre, so the wire
+  runs straight down. Off a sideways-pointing pin (an op-amp input) it steps
+  aside to the way the pin faces, turning down once — a clean L instead of an
+  S back in. Two legs off one host stand side by side, never down one column,
+  where they would route through each other's bodies.
 - **A feedback bridge sits in the gap, not the stratosphere.** A self-bridge
   drawn over an op-amp's body must clear it; a bridge spanning *two* parts sits
   in the gap between them, over nothing but the wire on the row, so it drops a
   tier closer. The output-to-input feedback resistor round the driver stage
   was being parked 30 mm up with long riser legs; it now sits just above the
   row where it belongs.
-- **A bridge faces the sides it reaches.** Unoriented, the feedback resistor
-  came out back-to-front — its left pin wired to the output on the right, its
-  right pin to the −in on the left, so both legs doubled back and it read as a
-  loop over the top and an S underneath. Each pin now takes the mean x of the
-  parts its net reaches, and the pin that must reach furthest left is drawn on
-  the left. Spine parts were already oriented this way; bridges were the gap.
-- **An op-amp is flipped when its inputs are the wrong way up.** The driver's
-  +in wires *down* to a bias leg while −in wires *up* to the feedback; if the
-  down-going input is the higher pin, those two wires leave adjacent pins in
-  opposite directions and cross right at the op-amp. A vertical mirror
-  (`mirror x`) swaps the input pair — the output stays on the tip — and the
-  crossing is gone. Only a same-column input pair is touched, so transistors
-  and passives are never flipped. This is the first genuine *placement
-  pattern* in the Weave sense: a fix applied outside the layout graph, keyed
-  on the geometry the graph cannot see.
+
+And **one** rule settles *which way every part faces* — `place.py`'s `_orient`:
+
+> Try each orientation the part's slot allows and keep the one where its pins
+> sit closest to what they connect to; only turn when the gain clearly beats
+> leaving it as placed. A two-terminal part flips end-for-end; a part of three
+> pins or more (an active device) is not rotated but may be mirrored
+> top-to-bottom.
+
+Out of that single rule fall every case that used to be written out by hand: a
+spine passive meets the parts either side; a leg's rail pin drops while its
+live pin faces the host; a feedback resistor stops coming out back-to-front (a
+loop over the top and an S beneath); an op-amp mirrors so its inputs meet the
+feedback above and the bias below; a transistor keeps collector-up,
+emitter-down because that is what its neighbours pull it to. Nothing is keyed
+on what a part *is* — the geometry of what it reaches decides, which is why it
+orients a device the corpus has never seen without a new rule. The margin (a
+turn must beat the placed orientation by more than a passive's own pin span)
+is what separates a genuinely back-to-front part from a coin-toss between two
+electrically identical ways round; without it a marginal turn would trade a
+tidy wire for a crossing. This is the *placement pattern* the four earlier
+rules were each reaching for, in the Weave sense — a fix outside the layout
+graph, keyed on geometry the graph cannot see — now stated once.
 
 ## Symbols
 

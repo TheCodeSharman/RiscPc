@@ -8,14 +8,14 @@
 <polyline points="126.48,454.52 96.00,454.52" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="126.48,464.68 96.00,464.68" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="126.48,474.84 96.00,474.84" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
-<polyline points="543.04,383.40 543.04,403.72" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="258.56,276.72 258.56,256.40" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
-<polyline points="431.28,383.40 431.28,403.72" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="543.04,266.56 543.04,246.24" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
-<polyline points="543.04,749.16 543.04,769.48" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
+<polyline points="543.04,383.40 543.04,403.72" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
+<polyline points="431.28,383.40 431.28,403.72" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="258.56,642.48 258.56,622.16" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
-<polyline points="431.28,749.16 431.28,769.48" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="543.04,632.32 543.04,612.00" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
+<polyline points="543.04,749.16 543.04,769.48" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
+<polyline points="431.28,749.16 431.28,769.48" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="212.84,840.60 192.52,840.60" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="243.32,840.60 263.64,840.60" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
 <polyline points="456.68,840.60 436.36,840.60" fill="none" stroke="#1a6b1a" stroke-width="1.00" stroke-linecap="round"/>
@@ -450,22 +450,22 @@
 <text x="126.48" y="525.84" font-size="4.4" fill="#8b1a1a" text-anchor="middle">GND</text>
 <polyline points="224.48,481.40 228.08,477.80 231.68,481.40" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="228.08" y="473.80" font-size="4.4" fill="#8b1a1a" text-anchor="middle">5V</text>
+<polyline points="539.44,242.64 543.04,239.04 546.64,242.64" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
+<text x="543.04" y="235.04" font-size="4.4" fill="#8b1a1a" text-anchor="middle">5V</text>
 <polyline points="539.44,407.32 543.04,410.92 546.64,407.32" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="543.04" y="421.92" font-size="4.4" fill="#8b1a1a" text-anchor="middle">-12V</text>
 <line x1="427.68" y1="405.52" x2="434.88" y2="405.52" stroke="#8b1a1a" stroke-width="1.4"/>
 <line x1="429.05" y1="407.50" x2="433.51" y2="407.50" stroke="#8b1a1a" stroke-width="1.4"/>
 <line x1="430.27" y1="409.48" x2="432.29" y2="409.48" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="431.28" y="424.24" font-size="4.4" fill="#8b1a1a" text-anchor="middle">GND</text>
-<polyline points="539.44,242.64 543.04,239.04 546.64,242.64" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
-<text x="543.04" y="235.04" font-size="4.4" fill="#8b1a1a" text-anchor="middle">5V</text>
+<polyline points="539.44,608.40 543.04,604.80 546.64,608.40" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
+<text x="543.04" y="600.80" font-size="4.4" fill="#8b1a1a" text-anchor="middle">5V</text>
 <polyline points="539.44,773.08 543.04,776.68 546.64,773.08" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="543.04" y="787.68" font-size="4.4" fill="#8b1a1a" text-anchor="middle">-12V</text>
 <line x1="427.68" y1="771.28" x2="434.88" y2="771.28" stroke="#8b1a1a" stroke-width="1.4"/>
 <line x1="429.05" y1="773.26" x2="433.51" y2="773.26" stroke="#8b1a1a" stroke-width="1.4"/>
 <line x1="430.27" y1="775.24" x2="432.29" y2="775.24" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="431.28" y="790.00" font-size="4.4" fill="#8b1a1a" text-anchor="middle">GND</text>
-<polyline points="539.44,608.40 543.04,604.80 546.64,608.40" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
-<text x="543.04" y="600.80" font-size="4.4" fill="#8b1a1a" text-anchor="middle">5V</text>
 <polyline points="188.92,844.20 192.52,847.80 196.12,844.20" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>
 <text x="192.52" y="858.80" font-size="4.4" fill="#8b1a1a" text-anchor="middle">-12V_RAW</text>
 <polyline points="260.04,844.20 263.64,847.80 267.24,844.20" fill="none" stroke="#8b1a1a" stroke-width="1.4"/>

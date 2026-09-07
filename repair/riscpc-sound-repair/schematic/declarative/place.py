@@ -47,6 +47,13 @@ STUB_DROP = STUB * 2
 # other's body. Half a spine column keeps the second leg clear of the next
 # spine part, whose own legs sit a full column away.
 LEG_SHIFT = GRID * 6
+# How much a turn must save before it is worth making. A two-terminal part is
+# electrically symmetric, so flipping it end-for-end is often free and the
+# distance it saves is arbitrary noise — swapping which pin is the nearer by
+# the part's own span. Only reorient when the gain clearly exceeds that, which
+# is what tells a genuinely back-to-front part from a coin-toss and stops a
+# marginal turn from trading a tidy wire for a crossing.
+FLIP_MARGIN = GRID * 7
 SUPPLY_COLS = 3             # rail-filtering parts per row
 SUPPLY_PITCH = COL * 4      # wide enough for a rail label at each end
 
@@ -157,37 +164,39 @@ class Placer(Builder):
     # --- one lane -----------------------------------------------------
     def _lane(self, lane, x0: float, y: float, head) -> None:
         placed: dict[str, object] = {}
+        parts = []
         x = x0
         for ref in lane.spine:
             placed[ref] = self._place_multi(ref, x, y)
+            parts.append(placed[ref])
             x += COL
 
-        # Orient each part so the pin it shares with its upstream neighbour
-        # faces left. Nothing is wired here — a resistor whose pin 1 ends up
-        # downstream would make the wire double back through its own body,
-        # and the router cannot undo that.
-        for a, b in zip(lane.spine, lane.spine[1:]):
-            self._orient(placed[a], placed[b])
-
-        # Now the inputs' handedness — before any attachment is placed, so its
-        # drop reads the mirrored pins.
-        for ref in lane.spine:
-            self._maybe_mirror_inputs(placed[ref], lane)
-
+        # Attachments — bridges over the row, legs under it. Positions only:
+        # orientation waits until every part is down, so each can be turned to
+        # face neighbours that actually exist yet.
         below = defaultdict(int)
         for att in lane.attachments:
             if att.kind == "bridge":
-                self._place_bridge(att, placed, y)
+                b = self._place_bridge(att, placed, y)
+                if b is not None:
+                    parts.append(b)
             else:
-                self._stub(att, placed, y)
-                below[att.spans[0]] = max(below[att.spans[0]], att.tier + 1)
-        for att in lane.attachments:
-            if att.kind == "bridge":
-                self._globals_for(self._bridges[att.ref])
-
+                p = self._stub(att, placed, y)
+                if p is not None:
+                    parts.append(p)
+                    below[att.spans[0]] = max(below[att.spans[0]], att.tier + 1)
         for ref in lane.spine:
-            self._globals_for(placed[ref])
-            self._hangers_for(placed[ref], y, below)
+            parts.extend(self._hangers_for(placed[ref], y, below))
+
+        # One rule turns every part, whatever it is (see _orient).
+        for p in parts:
+            self._orient(p)
+
+        # Pins now sit where they finally are, so their leads out to power
+        # symbols and off-sheet labels can be recorded.
+        for p in parts:
+            self._globals_for(p)
+        for ref in lane.spine:
             self._loose_for(placed[ref])
             self._terminals_for(placed[ref])
 
@@ -300,11 +309,11 @@ class Placer(Builder):
             tree_pts.extend(pts)
             first = False
 
-    # --- attachments --------------------------------------------------
-    def _place_bridge(self, att, placed, row_y: float) -> None:
+    # --- attachments (positions; orientation is one pass, in _lane) ----
+    def _place_bridge(self, att, placed, row_y: float):
         lo, hi = placed.get(att.spans[0]), placed.get(att.spans[1])
         if lo is None or hi is None:
-            return
+            return None
         # A self-bridge sits over a part's own body and must clear it, and any
         # bridge stacked below. A bridge spanning *two* parts sits in the gap
         # between them, over nothing but the wire on the row — so it drops a
@@ -313,40 +322,8 @@ class Placer(Builder):
         clearance = TIER if att.spans[0] == att.spans[1] else 0.0
         y = row_y - (att.tier + 1) * TIER - clearance
         b = self._place_multi(att.ref, snap((lo.x + hi.x) / 2), y)
-        self._orient_bridge(b, placed)
         self._bridges[att.ref] = b
-
-    def _orient_bridge(self, bridge, placed) -> None:
-        """Turn a bridge so each pin faces the side it has to reach.
-
-        Left unoriented, a feedback resistor came out back-to-front: the pin
-        drawn on the left wired to the output on the right and the pin on the
-        right wired to the −in on the left, so both legs doubled back and the
-        whole thing read as a loop over the top and an S underneath. For each
-        pin, take the mean x of the placed parts its net reaches; the pin that
-        must reach furthest left belongs on the left.
-        """
-        sym = self.sym(bridge.ref)
-        pins = list(sym.units[bridge.unit].pins)
-        if len(pins) != 2:
-            return
-        reach = {}
-        for pin in pins:
-            net = self.cir.net_at(bridge.ref, pin)
-            xs = []
-            if net:
-                for r, _ in net.pins:
-                    if r == bridge.ref:
-                        continue
-                    pp = placed.get(r)
-                    hp = self._pin_at(pp, net.name) if pp else None
-                    if hp:
-                        xs.append(hp[0])
-            reach[pin] = sum(xs) / len(xs) if xs else bridge.x
-        left_pin = min(pins, key=lambda p: reach[p])
-        cur = {p: pin_xy(bridge, sym, p)[0] for p in pins}
-        if cur[left_pin] == max(cur.values()) and len(set(cur.values())) > 1:
-            bridge.angle = (bridge.angle + 180) % 360
+        return b
 
     def _pin_name_at(self, placed, net: str):
         sym = self.sym(placed.ref)
@@ -356,10 +333,10 @@ class Placer(Builder):
                 return pin
         return None
 
-    def _stub(self, att, placed, row_y: float) -> None:
+    def _stub(self, att, placed, row_y: float):
         host = placed.get(att.spans[0])
         if host is None:
-            return
+            return None
         # `_stack` has already given co-located stubs distinct tiers; a leg is
         # drawn vertically dropping to its rail, so the tier shifts it sideways
         # rather than down — two legs stood in one column would each route a
@@ -368,10 +345,7 @@ class Placer(Builder):
         base_x = self._host_pin_x(host, att.ref, host.x)
         x = base_x + att.tier * LEG_SHIFT
         y = row_y + STUB_DROP
-        p = self._place_multi(att.ref, x, y, vertical=True)
-        if att.net:
-            self._face_down(p, att.net)
-        self._globals_for(p)
+        return self._place_multi(att.ref, x, y, vertical=True)
 
     # --- helpers ------------------------------------------------------
     def _place_multi(self, ref: str, x: float, y: float, angle=None,
@@ -460,86 +434,86 @@ class Placer(Builder):
             x += dx * (GRID * 2)
         return x
 
-    def _orient(self, a, b) -> None:
-        net = self._shared_net(a.ref, b.ref)
-        if net:
-            self._face_left(b, net)
+    def _orient(self, placed) -> None:
+        """Turn a part to face its neighbours — one rule for every component.
 
-    def _face_left(self, placed, net: str) -> None:
-        """Rotate a two-terminal part so its `net` pin is the leftmost."""
-        sym = self.sym(placed.ref)
-        pins = sym.units[placed.unit].pins
-        if len(pins) != 2:
+        Try each orientation the part's slot allows and keep the one where its
+        pins sit closest to what they connect to. Out of that fall all the old
+        special cases: a spine passive turns so its ends meet the parts either
+        side; a leg so its live pin faces its host and its rail pin the rail; a
+        bridge so each end faces the side it spans; an op-amp so its inputs
+        meet the feedback above and the bias below — a vertical mirror if that
+        is which way round they need to be. Nothing is keyed on what a part
+        *is*; the geometry of what it reaches decides. A turn is only made when
+        it clearly helps (see FLIP_MARGIN), so a symmetric passive keeps the
+        orientation it was placed with unless it was genuinely back-to-front.
+
+        This runs only once every part is placed, so a part's neighbours are
+        real positions to aim at rather than intentions.
+        """
+        candidates = self._candidates(placed)
+        if len(candidates) < 2:
             return
-        xs = {p: pin_xy(placed, sym, p)[0] for p in pins}
-        target = next(
-            (p for p in pins
-             if (n := self.cir.net_at(placed.ref, p)) and n.name == net), None
-        )
-        if target and xs[target] == max(xs.values()) and len(set(xs.values())) > 1:
-            placed.angle = (placed.angle + 180) % 360
+        placed.angle, placed.mirror = candidates[0]
+        best, best_cost = candidates[0], self._facing_cost(placed)
+        for cand in candidates[1:]:
+            placed.angle, placed.mirror = cand
+            cost = self._facing_cost(placed)
+            if cost < best_cost - FLIP_MARGIN:
+                best, best_cost = cand, cost
+        placed.angle, placed.mirror = best
 
-    def _face_down(self, placed, net: str) -> None:
-        """Flip a vertical two-terminal part so its `net` pin is the lowest.
+    def _candidates(self, placed):
+        """The orientations a part's slot allows — the scorer picks among them.
 
-        A leg drops to a rail below the row; putting the rail-net pin at the
-        bottom keeps the wire running straight on down to the power symbol
-        instead of doubling back up through the body.
+        A two-terminal part may flip end-for-end within the axis its position
+        assumes; the flip keeps that axis. A part of three pins or more (an
+        active device) is not rotated — its facing is fixed by the symbol — but
+        may be mirrored top-to-bottom, which swaps an op-amp's inputs while
+        leaving its output on the tip.
         """
         sym = self.sym(placed.ref)
-        pins = sym.units[placed.unit].pins
-        if len(pins) != 2:
-            return
-        ys = {p: pin_xy(placed, sym, p)[1] for p in pins}
-        target = next(
-            (p for p in pins
-             if (n := self.cir.net_at(placed.ref, p)) and n.name == net), None
-        )
-        if target and ys[target] == min(ys.values()) and len(set(ys.values())) > 1:
-            placed.angle = (placed.angle + 180) % 360
+        n = len(sym.units[placed.unit].pins)
+        if n < 2:
+            return [(placed.angle, placed.mirror)]
+        if n >= 3:
+            return [(placed.angle, None), (placed.angle, "x")]
+        a = placed.angle
+        return [(a, placed.mirror), ((a + 180) % 360, placed.mirror)]
 
-    def _maybe_mirror_inputs(self, placed, lane) -> None:
-        """Flip an op-amp top-to-bottom when its inputs are the wrong way up.
+    def _facing_cost(self, placed) -> float:
+        """Sum of Manhattan distances from each pin to what its net reaches.
 
-        The driver's +in wires *down* to its bias leg while −in wires *up* to
-        the feedback. If the down-going input is the higher pin, those two
-        wires leave adjacent pins in opposite directions and must cross once,
-        right at the op-amp — the last crossings in the headphone amp. A
-        vertical mirror swaps the input pair; the output stays put on the tip,
-        so the crossing simply goes away. Only a same-column input pair is
-        touched, which leaves transistors and passives alone.
+        Global nets are skipped: a rail is drawn as a local stub at the pin, so
+        it pulls in no direction, and its many members have no meaningful
+        centre. The local nets are what a part should face.
         """
         sym = self.sym(placed.ref)
-        pins = sym.units[placed.unit].pins
-        if len(pins) < 3:
-            return
-        up, down = self._attachment_pins(placed, lane)
-        for u in up:
-            for d in down:
-                pu, pd = pins.get(u), pins.get(d)
-                if not pu or not pd or abs(pu.x - pd.x) > 1e-6:
-                    continue
-                if pd.y > pu.y:          # the down-going input sits higher
-                    placed.mirror = "x"
-                    return
-
-    def _attachment_pins(self, placed, lane):
-        """This part's pins that feed something drawn above it, vs below."""
-        ref = placed.ref
-        up, down = set(), set()
-        for att in lane.attachments:
-            net = self._shared_net(att.ref, ref)
-            pin = self._pin_name_at(placed, net) if net else None
-            if pin:
-                (up if att.kind == "bridge" else down).add(pin)
-        for h in self.lay.stubs.get(ref, []):
-            if self.cir.parts[h].kind == "terminal":
+        total = 0.0
+        for pin in sym.units[placed.unit].pins:
+            net = self.cir.net_at(placed.ref, pin)
+            if not net or net.name in self.lay.globals:
                 continue
-            net = self._shared_net(h, ref)
-            pin = self._pin_name_at(placed, net) if net else None
-            if pin:
-                down.add(pin)
-        return up, down
+            target = self._net_target(placed.ref, net.name)
+            if target is None:
+                continue
+            px, py = pin_xy(placed, sym, pin)
+            total += abs(px - target[0]) + abs(py - target[1])
+        return total
+
+    def _net_target(self, ref: str, netname: str):
+        """Mean position of the pins other placed parts put on this net."""
+        xs, ys = [], []
+        for p in self.sheet.placed:
+            if p.ref == ref:
+                continue
+            hp = self._pin_at(p, netname)
+            if hp:
+                xs.append(hp[0])
+                ys.append(hp[1])
+        if not xs:
+            return None
+        return (sum(xs) / len(xs), sum(ys) / len(ys))
 
     def _globals_for(self, placed, prefer_horizontal: bool = False) -> None:
         """Note every global pin. Where its symbol goes is decided later.
@@ -625,7 +599,7 @@ class Placer(Builder):
             lo, hi = sorted((end[1], gy))
             grid.add_body((end[0] - GLYPH / 2, lo, end[0] + GLYPH / 2, hi))
 
-    def _hangers_for(self, placed, row_y: float, below) -> None:
+    def _hangers_for(self, placed, row_y: float, below) -> list:
         """Place the rule-2 stub parts that hang off this host.
 
         A part whose only neighbour is one other part never takes a column of
@@ -633,22 +607,20 @@ class Placer(Builder):
         off-board terminals were being handled, which meant both 15k bias
         resistors were simply absent from the drawing — and no check noticed,
         because a part with no pins on the sheet cannot disagree with
-        anything. `--verify` now reports that as MISSING.
+        anything. `--verify` now reports that as MISSING. Positions only; the
+        orientation pass in `_lane` turns each so its rail pin drops.
         """
+        out = []
         for ref in self.lay.stubs.get(placed.ref, []):
             if self.cir.parts[ref].kind == "terminal":
                 continue                    # `_terminals_for` puts those inline
             tier = below[placed.ref]
             below[placed.ref] += 1
             base_x = self._host_pin_x(placed, ref, placed.x)
-            p = self._place_multi(
+            out.append(self._place_multi(
                 ref, base_x + tier * LEG_SHIFT, row_y + STUB_DROP,
-                vertical=True)
-            rail = next((n.name for n in self.cir.nets_of(ref)
-                         if n.name in self.lay.globals), None)
-            if rail:
-                self._face_down(p, rail)
-            self._globals_for(p)
+                vertical=True))
+        return out
 
     def _terminals_for(self, placed) -> None:
         """Off-board connections hang off their host as a labelled point."""
