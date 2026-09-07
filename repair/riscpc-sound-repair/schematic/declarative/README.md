@@ -77,7 +77,11 @@ known — things `layout.py` cannot decide because it works on the graph alone:
   dropped from the *pin* it attaches to, not the host's centre, so the wire
   runs straight down through it to the power symbol. Two legs off one host
   stand side by side rather than stacking down one column — collinear vertical
-  parts would each route a wire through the other's body.
+  parts would each route a wire through the other's body. A leg off a
+  *sideways-pointing* pin (an op-amp input) is set off to the side the pin
+  faces, so the wire leaves the pin along its axis and turns down once — a
+  clean L. Directly beneath such a pin, which can only be entered
+  horizontally, the wire has to S back in to arrive.
 - **An op-amp is flipped when its inputs are the wrong way up.** The driver's
   +in wires *down* to a bias leg while −in wires *up* to the feedback; if the
   down-going input is the higher pin, those two wires leave adjacent pins in

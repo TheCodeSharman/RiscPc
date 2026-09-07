@@ -400,15 +400,26 @@ class Placer(Builder):
         return None
 
     def _host_pin_x(self, host, leg_ref: str, fallback: float) -> float:
-        """x of the host pin a leg attaches to, so it drops from the pin.
+        """x a leg should drop from, given the host pin it attaches to.
 
-        Dropping from the host's centre instead makes a leg off an op-amp's
-        +in jog sideways across the −in wiring — the last two crossings in the
-        headphone amp were exactly that. From the pin, the drop is straight.
+        Dropping from the host's centre makes a leg off an op-amp's +in jog
+        sideways across the −in wiring — the last two crossings in the amp were
+        exactly that. So the leg drops from the pin. But a pin that points
+        *sideways* (an op-amp input) can only be entered horizontally: a leg
+        directly beneath it forces the wire to S back in, while a leg set off
+        to the side the pin faces makes a clean L — out along the pin, one turn
+        down. A pin already pointing up or down takes the leg straight under.
         """
         net = self._shared_net(leg_ref, host.ref)
-        hp = self._pin_at(host, net) if net else None
-        return hp[0] if hp else fallback
+        pin = self._pin_name_at(host, net) if net else None
+        if not pin:
+            return fallback
+        sym = self.sym(host.ref)
+        x = pin_xy(host, sym, pin)[0]
+        dx, dy = pin_dir(host, sym, pin)
+        if abs(dx) > abs(dy):
+            x += dx * (GRID * 2)
+        return x
 
     def _orient(self, a, b) -> None:
         net = self._shared_net(a.ref, b.ref)
