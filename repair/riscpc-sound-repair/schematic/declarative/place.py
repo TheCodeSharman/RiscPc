@@ -312,8 +312,41 @@ class Placer(Builder):
         # was parking the output-to-input feedback resistor 30 mm up.
         clearance = TIER if att.spans[0] == att.spans[1] else 0.0
         y = row_y - (att.tier + 1) * TIER - clearance
-        self._bridges[att.ref] = self._place_multi(
-            att.ref, snap((lo.x + hi.x) / 2), y)
+        b = self._place_multi(att.ref, snap((lo.x + hi.x) / 2), y)
+        self._orient_bridge(b, placed)
+        self._bridges[att.ref] = b
+
+    def _orient_bridge(self, bridge, placed) -> None:
+        """Turn a bridge so each pin faces the side it has to reach.
+
+        Left unoriented, a feedback resistor came out back-to-front: the pin
+        drawn on the left wired to the output on the right and the pin on the
+        right wired to the −in on the left, so both legs doubled back and the
+        whole thing read as a loop over the top and an S underneath. For each
+        pin, take the mean x of the placed parts its net reaches; the pin that
+        must reach furthest left belongs on the left.
+        """
+        sym = self.sym(bridge.ref)
+        pins = list(sym.units[bridge.unit].pins)
+        if len(pins) != 2:
+            return
+        reach = {}
+        for pin in pins:
+            net = self.cir.net_at(bridge.ref, pin)
+            xs = []
+            if net:
+                for r, _ in net.pins:
+                    if r == bridge.ref:
+                        continue
+                    pp = placed.get(r)
+                    hp = self._pin_at(pp, net.name) if pp else None
+                    if hp:
+                        xs.append(hp[0])
+            reach[pin] = sum(xs) / len(xs) if xs else bridge.x
+        left_pin = min(pins, key=lambda p: reach[p])
+        cur = {p: pin_xy(bridge, sym, p)[0] for p in pins}
+        if cur[left_pin] == max(cur.values()) and len(set(cur.values())) > 1:
+            bridge.angle = (bridge.angle + 180) % 360
 
     def _pin_name_at(self, placed, net: str):
         sym = self.sym(placed.ref)

@@ -88,6 +88,12 @@ known — things `layout.py` cannot decide because it works on the graph alone:
   tier closer. The output-to-input feedback resistor round the driver stage
   was being parked 30 mm up with long riser legs; it now sits just above the
   row where it belongs.
+- **A bridge faces the sides it reaches.** Unoriented, the feedback resistor
+  came out back-to-front — its left pin wired to the output on the right, its
+  right pin to the −in on the left, so both legs doubled back and it read as a
+  loop over the top and an S underneath. Each pin now takes the mean x of the
+  parts its net reaches, and the pin that must reach furthest left is drawn on
+  the left. Spine parts were already oriented this way; bridges were the gap.
 - **An op-amp is flipped when its inputs are the wrong way up.** The driver's
   +in wires *down* to a bias leg while −in wires *up* to the feedback; if the
   down-going input is the higher pin, those two wires leave adjacent pins in
