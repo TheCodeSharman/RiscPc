@@ -41,7 +41,7 @@ from collections import defaultdict
 
 STEP = 1.27                 # routing grid — KiCad's own, so nothing snaps later
 TURN_COST = 8.0             # in units of STEP; high enough to prefer straight
-CROSS_COST = 10.0           # crossing a foreign net is legal but not free
+CROSS_COST = 40.0           # crossing a foreign net is legal, but pay to avoid it
 DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 H, V = "h", "v"

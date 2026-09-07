@@ -187,9 +187,14 @@ class Placer(Builder):
 
     @staticmethod
     def _headroom(lane) -> float:
-        """Vertical space a lane needs above its row for stacked bridges."""
+        """Vertical space a lane needs above its row for stacked bridges.
+
+        One tier per stacked bridge, plus half a tier for the topmost bridge's
+        label. Reserving a whole extra tier is what left the op-amps sitting
+        that much below their feedback.
+        """
         top = max((a.tier for a in lane.attachments if a.above), default=-1)
-        return (top + 2) * TIER
+        return (top + 1) * TIER + TIER / 2
 
     def _legroom(self, lane) -> float:
         """Space below the row for legs — vertical drops to a rail.
@@ -377,13 +382,12 @@ class Placer(Builder):
         lo, hi = placed.get(att.spans[0]), placed.get(att.spans[1])
         if lo is None or hi is None:
             return None
-        # A self-bridge sits over a part's own body and must clear it, and any
-        # bridge stacked below. A bridge spanning *two* parts sits in the gap
-        # between them, over nothing but the wire on the row — so it drops a
-        # tier closer, and its risers stop reading as dog-legs. This is what
-        # was parking the output-to-input feedback resistor 30 mm up.
-        clearance = TIER if att.spans[0] == att.spans[1] else 0.0
-        y = row_y - (att.tier + 1) * TIER - clearance
+        # One tier of gap above the row, whether the bridge spans two parts or
+        # sits over one op-amp's body — a tier already clears the body, so the
+        # feedback rides just above its op-amp, the same distance the driver's
+        # Rfb rides above its own. What used to add a second tier for a
+        # self-bridge only parked the I/V feedback 15 mm too high.
+        y = row_y - (att.tier + 1) * TIER
         b = self._place_multi(att.ref, snap((lo.x + hi.x) / 2), y)
         self._bridges[att.ref] = b
         return b

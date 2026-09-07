@@ -80,12 +80,15 @@ settle *where* a part sits:
   aside to the way the pin faces, turning down once — a clean L instead of an
   S back in. Two legs off one host stand side by side, never down one column,
   where they would route through each other's bodies.
-- **A feedback bridge sits in the gap, not the stratosphere.** A self-bridge
-  drawn over an op-amp's body must clear it; a bridge spanning *two* parts sits
-  in the gap between them, over nothing but the wire on the row, so it drops a
-  tier closer. The output-to-input feedback resistor round the driver stage
-  was being parked 30 mm up with long riser legs; it now sits just above the
-  row where it belongs.
+- **A bridge sits one tier above its row — no more.** A tier already clears an
+  op-amp's body, so a feedback network rides just above its op-amp, the same
+  distance whether it spans two parts (the driver's Rfb) or loops over one
+  (the I/V converter's Riv ∥ Cf). Reserving a second tier for a self-bridge
+  only parked the I/V feedback 15 mm too high and dragged its op-amp down to
+  match; dropping it lifts each op-amp to meet its feedback and takes a strip
+  off the sheet. The summing net then runs a hair closer to the DAC's rails,
+  which is what the raised crossing penalty in `route.py` is now for — a
+  general nudge to route clear, keyed on nothing in particular.
 - **A supply filter is drawn as a block, not scattered.** Parts whose every
   net is a rail never join the signal graph, so they used to be laid out one
   to a lane and wired only by label — an inductor and its reservoir cap came
