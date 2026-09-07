@@ -47,6 +47,8 @@ STUB_DROP = STUB * 2
 # other's body. Half a spine column keeps the second leg clear of the next
 # spine part, whose own legs sit a full column away.
 LEG_SHIFT = GRID * 6
+# (supply parts used to lay out as a grid of their own; they now flow through
+# the ordinary spine-and-legs path, so no separate pitch is needed.)
 # How much a turn must save before it is worth making. A two-terminal part is
 # electrically symmetric, so flipping it end-for-end is often free and the
 # distance it saves is arbitrary noise — swapping which pin is the nearer by
@@ -54,8 +56,6 @@ LEG_SHIFT = GRID * 6
 # is what tells a genuinely back-to-front part from a coin-toss and stops a
 # marginal turn from trading a tidy wire for a crossing.
 FLIP_MARGIN = GRID * 7
-SUPPLY_COLS = 3             # rail-filtering parts per row
-SUPPLY_PITCH = COL * 4      # wide enough for a rail label at each end
 
 
 @dataclass
@@ -75,6 +75,13 @@ class Placer(Builder):
         self._bridges = {}
         self._pending: list[_Stub] = []
         self._spares: list[tuple[str, int]] = []
+        # A rail with two pins in one lane (an inductor and its reservoir cap)
+        # is drawn as a wire between them with a single label — an "island" —
+        # rather than a power symbol at each pin. `_island` is every such pin,
+        # `_island_quiet` the ones whose symbol is suppressed (all but one).
+        self._island: set[tuple[str, str]] = set()
+        self._island_quiet: set[tuple[str, str]] = set()
+        self._island_tap: set[tuple[str, str]] = set()
 
     def run(self) -> Sheet:
         y = MARGIN_Y
@@ -87,8 +94,9 @@ class Placer(Builder):
 
     # --- groups -------------------------------------------------------
     def _group(self, group, y0: float) -> float:
-        if group.supply:
-            return self._supply(group, y0)
+        # A supply group has no head and its lanes are small filter blocks, but
+        # it lays out like any other — a spine with legs — so it falls through
+        # to the same path rather than a grid of its own.
 
         # Draw each lane at the height of the head pin that feeds it, so the
         # fan-out does not cross itself. The DAC's pin 8 sits above pin 6 but
@@ -143,24 +151,6 @@ class Placer(Builder):
         )
         return STUB_DROP + STUB if has_leg else STUB * 2
 
-    def _supply(self, group, y0: float) -> float:
-        """Rail filtering: each part runs horizontally between its globals.
-
-        Laid out as a grid rather than a column. These are all two-terminal
-        parts sitting between two rails, so a column of them is one narrow
-        strip and a page of whitespace beside it — which is most of what made
-        the sheet twice as tall as it needed to be.
-        """
-        per_row = max(1, min(SUPPLY_COLS, len(group.lanes)))
-        y = y0
-        for i, lane in enumerate(group.lanes):
-            if i and i % per_row == 0:
-                y += ROW // 2
-            x = MARGIN_X + COL + (i % per_row) * SUPPLY_PITCH
-            p = self.place(lane.spine[0], x, y)
-            self._globals_for(p, prefer_horizontal=True)
-        return y
-
     # --- one lane -----------------------------------------------------
     def _lane(self, lane, x0: float, y: float, head) -> None:
         placed: dict[str, object] = {}
@@ -192,6 +182,11 @@ class Placer(Builder):
         for p in parts:
             self._orient(p)
 
+        # A rail shared by two parts of this lane is wired between them, not
+        # symbol-per-pin (see _register_islands); that has to be known before
+        # globals are recorded so the wired pins can be left out.
+        self._register_islands(parts)
+
         # Pins now sit where they finally are, so their leads out to power
         # symbols and off-sheet labels can be recorded.
         for p in parts:
@@ -199,6 +194,32 @@ class Placer(Builder):
         for ref in lane.spine:
             self._loose_for(placed[ref])
             self._terminals_for(placed[ref])
+
+    def _register_islands(self, parts) -> None:
+        """Find rails a lane wires internally: an inductor and its cap on 12V.
+
+        A supply filter's two parts share a rail (its output), which globally
+        is a power symbol everywhere it appears — so an inductor and its
+        reservoir cap came out as two segments each carrying the same label,
+        not one filter. When a global rail touches two pins of a single lane
+        the connection is local and short, so it is drawn as a wire with a
+        lone label instead. All but one of the island's pins have their symbol
+        suppressed; the survivor is the rail's tap out to the rest of the
+        sheet, by name, exactly as before.
+        """
+        by_net: dict[str, list[tuple[str, str]]] = defaultdict(list)
+        for p in parts:
+            sym = self.sym(p.ref)
+            for pin in sym.units[p.unit].pins:
+                net = self.cir.net_at(p.ref, pin)
+                if net and net.name in self.lay.globals:
+                    by_net[net.name].append((p.ref, pin))
+        for members in by_net.values():
+            if len(members) < 2:
+                continue
+            self._island.update(members)
+            self._island_quiet.update(members[1:])
+            self._island_tap.add(members[0])   # keeps the label; send it sideways
 
     def _spare_units(self, y: float) -> float:
         """Park each package's supply unit in a row at the foot of the sheet.
@@ -241,7 +262,10 @@ class Placer(Builder):
                     continue
                 at = pin_xy(placed, sym, pin)
                 grid.add_pin(at, net.name)
-                if net.name not in self.lay.globals:
+                # Local nets route; a global normally does not — unless it is an
+                # island rail, wired between two pins of one lane.
+                if (net.name not in self.lay.globals
+                        or (placed.ref, pin) in self._island):
                     terminals[net.name].append(
                         (at, pin_dir(placed, sym, pin), placed.traced))
 
@@ -404,6 +428,18 @@ class Placer(Builder):
         both = na & nb - self.lay.globals
         return sorted(both)[0] if both else None
 
+    def _shared_rail(self, a: str, b: str) -> str | None:
+        """A global rail two parts share — how a filter cap meets its inductor.
+
+        Their only common net is the rail (12V), which `_shared_net` skips as a
+        global; but for an island the leg does drop from that pin, so it is
+        worth finding.
+        """
+        na = {n.name for n in self.cir.nets_of(a)}
+        nb = {n.name for n in self.cir.nets_of(b)}
+        both = sorted((na & nb) & self.lay.globals)
+        return both[0] if both else None
+
     def _pin_at(self, placed, net: str):
         sym = self.sym(placed.ref)
         for pin in sym.units[placed.unit].pins:
@@ -424,14 +460,18 @@ class Placer(Builder):
         down. A pin already pointing up or down takes the leg straight under.
         """
         net = self._shared_net(leg_ref, host.ref)
-        pin = self._pin_name_at(host, net) if net else None
+        rail = self._shared_rail(leg_ref, host.ref) if not net else None
+        pin = self._pin_name_at(host, net or rail) if (net or rail) else None
         if not pin:
             return fallback
         sym = self.sym(host.ref)
         x = pin_xy(host, sym, pin)[0]
-        dx, dy = pin_dir(host, sym, pin)
-        if abs(dx) > abs(dy):
-            x += dx * (GRID * 2)
+        # The side-step is for a pin that can only be entered horizontally — an
+        # op-amp input. A rail tap takes the cap straight beneath it.
+        if rail is None:
+            dx, dy = pin_dir(host, sym, pin)
+            if abs(dx) > abs(dy):
+                x += dx * (GRID * 2)
         return x
 
     def _orient(self, placed) -> None:
@@ -529,13 +569,18 @@ class Placer(Builder):
             net = self.cir.net_at(placed.ref, pin)
             if not net or net.name not in self.lay.globals:
                 continue
+            if (placed.ref, pin) in self._island_quiet:
+                continue                # wired to its island's tap, no symbol
             self._pending.append(_Stub(
                 at=pin_xy(placed, sym, pin),
                 out=pin_dir(placed, sym, pin),
                 net=net.name,
                 traced=placed.traced,
                 power=True,
-                prefer_horizontal=prefer_horizontal,
+                # an island tap sends its label sideways, leaving the way down
+                # clear for the cap wired beneath it.
+                prefer_horizontal=(prefer_horizontal
+                                   or (placed.ref, pin) in self._island_tap),
             ))
 
     def _loose_for(self, placed) -> None:

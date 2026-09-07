@@ -86,6 +86,16 @@ settle *where* a part sits:
   tier closer. The output-to-input feedback resistor round the driver stage
   was being parked 30 mm up with long riser legs; it now sits just above the
   row where it belongs.
+- **A supply filter is drawn as a block, not scattered.** Parts whose every
+  net is a rail never join the signal graph, so they used to be laid out one
+  to a lane and wired only by label — an inductor and its reservoir cap came
+  out as two segments both stamped `12V`, not a filter. `layout.py` now links
+  them by the rail they share (ground excepted — it is the return, a leg to a
+  symbol), the inductor a spine with the cap hung beneath it. And when a rail
+  touches two pins of one lane, `place.py` draws that stretch as a real wire
+  with a single tapped-out label — an *island* — instead of a symbol at each
+  pin. Nowhere else in the corpus does a rail land twice in a lane, so only
+  the filters are touched; the signal sheet is untouched.
 
 And **one** rule settles *which way every part faces* — `place.py`'s `_orient`:
 

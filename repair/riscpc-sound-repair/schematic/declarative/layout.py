@@ -47,6 +47,14 @@ GLOBAL_NAME = re.compile(
 # signal node: a summing node with a feedback pair is already four pins.
 GLOBAL_FANOUT = 6
 
+# Ground-side rails. A supply filter is linked up by the rail it shares, but
+# ground is the return everything drops to — a leg to a symbol, not a spine.
+GROUND_NAME = re.compile(r"^(A|D)?GND$|^0V$|^VSS$|^VEE$", re.I)
+
+
+def is_ground(name: str) -> bool:
+    return bool(GROUND_NAME.match(name))
+
 
 @dataclass
 class Attachment:
@@ -151,11 +159,56 @@ def build(cir: Circuit, hints: dict | None = None) -> Layout:
 
 
 def _lay_supply(cir, refs, lay) -> Group:
-    """One lane per part, each running between the globals it connects."""
+    """Draw each rail's filter as a connected block, not floating segments.
+
+    These parts touch only supply nets, so they never join the signal graph —
+    but they are not unrelated either: an inductor feeds a rail and a reservoir
+    cap decouples it. Link them by the rail they share (ground excepted, which
+    is the return everything drops to, so it stays a leg to a symbol). An LC
+    filter then reads as one thing instead of two segments labelled the same.
+    """
     group = Group(supply=True)
-    for ref in sorted(refs, key=lambda r: (len(cir.nets_of(r)), r), reverse=True):
-        group.lanes.append(Lane(spine=[ref]))
+    adj: dict[str, set[str]] = {r: set() for r in refs}
+    for net in cir.nets.values():
+        if is_ground(net.name):
+            continue
+        on = [r for r in cir.parts_on(net) if r in refs]
+        for a in on:
+            for b in on:
+                if a != b:
+                    adj[a].add(b)
+
+    seen: set[str] = set()
+    for start in sorted(refs, key=lambda r: (len(cir.nets_of(r)), r), reverse=True):
+        if start in seen:
+            continue
+        comp = _component(start, adj)
+        seen |= comp
+        group.lanes.append(_lay_filter(cir, comp, adj))
     return group
+
+
+def _lay_filter(cir, comp, adj) -> Lane:
+    """Series parts (no ground pin) are the spine; shunts hang to ground.
+
+    An inductor between a raw rail and a filtered one carries the signal
+    across, so it is the spine. A cap from that rail to ground is a shunt, hung
+    as a leg. A component with nothing but ground pins — a bare jack sleeve to
+    GND — is just its own short spine.
+    """
+    shunts = [r for r in comp
+              if any(is_ground(n.name) for n in cir.nets_of(r))]
+    series = sorted(r for r in comp if r not in shunts)
+    if not series:
+        return Lane(spine=sorted(comp))
+    lane = Lane(spine=series)
+    for ref in sorted(shunts):
+        host = next((s for s in series if s in adj[ref]), series[0])
+        gnet = next((n.name for n in cir.nets_of(ref)
+                     if is_ground(n.name)), None)
+        lane.attachments.append(
+            Attachment(ref, "stub", (host, host), net=gnet, above=False))
+    return lane
 
 
 def _component(start: str, adj: dict[str, set[str]]) -> set[str]:
