@@ -95,7 +95,10 @@ settle *where* a part sits:
   touches two pins of one lane, `place.py` draws that stretch as a real wire
   with a single tapped-out label — an *island* — instead of a symbol at each
   pin. Nowhere else in the corpus does a rail land twice in a lane, so only
-  the filters are touched; the signal sheet is untouched.
+  the filters are touched; the signal sheet is untouched. The filter blocks
+  are then *flowed* — laid left to right across the width the signal chain
+  already spans and wrapped onto a new shelf when the next would overflow —
+  rather than stacked one to a tall column, so they take a strip.
 
 And **one** rule settles *which way every part faces* — `place.py`'s `_orient`:
 

@@ -85,18 +85,50 @@ class Placer(Builder):
 
     def run(self) -> Sheet:
         y = MARGIN_Y
+        width = 0.0
         for group in self.lay.groups:
-            y = self._group(group, y) + ROW // 2
+            if group.supply:
+                # Small disconnected blocks — flow them across to the width the
+                # signal already uses, then wrap, rather than one tall column.
+                y = self._flow(group.lanes, y, width) + ROW // 2
+            else:
+                y = self._group(group, y) + ROW // 2
+                width = self.sheet.bounds()[2] - MARGIN_X
         self._spare_units(y + ROW // 2)
         self._wire_all()
         self._title()
         return self.sheet
 
     # --- groups -------------------------------------------------------
+    def _flow(self, lanes, y0: float, max_width: float) -> float:
+        """Pack a run of small blocks left-to-right, wrapping at a width.
+
+        A supply filter or a bare ground stub is a block a few columns wide; a
+        column of them wastes the sheet. Laid across to the width the signal
+        chain already spans and wrapped onto a new shelf when the next would
+        overflow, they take a strip instead. Each block is still a lane placed
+        the ordinary way — this only chooses where.
+        """
+        if max_width <= 0:
+            max_width = COL * 14
+        x, y, shelf = MARGIN_X, y0, 0.0
+        for lane in lanes:
+            w = self._block_width(lane)
+            if x > MARGIN_X and x - MARGIN_X + w > max_width:
+                x = MARGIN_X
+                y += shelf + ROW // 2
+                shelf = 0.0
+            self._lane(lane, x, y + self._headroom(lane), None)
+            shelf = max(shelf, self._headroom(lane) + self._legroom(lane))
+            x += w
+        return y + shelf
+
+    @staticmethod
+    def _block_width(lane) -> float:
+        """A block's footprint: its spine, plus room for a rail label each end."""
+        return len(lane.spine) * COL + COL * 2
+
     def _group(self, group, y0: float) -> float:
-        # A supply group has no head and its lanes are small filter blocks, but
-        # it lays out like any other — a spine with legs — so it falls through
-        # to the same path rather than a grid of its own.
 
         # Draw each lane at the height of the head pin that feeds it, so the
         # fan-out does not cross itself. The DAC's pin 8 sits above pin 6 but
