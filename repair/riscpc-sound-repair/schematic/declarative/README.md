@@ -8,6 +8,7 @@ the next piece and is not written yet.
 nix develop --command python3 render.py circuit.cir -o circuit.svg
 nix develop --command python3 render.py circuit.cir --verify    # is it the circuit?
 nix develop --command python3 render.py circuit.cir --check     # does it cross a body?
+nix develop --command python3 render.py circuit.cir --crossings # do two nets cross?
 nix develop --command python3 render.py circuit.cir --layout    # what was inferred
 nix develop --command python3 render.py circuit.cir --netlist   # net by net
 nix develop --command bash tests/run.sh                         # the whole ladder
@@ -63,6 +64,20 @@ reading from four graph rules:
 
 Lanes come from cutting the source, so the two channels separate without
 anyone saying they are channels.
+
+Two placement rules then run once positions exist and the pin geometry is
+known — things `layout.py` cannot decide because it works on the graph alone:
+
+- **Lanes are ordered by the head pin that feeds them.** The DAC's pin 8 sits
+  above pin 6 but feeds the *other* channel; drawn in lane order the two feeds
+  swap over and cross at the DAC. Sorted by the height of their feeding pin,
+  they run straight out. This is what put the three DAC-fan-out crossings to
+  zero.
+- **A leg stands on end.** A part hanging to a rail is drawn vertically and
+  dropped from the *pin* it attaches to, not the host's centre, so the wire
+  runs straight down through it to the power symbol. Two legs off one host
+  stand side by side rather than stacking down one column — collinear vertical
+  parts would each route a wire through the other's body.
 
 ## Symbols
 
@@ -121,14 +136,21 @@ routing is solved once and the KiCad writer is mostly translation.
    - `Cf_L` / `Cf_R` legs run a long way left to reach the op-amp's
      inverting input; a "keep these together" hint would place them better.
    - `U1A`'s supply unit (pins 4/11) floats below the row looking orphaned.
-3. **Routing is correct, placement is not yet good.** Everything above is a
-   placement complaint, and that is the honest state of it: the router now
-   draws what it is given without lying about the connectivity, so the next
-   round of improvement belongs in `layout.py` and `place.py`. The literature
-   agrees — *Weave* runs a layered (Sugiyama) engine for the signal chain and
-   handles feedback, divider legs, hanging shunts and supply corners as
-   explicit placement *patterns* outside that graph, which is what the four
-   graph rules here are reaching towards.
+3. **Placement is improving on measured crossings, not yet on all of them.**
+   The router draws what it is given without lying about the connectivity, so
+   improvement belongs in `place.py`. `--crossings` now counts wire-to-wire
+   crossings (nicer at zero, not a correctness check), and the two ordering
+   rules above took the headphone amp from 5 to 2 and the test ladder from 10
+   to 4. The two that remain are both the *complementary-input crossing*: on
+   the driver op-amp `+in` sits directly above `−in`, `+in` wires down to its
+   bias leg and `−in` wires up to the feedback — two wires leaving adjacent
+   pins in opposite directions must cross once. No horizontal nudge of the leg
+   removes it (measured); the structural fix is to **swap the op-amp's input
+   pins with a vertical mirror** when the topology wants `+in` low, which is a
+   real placement *pattern* and the next piece of work. The literature agrees
+   — *Weave* runs a layered (Sugiyama) engine for the signal chain and handles
+   feedback, divider legs, hanging shunts and supply corners as explicit
+   patterns outside that graph, which is what these rules are reaching towards.
 4. **The spare supply unit reads as two stalks.** A quad op-amp's pins 4 and
    11 are one pair shared by all four sections, so KiCad draws them as a
    fifth symbol with no body. They are parked together at the foot of the

@@ -166,7 +166,7 @@ class Builder:
 
     # --- placement ----------------------------------------------------
     def place(self, ref: str, x: float, y: float, unit: int | None = None,
-              angle: float | None = None) -> Placed:
+              angle: float | None = None, vertical: bool = False) -> Placed:
         part = self.cir.parts[ref]
         sym = self.sym(ref)
         if unit is None:
@@ -174,6 +174,11 @@ class Builder:
                 next(iter(sym.units))
         if angle is None:
             angle = _two_terminal_angle(sym, unit)
+            if vertical:
+                # A leg hanging to a rail reads better stood on end, so the
+                # wire runs straight down through it. Rotate a quarter-turn
+                # off whichever way it would lie flat.
+                angle = (angle + 90) % 180
         p = Placed(
             ref=ref, lib_id=sym.lib_id, unit=unit,
             x=snap(x), y=snap(y), angle=angle,

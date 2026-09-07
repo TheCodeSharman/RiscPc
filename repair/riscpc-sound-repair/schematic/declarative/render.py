@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     ap.add_argument("--netlist", action="store_true", help="print the netlist")
     ap.add_argument("--check", action="store_true",
                     help="report wires that cross a symbol body")
+    ap.add_argument("--crossings", action="store_true",
+                    help="count wires of different nets crossing each other")
     ap.add_argument("--verify", action="store_true",
                     help="read the drawing back and compare it to the netlist")
     args = ap.parse_args(argv)
@@ -53,6 +55,9 @@ def main(argv=None) -> int:
 
     if args.check:
         return _check(cir, sheet)
+
+    if args.crossings:
+        return _crossings(cir, sheet)
 
     if args.verify:
         return _verify(cir, sheet)
@@ -130,6 +135,39 @@ def _check(cir, sheet) -> int:
     for net, ref in sorted(bad):
         print(f"   net {net} crosses {ref}")
     return 1
+
+
+def _crossings(cir, sheet) -> int:
+    """Count places two different nets cross without a junction dot.
+
+    A schematic can be drawn flat precisely because such a crossing is *not* a
+    connection — `verify.py` proves that. But every one is a wire hopping over
+    another, and fewer of them reads cleaner, so this is the number the
+    placement engine is trying to drive down. It is not a correctness check:
+    zero is nicer, not required.
+    """
+    import verify
+
+    segs = verify._segments(sheet)
+    junc = {(round(x, 6), round(y, 6)) for x, y in sheet.junctions}
+    found = []
+    for i, s in enumerate(segs):
+        for j in range(i + 1, len(segs)):
+            t = segs[j]
+            x = verify._cross(s, t)
+            if x is None or s.net == t.net:
+                continue
+            if (round(x[0], 6), round(x[1], 6)) in junc:
+                continue
+            found.append((s.net, t.net, x))
+
+    if not found:
+        print(f"ok: {len(sheet.wires)} wires, no wire-to-wire crossings")
+        return 0
+    print(f"{len(found)} wire crossing(s):")
+    for a, b, x in sorted(found, key=lambda f: (f[0], f[1])):
+        print(f"   {a} x {b} at {x[0]:.1f},{x[1]:.1f}")
+    return 0
 
 
 def _print_netlist(cir) -> None:

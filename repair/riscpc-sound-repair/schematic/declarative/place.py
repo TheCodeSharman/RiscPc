@@ -42,6 +42,11 @@ GLYPH = GRID * 2            # room the power symbol's own artwork takes
 # host's value underneath it, the stub's reference above itself. Clearing
 # the symbols is not enough; STUB alone put "Rpull_R" on top of "BC849C".
 STUB_DROP = STUB * 2
+# Two legs off one host stand side by side rather than stacking down the same
+# column — collinear vertical parts would run each other's wire through the
+# other's body. Half a spine column keeps the second leg clear of the next
+# spine part, whose own legs sit a full column away.
+LEG_SHIFT = GRID * 6
 SUPPLY_COLS = 3             # rail-filtering parts per row
 SUPPLY_PITCH = COL * 4      # wide enough for a rail label at each end
 
@@ -78,6 +83,15 @@ class Placer(Builder):
         if group.supply:
             return self._supply(group, y0)
 
+        # Draw each lane at the height of the head pin that feeds it, so the
+        # fan-out does not cross itself. The DAC's pin 8 sits above pin 6 but
+        # feeds the other channel; ordered by pin, the two feeds run straight
+        # out instead of swapping over. layout.py cannot do this — the pin
+        # geometry only exists here.
+        if group.head and len(group.lanes) > 1:
+            group.lanes.sort(
+                key=lambda ln: -self._head_pin_y(group.head, ln))
+
         # A lane is as tall as its own bridge stack. Spacing them by a fixed
         # pitch means the tallest lane's bridges climb into the lane above.
         ys, cur = [], y0
@@ -107,19 +121,20 @@ class Placer(Builder):
         return (top + 2) * TIER
 
     def _legroom(self, lane) -> float:
-        """Space below the row for stubs, hangers and parked spare units."""
-        tiers = defaultdict(int)
-        for att in lane.attachments:
-            if not att.above or att.kind == "stub":
-                tiers[att.spans[0]] = max(tiers[att.spans[0]], att.tier + 1)
-        for ref in lane.spine:
-            hangers = [r for r in self.lay.stubs.get(ref, [])
-                       if self.cir.parts[r].kind != "terminal"]
-            tiers[ref] += len(hangers)
-        deepest = max(tiers.values(), default=0)
-        if not deepest:
-            return STUB * 2
-        return STUB_DROP + STUB + (deepest - 1) * TIER
+        """Space below the row for legs — vertical drops to a rail.
+
+        Legs now stand side by side at one depth rather than stacking down the
+        column, so the room needed below the row is the same whether a host
+        carries one leg or three: the resistor plus its drop to the rail.
+        """
+        has_leg = any(
+            not att.above or att.kind == "stub" for att in lane.attachments
+        ) or any(
+            any(self.cir.parts[r].kind != "terminal"
+                for r in self.lay.stubs.get(ref, []))
+            for ref in lane.spine
+        )
+        return STUB_DROP + STUB if has_leg else STUB * 2
 
     def _supply(self, group, y0: float) -> float:
         """Rail filtering: each part runs horizontally between its globals.
@@ -301,16 +316,22 @@ class Placer(Builder):
         host = placed.get(att.spans[0])
         if host is None:
             return
-        # `_stack` has already given co-located stubs distinct tiers; using
-        # them is what stops two legs off one host being placed on top of
-        # each other, which is what Rf and Rpull did the moment Rpull stopped
-        # being mistaken for a bridge.
-        y = row_y + STUB_DROP + att.tier * TIER
-        p = self._place_multi(att.ref, host.x, y, angle=90.0)
+        # `_stack` has already given co-located stubs distinct tiers; a leg is
+        # drawn vertically dropping to its rail, so the tier shifts it sideways
+        # rather than down — two legs stood in one column would each route a
+        # wire through the other's body, which is what Rf and Rpull did the
+        # moment Rpull stopped being mistaken for a bridge.
+        base_x = self._host_pin_x(host, att.ref, host.x)
+        x = base_x + att.tier * LEG_SHIFT
+        y = row_y + STUB_DROP
+        p = self._place_multi(att.ref, x, y, vertical=True)
+        if att.net:
+            self._face_down(p, att.net)
         self._globals_for(p)
 
     # --- helpers ------------------------------------------------------
-    def _place_multi(self, ref: str, x: float, y: float, angle=None):
+    def _place_multi(self, ref: str, x: float, y: float, angle=None,
+                     vertical: bool = False):
         """Place a part, emitting a second instance for a spare unit.
 
         A quad op-amp's supply pins live on their own unit; KiCad expects that
@@ -322,14 +343,42 @@ class Placer(Builder):
         by_unit = sym.split_by_unit(part.pins) if len(sym.units) > 1 else None
 
         if not by_unit or len(by_unit) == 1:
-            return self.place(ref, x, y, angle=angle)
+            return self.place(ref, x, y, angle=angle, vertical=vertical)
 
         main = min(by_unit, key=lambda u: -len(by_unit[u]))
-        p = self.place(ref, x, y, unit=main, angle=angle)
+        p = self.place(ref, x, y, unit=main, angle=angle, vertical=vertical)
         for unit in by_unit:
             if unit != main:
                 self._spares.append((ref, unit))
         return p
+
+    def _main_unit(self, ref: str) -> int:
+        """The unit `_place_multi` will draw as the part's body."""
+        sym = self.sym(ref)
+        if len(sym.units) == 1:
+            return next(iter(sym.units))
+        by_unit = sym.split_by_unit(self.cir.parts[ref].pins)
+        return min(by_unit, key=lambda u: -len(by_unit[u]))
+
+    def _head_pin_y(self, head_ref: str, lane) -> float:
+        """Library y (y-up) of the head pin(s) that feed `lane`.
+
+        A larger value sits higher on the sheet, so sorting lanes by it
+        descending draws the fan-out in pin order. Averaged when a lane is fed
+        by more than one head pin; zero if none is found, which leaves such a
+        lane where the stable sort had it.
+        """
+        members = set(lane.spine) | {a.ref for a in lane.attachments}
+        sym = self.sym(head_ref)
+        unit = self._main_unit(head_ref)
+        ys = []
+        for pin, pinobj in sym.units[unit].pins.items():
+            net = self.cir.net_at(head_ref, pin)
+            if not net or net.name in self.lay.globals:
+                continue
+            if any(r in members for r, _ in net.pins):
+                ys.append(pinobj.y)
+        return sum(ys) / len(ys) if ys else 0.0
 
     def _shared_net(self, a: str, b: str) -> str | None:
         na = {n.name for n in self.cir.nets_of(a)}
@@ -344,6 +393,17 @@ class Placer(Builder):
             if n and n.name == net:
                 return pin_xy(placed, sym, pin)
         return None
+
+    def _host_pin_x(self, host, leg_ref: str, fallback: float) -> float:
+        """x of the host pin a leg attaches to, so it drops from the pin.
+
+        Dropping from the host's centre instead makes a leg off an op-amp's
+        +in jog sideways across the −in wiring — the last two crossings in the
+        headphone amp were exactly that. From the pin, the drop is straight.
+        """
+        net = self._shared_net(leg_ref, host.ref)
+        hp = self._pin_at(host, net) if net else None
+        return hp[0] if hp else fallback
 
     def _orient(self, a, b) -> None:
         net = self._shared_net(a.ref, b.ref)
@@ -362,6 +422,25 @@ class Placer(Builder):
              if (n := self.cir.net_at(placed.ref, p)) and n.name == net), None
         )
         if target and xs[target] == max(xs.values()) and len(set(xs.values())) > 1:
+            placed.angle = (placed.angle + 180) % 360
+
+    def _face_down(self, placed, net: str) -> None:
+        """Flip a vertical two-terminal part so its `net` pin is the lowest.
+
+        A leg drops to a rail below the row; putting the rail-net pin at the
+        bottom keeps the wire running straight on down to the power symbol
+        instead of doubling back up through the body.
+        """
+        sym = self.sym(placed.ref)
+        pins = sym.units[placed.unit].pins
+        if len(pins) != 2:
+            return
+        ys = {p: pin_xy(placed, sym, p)[1] for p in pins}
+        target = next(
+            (p for p in pins
+             if (n := self.cir.net_at(placed.ref, p)) and n.name == net), None
+        )
+        if target and ys[target] == min(ys.values()) and len(set(ys.values())) > 1:
             placed.angle = (placed.angle + 180) % 360
 
     def _globals_for(self, placed, prefer_horizontal: bool = False) -> None:
@@ -463,8 +542,14 @@ class Placer(Builder):
                 continue                    # `_terminals_for` puts those inline
             tier = below[placed.ref]
             below[placed.ref] += 1
+            base_x = self._host_pin_x(placed, ref, placed.x)
             p = self._place_multi(
-                ref, placed.x, row_y + STUB_DROP + tier * TIER, angle=90.0)
+                ref, base_x + tier * LEG_SHIFT, row_y + STUB_DROP,
+                vertical=True)
+            rail = next((n.name for n in self.cir.nets_of(ref)
+                         if n.name in self.lay.globals), None)
+            if rail:
+                self._face_down(p, rail)
             self._globals_for(p)
 
     def _terminals_for(self, placed) -> None:
