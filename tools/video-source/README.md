@@ -81,6 +81,14 @@ command that errors replies `FAIL` and the server keeps listening.
 monitor definition that cannot do what was asked would otherwise look, from the
 far end, exactly like a fault in the thing being tested.
 
+**A reply ending `NOCARD` means the mode was set and nothing was drawn.** Every
+handler that changes the mode repaints, because the signal after a mode change
+is otherwise black with a flashing cursor -- which reads from the far end as the
+scaler having lost the source, and has been diagnosed as one. But every repaint
+is guarded by `haslib%`, so with `PatLib` missing the reply was still `OK` and
+the screen was still black. It now says so, in the reply and once on the
+server's own screen when the library fails to load.
+
 `BORDER` is **off by default, and that is about the thing under test.** The
 liveness animation used to flip the screen border cyan and magenta twice a
 second. A scaler samples the analog line and reconstructs black from it, so a

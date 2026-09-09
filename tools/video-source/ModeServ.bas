@@ -159,7 +159,7 @@
  1470 REM PROCdispatch's handler turns into FAIL - same reply as before.
  1480 MODE m$
  1485 IF haslib% THEN PROCpaint("PM5544")
- 1490 PROCsend(c%,"OK "+FNachieved)
+ 1490 PROCsend(c%,"OK "+FNachieved+FNnocard)
  1495 ENDPROC
  1500 :
  1510 REM Everything after the first word: the mode string exactly as sent.
@@ -193,7 +193,7 @@
  1726 a$=FNrest(cmd$)
  1732 IF a$<>"" THEN PROCsetsync(c%,VAL(a$)):IF badsync% THEN ENDPROC
  1738 SYS "OS_ReadSysInfo",1 TO ,,s%
- 1744 PROCsend(c%,"OK SYNC "+STR$s%+" "+FNachieved)
+ 1744 PROCsend(c%,"OK SYNC "+STR$s%+" "+FNachieved+FNnocard)
  1750 ENDPROC
  1756 :
  1762 DEF PROCsetsync(c%,n%)
@@ -248,7 +248,7 @@
  2180 :
  2190 DEF FNloadlib
  2200 LOCAL ERROR
- 2210 ON ERROR LOCAL =FALSE
+ 2210 ON ERROR LOCAL PRINT "PatLib did not load - run Build. No card will be drawn.":=FALSE
  2220 LIBRARY "PatLib"
  2230 =TRUE
  2240 :
@@ -333,7 +333,7 @@
  2958 OTHERWISE:PROCsend(c%,"FAIL border is ON or OFF"):ENDPROC
  2959 ENDCASE
  2960 IF a$<>"" AND haslib% THEN PROCpaint(lastcard$)
- 2970 IF BORDERFLASH% THEN PROCsend(c%,"OK BORDER ON") ELSE PROCsend(c%,"OK BORDER OFF")
+ 2970 IF BORDERFLASH% THEN PROCsend(c%,"OK BORDER ON"+FNnocard) ELSE PROCsend(c%,"OK BORDER OFF"+FNnocard)
  2980 ENDPROC
  2990 :
  3000 REM INTERLACE reports the state; INTERLACE ON|OFF sets it.
@@ -352,5 +352,14 @@
  3130 IF a$="ON" THEN ilace%=1:OSCLI("TV 0,0")
  3140 IF a$="OFF" THEN ilace%=0:OSCLI("TV 0,1")
  3150 IF a$<>"" THEN m$=FNachieved:MODE m$:IF haslib% THEN PROCpaint(lastcard$)
- 3160 IF ilace% THEN PROCsend(c%,"OK INTERLACE ON "+FNachieved) ELSE PROCsend(c%,"OK INTERLACE OFF "+FNachieved)
+ 3160 IF ilace% THEN PROCsend(c%,"OK INTERLACE ON "+FNachieved+FNnocard) ELSE PROCsend(c%,"OK INTERLACE OFF "+FNachieved+FNnocard)
  3170 ENDPROC
+ 3180 :
+ 3182 REM Appended to every reply whose handler changed the mode. A mode change
+ 3184 REM leaves the machine showing black with a flashing cursor until something
+ 3186 REM repaints, and every repaint here is guarded by haslib% -- so with PatLib
+ 3188 REM missing the reply is still OK and the screen is still black, which reads
+ 3190 REM from the far end as the scaler having lost the signal. Say it instead.
+ 3192 DEF FNnocard
+ 3194 IF haslib% THEN =""
+ 3196 =" NOCARD"
