@@ -45,6 +45,8 @@
   380 DIM sa% 16,opt% 4,alen% 4,rx% 1024,tx% 1024,enum% 4096,rfd% 32,tv% 8
   390 listen%=-1:conn%=-1:running%=TRUE
   395 painted%=FALSE:selok%=TRUE:anim%=0
+  396 BORDERFLASH%=0
+  397 ilace%=0:lastcard$="PM5544"
   400 haslib%=FNloadlib
   420 ENDPROC
   430 :
@@ -141,6 +143,8 @@
  1340 WHEN "MODES":PROCmodes(c%)
  1350 WHEN "MODE":PROCsetmode(c%,cmd$)
  1355 WHEN "SYNC":PROCsync(c%,cmd$)
+ 1356 WHEN "BORDER":PROCborder(c%,cmd$)
+ 1357 WHEN "INTERLACE":PROCinterlace(c%,cmd$)
  1360 WHEN "":PROCsend(c%,"FAIL empty command")
  1370 OTHERWISE:PROCsend(c%,"FAIL unknown command "+w$)
  1380 ENDCASE
@@ -260,7 +264,7 @@
  2326 DEF PROCpaint(which$)
  2327 PROCpatinit
  2328 IF which$="CARD" THEN PROCpatdraw ELSE PROCpm5544
- 2329 painted%=TRUE:anim%=TIME+ANIM_CS%
+ 2329 painted%=TRUE:anim%=TIME+ANIM_CS%:lastcard$=which$
  2330 ENDPROC
  2340 :
  2350 DEF FNword(s$,n%)
@@ -308,3 +312,45 @@
  2780 IF f% AND 1 THEN selok%=FALSE:PRINT "Socket_Select failed - falling back to blocking accept, no liveness flip.":=FNaccept(s%)
  2790 IF n%<=0 THEN =-1
  2800 =FNaccept(s%)
+ 2810 :
+ 2820 REM BORDER reports the screen border flip; BORDER ON|OFF sets it.
+ 2830 REM
+ 2840 REM OFF by default, and the reason is the thing under test rather than
+ 2850 REM taste. A scaler reconstructs black from the analog line it samples, so
+ 2860 REM a border changing colour twice a second moves that reference: measured
+ 2870 REM on a GBS-C in pass-through, the whole picture alternates red and green
+ 2880 REM -- the complements of the cyan and magenta flipped here -- while every
+ 2890 REM register on the scaler reads identical between the two frames. The card
+ 2900 REM stays visibly alive without it, because the ring and corner flips are
+ 2910 REM inside the picture.
+ 2920 DEF PROCborder(c%,cmd$)
+ 2930 LOCAL a$
+ 2940 a$=FNupper(FNrest(cmd$))
+ 2950 CASE a$ OF
+ 2952 WHEN "ON":BORDERFLASH%=1
+ 2954 WHEN "OFF":BORDERFLASH%=0
+ 2956 WHEN "":
+ 2958 OTHERWISE:PROCsend(c%,"FAIL border is ON or OFF"):ENDPROC
+ 2959 ENDCASE
+ 2960 IF a$<>"" AND haslib% THEN PROCpaint(lastcard$)
+ 2970 IF BORDERFLASH% THEN PROCsend(c%,"OK BORDER ON") ELSE PROCsend(c%,"OK BORDER OFF")
+ 2980 ENDPROC
+ 2990 :
+ 3000 REM INTERLACE reports the state; INTERLACE ON|OFF sets it.
+ 3010 REM
+ 3020 REM *TV vert_align,interlace, where interlace 0 is ON and 1 is OFF -- the
+ 3030 REM sense is inverted, PRM volume 1. Like SYNC this is a machine setting
+ 3040 REM rather than a mode file field, and the PRM says it takes effect on the
+ 3050 REM next mode change, so the mode is re-applied to make it reach the wire.
+ 3060 REM
+ 3070 REM There is no OS call that reads it back, so the state reported is what
+ 3080 REM this server last set. A fresh server reports OFF whatever *TV was.
+ 3090 DEF PROCinterlace(c%,cmd$)
+ 3100 LOCAL a$,m$
+ 3110 a$=FNupper(FNrest(cmd$))
+ 3120 IF a$<>"" AND a$<>"ON" AND a$<>"OFF" THEN PROCsend(c%,"FAIL interlace is ON or OFF"):ENDPROC
+ 3130 IF a$="ON" THEN ilace%=1:OSCLI("TV 0,0")
+ 3140 IF a$="OFF" THEN ilace%=0:OSCLI("TV 0,1")
+ 3150 IF a$<>"" THEN m$=FNachieved:MODE m$:IF haslib% THEN PROCpaint(lastcard$)
+ 3160 IF ilace% THEN PROCsend(c%,"OK INTERLACE ON "+FNachieved) ELSE PROCsend(c%,"OK INTERLACE OFF "+FNachieved)
+ 3170 ENDPROC

@@ -6,7 +6,9 @@
    60 REM   PROCpatinit    read the mode variables and derive the geometry
    70 REM   PROCpm5544     draw the PM5544-style test card
    80 REM   PROCpatdraw    draw the plain capture-geometry card
-   90 REM   PROCanimate    flip the border and outer ring forever (never returns)
+   90 REM   PROCanimate    flip the outer ring forever (never returns)
+   95 REM   BORDERFLASH%   set non-zero before painting to flip the screen border
+   96 REM                  too. Zero, which is BASIC's default, leaves it black.
   100 REM
   110 REM Call PROCpatinit again after ANY mode change. Every dimension comes from the
   120 REM mode variables, so the geometry is only right for the mode it was read in,
@@ -263,6 +265,7 @@
  2000 UX%=1<<XE% : UY%=1<<YE%
  2010 B%=H% DIV 32 : IF B%<2 THEN B%=2
  2020 S%=B% : IF S%<4 THEN S%=4
+ 2028 IF BORDERFLASH%=0 THEN VDU 19,0,24,0,0,0
  2029 ANIM_CS%=50
  2030 CX%=W% DIV 2 : CY%=H% DIV 2
  2031 AP%=0:ANIMKIND%=0
@@ -283,7 +286,7 @@
  2090 DEF PROCpatdraw
  2100 LOCAL I%,GX%,GW%,R%,RH%
  2105 ANIMKIND%=0
- 2110 VDU 19,0,24,255,0,255
+ 2110 IF BORDERFLASH% THEN VDU 19,0,24,255,0,255
  2120 :
  2130 REM ---- concentric bands, outermost first ---------------------------
  2140 FOR I%=0 TO 5
@@ -399,7 +402,7 @@
  3124 REM carries no count, white against black either way, so they stay readable
  3126 REM as corners while still being unmistakably alive.
  3128 DEF PROCanimstep
- 3130 IF AP% THEN VDU 19,0,24,0,255,255 ELSE VDU 19,0,24,255,0,255
+ 3130 IF BORDERFLASH% THEN PROCborderflip
  3132 IF ANIMKIND%=0 THEN PROCanimring ELSE PROCanimcorners
  3134 AP%=AP% EOR 1
  3136 ENDPROC
@@ -431,6 +434,22 @@
  3188  REPEAT UNTIL TIME>T%
  3190 UNTIL FALSE
  3192 ENDPROC
+ 3194 :
+ 3196 REM The screen border, flipped cyan/magenta with the rest of the liveness
+ 3197 REM animation. OFF unless BORDERFLASH% is set, and that is not timidity:
+ 3198 REM a scaler samples the analog line and reconstructs black from it, and a
+ 3199 REM border that changes colour twice a second moves that reference under
+ 3200 REM it. Measured on a GBS-C: the whole picture alternates red and green,
+ 3201 REM which are the complements of these two, while every register on the
+ 3202 REM scaler reads identical. The card is still visibly alive without it --
+ 3203 REM PROCanimring and PROCanimcorners flip INSIDE the picture.
+ 3204 REM
+ 3205 REM BORDERFLASH% is never initialised here on purpose. BASIC starts an
+ 3206 REM integer at zero, so a caller that says nothing gets the border left
+ 3207 REM alone, and only a caller that asks for the flip gets it.
+ 3208 DEF PROCborderflip
+ 3210 IF AP% THEN VDU 19,0,24,0,255,255 ELSE VDU 19,0,24,255,0,255
+ 3212 ENDPROC
  3300 :
  3310 REM The outermost band as four strips, so redrawing it does not wipe
  3320 REM the centre field the way a nested fill would.

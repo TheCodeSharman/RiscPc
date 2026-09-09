@@ -68,6 +68,8 @@ MODE X320 Y256 C256 F50   OK <mode>, read back from the hardware
 MODES                     one line per mode this monitor definition allows
 PATTERN [CARD|PM5544]     OK, once drawn
 SYNC [0|1|3]              OK SYNC <n> <mode>; 0 separate, 1 composite, 3 auto
+BORDER [ON|OFF]           OK BORDER <state>; the screen border flip, OFF by default
+INTERLACE [ON|OFF]        OK INTERLACE <state> <mode>
 QUIT                      OK, then the server stops
 ```
 
@@ -78,6 +80,22 @@ command that errors replies `FAIL` and the server keeps listening.
 `MODE` replies with what the hardware ended up in, never with the request. A
 monitor definition that cannot do what was asked would otherwise look, from the
 far end, exactly like a fault in the thing being tested.
+
+`BORDER` is **off by default, and that is about the thing under test.** The
+liveness animation used to flip the screen border cyan and magenta twice a
+second. A scaler samples the analog line and reconstructs black from it, so a
+border that changes colour moves that reference under it: measured on a GBS-C in
+pass-through, the whole picture alternates red and green -- the complements of
+those two -- while every register on the scaler reads identical between the two
+frames. The card is still visibly alive with the border left alone, because
+`PROCanimring` and `PROCanimcorners` flip inside the picture.
+
+`INTERLACE` is `*TV`, and **the sense is inverted**: `*TV <vert>,0` turns
+interlace ON and `,1` turns it OFF (PRM volume 1). Like `SYNC` it is a machine
+setting rather than a mode-file field, and the PRM says it takes effect on the
+next mode change, so the mode is re-applied. **There is no OS call that reads it
+back**, so the state reported is what this server last set -- a freshly started
+server reports OFF whatever `*TV` was left at.
 
 `SYNC` is **not** a mode-file setting. A monitor definition carries sync polarity
 per mode and nothing else; composite versus separate is one CMOS value for the
