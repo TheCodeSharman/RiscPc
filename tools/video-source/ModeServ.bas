@@ -283,6 +283,12 @@
  2480 :
  2490 DEF FNupper(s$)
  2500 LOCAL i%,c%,r$
+ 2501 REM Empty returns early: BBC BASIC tests a FOR at its NEXT, so FOR i%=1
+ 2502 REM TO 0 runs the body once, ASC(MID$("",1,1)) is -1, and the loop
+ 2503 REM appends CHR$(-1). It answered one &FF character to an empty
+ 2504 REM argument, so BORDER and INTERLACE with no argument replied FAIL
+ 2505 REM instead of reporting state.
+ 2506 IF s$="" THEN =""
  2510 FOR i%=1 TO LEN(s$)
  2520  c%=ASC(MID$(s$,i%,1))
  2530  IF c%>=97 AND c%<=122 THEN c%-=32
