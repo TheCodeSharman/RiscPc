@@ -33,9 +33,17 @@ below are a question put to the machine. If they appear in MODES they work.
 
 **Deduplicated on resolution and integer field rate**, which is what the mode
 selector keys on: two modes agreeing on both are one mode as far as MODE and
-MODES are concerned, and the second is unreachable. 299 of the 352 modes are
-duplicates that way. Where two files disagree about the timings behind one key,
-the first in Acorn's numbering wins.
+MODES are concerned, and the second is unreachable.
+
+**Where two files disagree behind one key, AKF50 wins.** It is the definition
+the bench RISC PC ran on, so every measurement taken against it -- the sync
+duty, the divider the scaler settles on -- is against AKF50's timings, and a
+key silently served from another file changes what the scaler sees while the
+line rate, field rate and line count all stay put. Seven 15.6 kHz PAL modes sit
+on that fault line: AKF50 gives 320x256 an hsync of 36 units in 512 where
+AKF11's is 38, with the porches split differently either side, and both are
+15.625 kHz on 312 lines at 50.08 Hz. Below AKF50 the tiebreak is Acorn's
+numbering, which is arbitrary and only has to be stable.
 
 ## What 2 MB of VRAM actually costs
 
@@ -83,13 +91,13 @@ the machine can present timings no Acorn monitor ever asked for. See CEA below.
 
 # x_res, y_res, pixel_rate kHz, h_timings, v_timings, sync_pol, source file
 MODES = [
-    ( 320,  250,   8000, "38,44,48,320,48,14", "3,19,19,250,19,2", 0, "AKF11-40"),   #  15.6 kHz
-    ( 320,  256,   8000, "38,44,48,320,48,14", "3,19,16,256,16,2", 0, "AKF11-40"),   #  15.6 kHz
-    ( 640,  250,  16000, "76,88,96,640,96,28", "3,19,19,250,19,2", 0, "AKF11-40"),   #  15.6 kHz
-    ( 640,  256,  16000, "76,88,96,640,96,28", "3,19,16,256,16,2", 0, "AKF11-40"),   #  15.6 kHz
-    ( 768,  288,  16000, "76,120,0,768,0,60", "3,19,0,288,0,2", 0, "AKF11-40"),   #  15.6 kHz
-    (1056,  250,  24000, "114,132,96,1056,96,42", "3,19,19,250,19,2", 0, "AKF11-40"),   #  15.6 kHz
-    (1056,  256,  24000, "114,132,96,1056,96,42", "3,19,16,256,16,2", 0, "AKF11-40"),   #  15.6 kHz
+    ( 320,  250,   8000, "36,30,44,320,44,38", "3,16,20,250,20,3", 0, "AKF50"),   #  15.6 kHz
+    ( 320,  256,   8000, "36,30,44,320,44,38", "3,16,17,256,17,3", 0, "AKF50"),   #  15.6 kHz
+    ( 640,  250,  16000, "72,62,88,640,88,74", "3,16,20,250,20,3", 0, "AKF50"),   #  15.6 kHz
+    ( 640,  256,  16000, "72,62,88,640,88,74", "3,16,17,256,17,3", 0, "AKF50"),   #  15.6 kHz
+    ( 768,  288,  16000, "76,66,16,768,16,82", "3,19,0,288,0,2", 0, "AKF50"),   #  15.6 kHz
+    (1056,  250,  24000, "108,72,106,1056,106,88", "3,16,20,250,20,3", 0, "AKF50"),   #  15.6 kHz
+    (1056,  256,  24000, "108,72,106,1056,106,88", "3,16,17,256,17,3", 0, "AKF50"),   #  15.6 kHz
     ( 640,  200,  16000, "72,146,16,640,16,130", "3,34,0,200,0,25", 0, "AKF50"),   #  15.7 kHz
     ( 896,  352,  24000, "118,38,20,896,20,8", "3,9,0,352,0,0", 2, "AKF50"),   #  21.8 kHz
     ( 640,  352,  16783, "76,20,16,640,16,0", "3,9,0,352,0,0", 2, "AKF50"),   #  21.9 kHz
@@ -204,6 +212,27 @@ CEA = [
 MODES = MODES + CEA
 
 
+# A mode with an empty mode_name is reachable by MODE and absent from the
+# Display Manager menu -- AKF50's own version history says so in as many words,
+# "Removed mode names from modes not appearing in DisplayManager menu". Acorn
+# names one entry per resolution and repeats the name across field rates, the
+# menu offering the rates beneath it, so these are its spellings verbatim.
+NAMED = {(640, 480), (800, 600), (1024, 768), (1280, 1024)}
+
+
+def mode_name(x, y):
+    return "%d x %d" % (x, y) if (x, y) in NAMED else ""
+
+
+def check_named(modes):
+    """A menu entry no mode carries is a menu entry nobody can pick."""
+    have = {(x, y) for x, y, *_ in modes}
+    missing = NAMED - have
+    if missing:
+        raise SystemExit("named but absent: "
+                         + ", ".join("%dx%d" % k for k in sorted(missing)))
+
+
 def totals(timings):
     return sum(int(n) for n in timings.split(","))
 
@@ -221,6 +250,7 @@ def check_distinct(modes):
 
 
 check_distinct(MODES)
+check_named(MODES)
 
 print("file_format:1")
 print("monitor_title:RetroScaler Acorn")
@@ -236,7 +266,7 @@ for x, y, px, h, v, pol, src in MODES:
     print("# %s -- %.1f kHz line, %.2f Hz field, %d lines"
           % (src, line / 1000, line / totals(v), totals(v)))
     print("startmode")
-    print("mode_name:")
+    print("mode_name:%s" % mode_name(x, y))
     print("x_res:%d" % x)
     print("y_res:%d" % y)
     print("pixel_rate:%d" % px)
