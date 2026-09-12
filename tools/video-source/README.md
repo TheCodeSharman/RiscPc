@@ -106,6 +106,22 @@ next mode change, so the mode is re-applied. **There is no OS call that reads it
 back**, so the state reported is what this server last set -- a freshly started
 server reports OFF whatever `*TV` was left at.
 
+### The card says what it is a picture of
+
+`PATTERN PM5544` writes the mode as the hardware reports it into the upper
+ident bar and the sync type and interlace state into the lower one -- the two
+bars a real PM5544 puts the broadcaster's name in, so the caption costs no
+space and needs no layout of its own. A photograph of the television then
+carries its own conditions, which is what a screenshot filed weeks later
+otherwise has to be paired with a note to mean anything.
+
+Sync and interlace are there because they are the two settings a monitor
+definition cannot carry: both are machine state. Interlace is what the server
+last SET rather than read, since no OS call reads it back, so a fresh server
+captions PROGRESSIVE whatever `*TV` was.
+
+`PATTERN CARD` has no ident bars and is left alone.
+
 `SYNC` is **not** a mode-file setting. A monitor definition carries sync polarity
 per mode and nothing else; composite versus separate is one CMOS value for the
 machine (`*Configure Sync`, read back with `OS_ReadSysInfo 1`). The kernel reads

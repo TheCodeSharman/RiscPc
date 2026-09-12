@@ -262,7 +262,7 @@
  2320 ENDPROC
  2325 :
  2326 DEF PROCpaint(which$)
- 2327 PROCpatinit
+ 2327 PROCpatinit:PROCcaptions
  2328 IF which$="CARD" THEN PROCpatdraw ELSE PROCpm5544
  2329 painted%=TRUE:anim%=TIME+ANIM_CS%:lastcard$=which$
  2330 ENDPROC
@@ -369,3 +369,25 @@
  3192 DEF FNnocard
  3194 IF haslib% THEN =""
  3196 =" NOCARD"
+ 3200 :
+ 3210 REM What the card is a picture OF, so a photograph carries it without a
+ 3220 REM note beside it. The mode as the HARDWARE reports it, and beneath it
+ 3230 REM the two things a mode file cannot carry -- sync type and interlace
+ 3240 REM are machine settings, not mode settings.
+ 3250 DEF PROCcaptions
+ 3260 LOCAL s%
+ 3270 SYS "OS_ReadSysInfo",1 TO ,,s%
+ 3280 CAPTOP$=FNachieved
+ 3290 CAPBOT$=FNsyncname(s%)+" SYNC "+FNilacename
+ 3300 ENDPROC
+ 3310 :
+ 3320 DEF FNsyncname(n%)
+ 3330 IF n%=0 THEN ="SEPARATE"
+ 3340 IF n%=1 THEN ="COMPOSITE"
+ 3350 ="AUTO"
+ 3360 :
+ 3370 REM No OS call reads interlace back, so this is what the server last set
+ 3380 REM and a fresh server says PROGRESSIVE whatever *TV was.
+ 3390 DEF FNilacename
+ 3400 IF ilace% THEN ="INTERLACED"
+ 3410 ="PROGRESSIVE"

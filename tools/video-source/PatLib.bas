@@ -229,6 +229,8 @@
  1640 PROCcol(&00000000)
  1650 PROCpix(cx%-bw% DIV 2,cy%+(r%*62) DIV (100*UY%),bw%,bh%)
  1660 PROCpix(cx%-bw% DIV 2,cy%-(r%*72) DIV (100*UY%),bw%,bh%)
+ 1662 PROCcaptext(CAPTOP$,cy%+(r%*62) DIV (100*UY%),bh%)
+ 1664 PROCcaptext(CAPBOT$,cy%-(r%*72) DIV (100*UY%),bh%)
  1670 ENDPROC
  1680 :
  1690 REM The centre cross, the one feature you line the picture up on.
@@ -268,7 +270,7 @@
  2028 IF BORDERFLASH%=0 THEN VDU 19,0,24,0,0,0
  2029 ANIM_CS%=50
  2030 CX%=W% DIV 2 : CY%=H% DIV 2
- 2031 AP%=0:ANIMKIND%=0
+ 2031 AP%=0:ANIMKIND%=0:CAPTOP$="":CAPBOT$=""
  2032 REM Sacrificial plot. The FIRST drawing operation after a MODE change is
  2033 REM lost -- measured with OS_ReadPoint, not guessed: a full-screen fill
  2034 REM issued straight after MODE reads back black, and the identical fill
@@ -468,3 +470,19 @@
  3450 PROCpix(0,0,1,H%)
  3460 PROCpix(W%-1,0,1,H%)
  3470 ENDPROC
+ 3480 :
+ 3490 REM One caption line, centred on the ident bar whose bottom edge is py%
+ 3500 REM pixels up and which is bh% tall. A real PM5544 puts the broadcaster's
+ 3510 REM name there, so the bars are already black and already empty.
+ 3520 REM
+ 3530 REM Through ColourTrans: a raw COLOUR number is a different hue in a
+ 3540 REM 16-colour mode and a 256-colour one.
+ 3550 DEF PROCcaptext(s$,py%,bh%)
+ 3560 LOCAL rh%,col%
+ 3570 IF s$="" THEN ENDPROC
+ 3580 rh%=H% DIV (TY%+1):IF rh%<1 THEN ENDPROC
+ 3590 SYS "ColourTrans_SetTextColour",&FFFFFF00,0,0,0
+ 3600 SYS "ColourTrans_SetTextColour",&00000000,0,0,128
+ 3605 col%=(TX%-LEN(s$)) DIV 2:IF col%<0 THEN col%=0
+ 3610 PRINT TAB(col%,(H%-py%-bh%) DIV rh%);s$;
+ 3620 ENDPROC
