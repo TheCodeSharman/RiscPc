@@ -18,10 +18,18 @@ so the script needs no RISC OS install to run.
 
 Two rules shaped it.
 
-**Pixel rate capped at 110 MHz.** That is the machine's ceiling, and what says
-so is the round number topping AKF80 and AKF85 where every other pixel rate in
-them is an awkward one -- 100.00 MHz caps the AKF60 group the same way. Four
-modes exceed it, all 136 MHz, all in AKF91/92, and they are left out.
+**Acorn's own modes are capped at 110 MHz here.** The round number topping
+AKF80 and AKF85, where every other pixel rate in them is awkward, looks like a
+machine limit, and 100.00 MHz caps the AKF60 group the same way -- but a
+monitor definition states what the MONITOR accepts, not what VIDC20 can clock,
+and AKF91/92 carry 136 MHz modes. So the cap is a convention here and not a
+proven ceiling. The four modes above it are left out of the Acorn block only
+because nothing needs them.
+
+**What settles it is the machine, and asking costs nothing.** RISC OS will not
+offer a mode it cannot generate, and ModeServ's MODE replies with what the
+hardware landed in rather than what was asked for -- so the 148.5 MHz entries
+below are a question put to the machine. If they appear in MODES they work.
 
 **Deduplicated on resolution and integer field rate**, which is what the mode
 selector keys on: two modes agreeing on both are one mode as far as MODE and
@@ -32,6 +40,8 @@ the first in Acorn's numbering wins.
 **VTOTALs are NOT distinct here** -- 20 of them across 53 modes -- so a watcher
 cannot name the mode on air from the sync counters alone. ModeSweep's list can,
 and deliberately; this file cannot and is not for that.
+Beyond Acorn's own modes it carries a CEA-861 block and one true NTSC line, so
+the machine can present timings no Acorn monitor ever asked for. See CEA below.
 """
 
 # x_res, y_res, pixel_rate kHz, h_timings, v_timings, sync_pol, source file
@@ -90,6 +100,71 @@ MODES = [
     (1280, 1024, 110000, "166,90,140,1280,30,30", "3,32,50,1024,50,4", 0, "AKF91"),   #  63.4 kHz
     (1280, 1024, 110000, "166,90,96,1280,96,0", "3,32,0,1024,0,3", 0, "AKF80"),   #  63.7 kHz
 ]
+
+
+# --- CEA-861, and the one SD line Acorn never drew -------------------------
+#
+# Acorn's modes are PAL-centric and stop at 63.7 kHz, so nothing in them
+# presents a timing a television source would. These do, which is what lets the
+# machine stand in for sources the bench has none of.
+#
+# **THIS IS THE ONLY WAY TO REACH STANDARDS 5, 6 AND 7.** Mode Detect names
+# those from the TIMING alone -- STATUS_IF_INP_720, _1080I, _1808P -- and
+# getVideoMode() consults neither the connector nor the colour space on the way
+# there, so a 720p-timed RGBHV source should classify as 720p. The bench has no
+# HD component source and the Wii stops at 480p, so without these the three
+# arms are unexercisable. It tests the timing half only: the colour path
+# follows the input selection, and this arrives on an RGB one.
+#
+# Timings are CEA-861's, copied. h_timings and v_timings are
+# sync/back/border/display/border/front, and CEA states sync, back and front, so
+# the borders are zero except where a total needs padding.
+#
+# **1080p50 and 1080p60 want 148.5 MHz**, above anything Acorn's own files ask
+# for. They are here as a question rather than a claim: if the machine cannot
+# clock them they will not appear in MODES, and 1080p24/25/30 carry the same
+# 1125-line shape at 74.25 MHz either way.
+#
+# Bit depth does not help with a clock, but it may with the bandwidth behind
+# one: 1920x1080 is 2.07 MB at 8 bpp and 259 KB at 1 bpp, and a definition
+# names no depth -- RISC OS offers whichever ones fit. So a mode that is
+# refused at 8 bpp and offered at 1 or 2 is a bandwidth answer, not a clock
+# one.
+#
+# **The interlaced modes are absent too.** A monitor definition has no interlace
+# key -- it is *TV vert,interlace, which ModeServ's INTERLACE command sets and
+# which re-applies the mode -- so 480i, 576i and 1080i are that mechanism's
+# rather than this file's, and pairing the two has not been worked out.
+#
+# 1920x1080 is 2,073,600 bytes at 8 bpp against 2 MB of VRAM. It fits by 23 KB.
+CEA = [
+    # A true NTSC line. Acorn's SD is 15.625 kHz on 312 lines; this is the
+    # 15.734 kHz on 262 that every NTSC console and the composite path produce,
+    # and no Acorn definition contains it.
+    ( 640,  240,  13500, "62,60,40,640,40,16",   "6,15,0,240,0,1",    3, "NTSC SD"),
+
+    ( 720,  480,  27000, "62,60,0,720,0,16",     "6,30,0,480,0,9",    3, "CEA 2/3 480p"),
+    ( 720,  576,  27000, "64,68,0,720,0,12",     "5,39,0,576,0,5",    3, "CEA 17/18 576p"),
+    (1280,  720,  74250, "40,220,0,1280,0,110",  "5,20,0,720,0,5",    0, "CEA 4 720p60"),
+    (1280,  720,  74250, "40,220,0,1280,0,440",  "5,20,0,720,0,5",    0, "CEA 19 720p50"),
+    (1920, 1080,  74250, "44,148,0,1920,0,88",   "5,36,0,1080,0,4",   0, "CEA 34 1080p30"),
+    (1920, 1080,  74250, "44,148,0,1920,0,528",  "5,36,0,1080,0,4",   0, "CEA 33 1080p25"),
+    (1920, 1080,  74250, "44,148,0,1920,0,638",  "5,36,0,1080,0,4",   0, "CEA 32 1080p24"),
+
+    # Above every rate Acorn's files ask for. See the note above: these are a
+    # question for the machine, not a claim about it.
+    (1920, 1080, 148500, "44,148,0,1920,0,88",   "5,36,0,1080,0,4",   0, "CEA 16 1080p60"),
+    (1920, 1080, 148500, "44,148,0,1920,0,528",  "5,36,0,1080,0,4",   0, "CEA 31 1080p50"),
+]
+
+# Per-console modes are deliberately absent. The scaler sees sync edges and not
+# pixels, so a source's dot clock and active width are invisible to it -- NES,
+# SNES and Mega Drive are one 15.7 kHz, 262-line, 60 Hz source as far as any
+# register here is concerned, and three entries producing identical STATUS_
+# readings would prove one thing three times. What was missing was the LINE
+# RATE, which is the NTSC SD entry above.
+
+MODES = MODES + CEA
 
 
 def totals(timings):

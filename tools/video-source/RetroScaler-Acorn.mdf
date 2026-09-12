@@ -590,3 +590,113 @@ v_timings:3,32,0,1024,0,3
 sync_pol:0
 endmode
 
+# NTSC SD -- 15.7 kHz line, 60.05 Hz field, 262 lines
+startmode
+mode_name:
+x_res:640
+y_res:240
+pixel_rate:13500
+h_timings:62,60,40,640,40,16
+v_timings:6,15,0,240,0,1
+sync_pol:3
+endmode
+
+# CEA 2/3 480p -- 31.5 kHz line, 59.94 Hz field, 525 lines
+startmode
+mode_name:
+x_res:720
+y_res:480
+pixel_rate:27000
+h_timings:62,60,0,720,0,16
+v_timings:6,30,0,480,0,9
+sync_pol:3
+endmode
+
+# CEA 17/18 576p -- 31.2 kHz line, 50.00 Hz field, 625 lines
+startmode
+mode_name:
+x_res:720
+y_res:576
+pixel_rate:27000
+h_timings:64,68,0,720,0,12
+v_timings:5,39,0,576,0,5
+sync_pol:3
+endmode
+
+# CEA 4 720p60 -- 45.0 kHz line, 60.00 Hz field, 750 lines
+startmode
+mode_name:
+x_res:1280
+y_res:720
+pixel_rate:74250
+h_timings:40,220,0,1280,0,110
+v_timings:5,20,0,720,0,5
+sync_pol:0
+endmode
+
+# CEA 19 720p50 -- 37.5 kHz line, 50.00 Hz field, 750 lines
+startmode
+mode_name:
+x_res:1280
+y_res:720
+pixel_rate:74250
+h_timings:40,220,0,1280,0,440
+v_timings:5,20,0,720,0,5
+sync_pol:0
+endmode
+
+# CEA 34 1080p30 -- 33.8 kHz line, 30.00 Hz field, 1125 lines
+startmode
+mode_name:
+x_res:1920
+y_res:1080
+pixel_rate:74250
+h_timings:44,148,0,1920,0,88
+v_timings:5,36,0,1080,0,4
+sync_pol:0
+endmode
+
+# CEA 33 1080p25 -- 28.1 kHz line, 25.00 Hz field, 1125 lines
+startmode
+mode_name:
+x_res:1920
+y_res:1080
+pixel_rate:74250
+h_timings:44,148,0,1920,0,528
+v_timings:5,36,0,1080,0,4
+sync_pol:0
+endmode
+
+# CEA 32 1080p24 -- 27.0 kHz line, 24.00 Hz field, 1125 lines
+startmode
+mode_name:
+x_res:1920
+y_res:1080
+pixel_rate:74250
+h_timings:44,148,0,1920,0,638
+v_timings:5,36,0,1080,0,4
+sync_pol:0
+endmode
+
+# CEA 16 1080p60 -- 67.5 kHz line, 60.00 Hz field, 1125 lines
+startmode
+mode_name:
+x_res:1920
+y_res:1080
+pixel_rate:148500
+h_timings:44,148,0,1920,0,88
+v_timings:5,36,0,1080,0,4
+sync_pol:0
+endmode
+
+# CEA 31 1080p50 -- 56.2 kHz line, 50.00 Hz field, 1125 lines
+startmode
+mode_name:
+x_res:1920
+y_res:1080
+pixel_rate:148500
+h_timings:44,148,0,1920,0,528
+v_timings:5,36,0,1080,0,4
+sync_pol:0
+endmode
+
