@@ -150,9 +150,25 @@ It also caught its own author writing a comment block over line 70, and caught
 **What that cannot catch is the shape of a `SYS` argument list.** RISC OS BASIC
 parses those at execution, and Brandy is more lenient than it — blank *input*
 parameters and trailing blanks in a `TO` list pass under Brandy and throw
-`Syntax error` on the machine. So every `SYS` here is only proven by running it
-on real hardware, which is why a failing command replies `FAIL` instead of
-taking the server down with it.
+`Syntax error` on the machine.
+
+**RPCEmu settles that, and it is already in this workflow.** It runs real RISC
+OS BASIC, which is what `Build` relies on to tokenise at all, so a `SYS` that
+parses in the guest parses on the machine. Run the guest rather than reaching
+for the bench:
+
+```sh
+rpcemu-run --socket hostcmd.sock -- Obey HostFS::HostFS.$.video.runtest
+```
+
+What is left for hardware is narrower than a syntax question: whether VIDC20
+can generate the timing a mode asks for, whether `*Configure Sync` reaches CMOS
+and changes the sync actually emitted, and what arrives at the far end of the
+video cable. The emulator has no analog output, so nothing about a signal is
+provable in it.
+
+A failing command still replies `FAIL` rather than taking the server down,
+because a mode the hardware refuses is a runtime answer either way.
 
 ## ModeSweep
 
