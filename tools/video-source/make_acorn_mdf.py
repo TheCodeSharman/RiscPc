@@ -37,6 +37,34 @@ MODES are concerned, and the second is unreachable. 299 of the 352 modes are
 duplicates that way. Where two files disagree about the timings behind one key,
 the first in Acorn's numbering wins.
 
+## What 2 MB of VRAM actually costs
+
+It caps the DEPTH, not the resolution, and across this file the cap never lands
+where it hurts:
+
+    1920x1080   1.98 MB at C256   C256 is the ceiling, and it fits by 23 KB
+    1280x1024   1.25 MB at C256   C256 ceiling
+    1600x600    0.92 MB at C256   C64K still fits
+    800x600     0.46 MB at C256   everything fits
+
+**C256 fits every mode here, 1080p included**, and C256 is exactly what the test
+card needs: at 16 colours the PM5544 palette comes out wrong, measured. So
+nothing in this file is depth-blocked and no monochrome mode is called for. What
+2 MB costs is C64K above 1280x720 and C16M above 800x600, which nothing here
+wants.
+
+**Bandwidth is the argument against 1080p60, not the clock and not the size.**
+VIDC20 fetches pixel_rate x bytes_per_pixel, so at C256:
+
+    1280x1024 @ 110.00 MHz   110 MB/s   an Acorn mode, shipped in AKF80
+    1920x1080 @  74.25 MHz    74 MB/s   1080p30, comfortably under it
+    1920x1080 @ 148.50 MHz   148 MB/s   1080p60, half as much again
+
+That 110 MB/s figure is the useful one: Acorn shipped a mode needing it, so the
+machine does at least that much. A lower depth is what would buy the rest back,
+which is why a mode refused at C256 and offered at C16 is a bandwidth answer
+rather than a clock one.
+
 **VTOTALs are NOT distinct here** -- 20 of them across 53 modes -- so a watcher
 cannot name the mode on air from the sync counters alone. ModeSweep's list can,
 and deliberately; this file cannot and is not for that.
