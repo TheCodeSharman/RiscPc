@@ -223,13 +223,10 @@
  1590 :
  1600 REM The two black ident boxes, above and below the middle.
  1610 DEF PROCidents(cx%,cy%,r%)
- 1620 LOCAL bw%,bh%
- 1630 bw%=(r%*70) DIV (100*UX%):bh%=(r%*10) DIV (100*UY%)
- 1640 PROCcol(&00000000)
- 1650 PROCpix(cx%-bw% DIV 2,cy%+(r%*62) DIV (100*UY%),bw%,bh%)
- 1660 PROCpix(cx%-bw% DIV 2,cy%-(r%*72) DIV (100*UY%),bw%,bh%)
- 1662 PROCcaptext(CAPTOP$,cy%+(r%*62) DIV (100*UY%),bh%)
- 1664 PROCcaptext(CAPBOT$,cy%-(r%*72) DIV (100*UY%),bh%)
+ 1620 LOCAL bh%
+ 1630 bh%=(r%*10) DIV (100*UY%)
+ 1650 PROCbar(cx%,cy%+(r%*62) DIV (100*UY%),r%,bh%,CAPTOP$)
+ 1660 PROCbar(cx%,cy%-(r%*72) DIV (100*UY%),r%,bh%,CAPBOT$)
  1670 ENDPROC
  1680 :
  1690 REM The centre cross, the one feature you line the picture up on.
@@ -476,26 +473,33 @@
  3460 PROCpix(W%-1,0,1,H%)
  3470 ENDPROC
  3480 :
- 3490 REM One caption line, centred on the ident bar whose bottom edge is py%
- 3500 REM pixels up and which is bh% tall. A real PM5544 puts the broadcaster's
- 3510 REM name there, so the bars are already black and already empty.
+ 3490 REM One caption line, inside the ident bar that starts x% across, py%
+ 3500 REM pixels up, bw% wide and bh% tall. A real PM5544 puts the
+ 3510 REM broadcaster's name there, so the bars are already black.
  3520 REM
  3530 REM Through ColourTrans: a raw COLOUR number is a different hue in a
  3540 REM 16-colour mode and a 256-colour one.
- 3550 DEF PROCcaptext(s$,py%,bh%)
- 3560 LOCAL rh%,col%
+ 3550 DEF PROCcaptext(s$,x%,py%,bw%,bh%)
+ 3560 LOCAL rh%,cw2%,col%,row%
  3570 IF s$="" THEN ENDPROC
  3580 rh%=H% DIV (TY%+1):IF rh%<1 THEN ENDPROC
+ 3582 cw2%=W% DIV (TX%+1):IF cw2%<1 THEN ENDPROC
  3590 SYS "ColourTrans_SetTextColour",&FFFFFF00,0,0,0
  3600 SYS "ColourTrans_SetTextColour",&00000000,0,0,128
- 3605 col%=(TX%-LEN(s$)) DIV 2:IF col%<0 THEN col%=0
- 3610 PRINT TAB(col%,(H%-py%-bh%) DIV rh%);s$;
+ 3605 col%=(x%+(bw%-LEN(s$)*cw2%) DIV 2) DIV cw2%:IF col%<0 THEN col%=0
+ 3606 REM TAB snaps to the row grid, so centring the row on the bar has to
+ 3607 REM round to the NEAREST row. Truncating put the lower caption a row
+ 3608 REM above its bar while the upper one happened to land inside.
+ 3609 row%=(H%-py%-bh%+(bh%-rh%) DIV 2+rh% DIV 2) DIV rh%
+ 3610 IF row%<0 THEN row%=0
+ 3611 IF row%>TY% THEN row%=TY%
+ 3612 PRINT TAB(col%,row%);s$;
  3620 ENDPROC
  3630 :
  3640 REM Which build of the card library this is. ModeServ's VERSION reports it,
  3650 REM because PatLib tokenises and loads separately from the server.
  3660 DEF FNpatver
- 3670 ="2026-09-12b"
+ 3670 ="2026-09-12c"
  3680 :
  3690 REM Grid line k, in pixels. NX% and NY% rarely divide W% and H%, and a
  3700 REM cell of W% DIV NX% repeated NX% times stops short of the far edge --
@@ -528,3 +532,20 @@
  3970 LOCAL ERROR
  3980 ON ERROR LOCAL =""
  3990 =CAPBOT$
+ 4000 :
+ 4010 REM One ident bar, widened to its caption when the caption is wider.
+ 4020 REM The nominal bar is 70% of the circle radius, which a 40-column mode
+ 4030 REM makes nine characters, so any caption spilled out of it and the bar
+ 4040 REM stopped reading as a bar. Growing the bar instead keeps the caption
+ 4050 REM on a black ground of its own shape, and leaves the wide modes --
+ 4060 REM where the nominal bar already holds the text -- exactly as they were.
+ 4070 DEF PROCbar(cx%,y%,r%,bh%,s$)
+ 4080 LOCAL w%,cw2%
+ 4090 cw2%=W% DIV (TX%+1):IF cw2%<1 THEN cw2%=1
+ 4100 w%=(r%*70) DIV (100*UX%)
+ 4110 IF (LEN(s$)+2)*cw2%>w% THEN w%=(LEN(s$)+2)*cw2%
+ 4120 IF w%>W% THEN w%=W%
+ 4130 PROCcol(&00000000)
+ 4140 PROCpix(cx%-w% DIV 2,y%,w%,bh%)
+ 4150 PROCcaptext(s$,cx%-w% DIV 2,y%,w%,bh%)
+ 4160 ENDPROC
