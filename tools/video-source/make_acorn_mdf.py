@@ -61,9 +61,18 @@ VIDC20 fetches pixel_rate x bytes_per_pixel, so at C256:
     1920x1080 @ 148.50 MHz   148 MB/s   1080p60, half as much again
 
 That 110 MB/s figure is the useful one: Acorn shipped a mode needing it, so the
-machine does at least that much. A lower depth is what would buy the rest back,
-which is why a mode refused at C256 and offered at C16 is a bandwidth answer
-rather than a clock one.
+machine does at least that much.
+
+**Three things could refuse 1080p60, and MODES tells them apart.** Depth changes
+the size and the bandwidth and leaves the pixel clock alone, so what a mode is
+offered AT is the discriminator:
+
+    offered at no depth at all     the motherboard's video PLL cannot reach
+                                   148.5 MHz -- depth cannot help a clock
+    offered at C16 but not C256    bandwidth, and a lower depth buys it back
+    offered at C256                it works, and the doubt was unfounded
+
+Size is already out: 1920x1080 at C256 fits by 23 KB.
 
 **VTOTALs are NOT distinct here** -- 20 of them across 53 modes -- so a watcher
 cannot name the mode on air from the sync counters alone. ModeSweep's list can,
