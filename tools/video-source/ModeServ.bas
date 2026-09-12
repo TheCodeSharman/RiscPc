@@ -398,7 +398,7 @@
  3440 REM separately, so PatLib can be a different build from the server that
  3450 REM LIBRARY-loaded it, and the reply names both.
  3460 DEF FNver
- 3470 ="2026-09-12d"
+ 3470 ="2026-09-12e"
  3480 :
  3490 DEF FNverreply(p$)
  3500 ="ModeServ "+FNver+" PatLib "+p$

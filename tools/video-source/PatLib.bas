@@ -244,12 +244,19 @@
  1680 :
  1690 REM The centre cross, the one feature you line the picture up on.
  1700 DEF PROCcentre(cx%,cy%,r%)
- 1710 LOCAL t%,l%
+ 1710 LOCAL t%,l%,o%,w%
  1720 t%=CW% DIV 3:IF t%<2 THEN t%=2
  1730 l%=(r%*20) DIV (100*UY%)
+ 1731 w%=(r%*20) DIV (100*UX%)
+ 1732 REM A white outline, because the cross crosses the black grating bars
+ 1733 REM and a black cross on a black bar cannot be lined up against.
+ 1734 o%=t% DIV 4:IF o%<1 THEN o%=1
+ 1735 PROCcol(&FFFFFF00)
+ 1736 PROCpix(cx%-t% DIV 2-o%,cy%-l%-o%,t%+2*o%,2*l%+2*o%)
+ 1737 PROCpix(cx%-w%-o%,cy%-t% DIV 2-o%,2*w%+2*o%,t%+2*o%)
  1740 PROCcol(&00000000)
  1750 PROCpix(cx%-t% DIV 2,cy%-l%,t%,2*l%)
- 1760 PROCpix(cx%-(r%*20) DIV (100*UX%),cy%-t% DIV 2,(r%*40) DIV (100*UX%),t%)
+ 1760 PROCpix(cx%-w%,cy%-t% DIV 2,2*w%,t%)
  1770 ENDPROC
  1780 :
  1790 REM A filled circle of radius r% OS UNITS, as horizontal runs. In OS units
@@ -512,7 +519,7 @@
  3640 REM Which build of the card library this is. ModeServ's VERSION reports it,
  3650 REM because PatLib tokenises and loads separately from the server.
  3660 DEF FNpatver
- 3670 ="2026-09-12d"
+ 3670 ="2026-09-12e"
  3680 :
  3690 REM Grid line k, in pixels. NX% and NY% rarely divide W% and H%, and a
  3700 REM cell of W% DIV NX% repeated NX% times stops short of the far edge --
