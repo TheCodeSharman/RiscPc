@@ -495,7 +495,7 @@
  3640 REM Which build of the card library this is. ModeServ's VERSION reports it,
  3650 REM because PatLib tokenises and loads separately from the server.
  3660 DEF FNpatver
- 3670 ="2026-09-12a"
+ 3670 ="2026-09-12b"
  3680 :
  3690 REM Grid line k, in pixels. NX% and NY% rarely divide W% and H%, and a
  3700 REM cell of W% DIV NX% repeated NX% times stops short of the far edge --
