@@ -486,3 +486,8 @@
  3605 col%=(TX%-LEN(s$)) DIV 2:IF col%<0 THEN col%=0
  3610 PRINT TAB(col%,(H%-py%-bh%) DIV rh%);s$;
  3620 ENDPROC
+ 3630 :
+ 3640 REM Which build of the card library this is. ModeServ's VERSION reports it,
+ 3650 REM because PatLib tokenises and loads separately from the server.
+ 3660 DEF FNpatver
+ 3670 ="2026-09-12a"

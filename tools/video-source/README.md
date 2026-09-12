@@ -71,6 +71,7 @@ PATTERN [CARD|PM5544]     OK, once drawn
 SYNC [0|1|3]              OK SYNC <n> <mode>; 0 separate, 1 composite, 3 auto
 BORDER [ON|OFF]           OK BORDER <state>; the screen border flip, OFF by default
 INTERLACE [ON|OFF]        OK INTERLACE <state> <mode>
+VERSION                   OK ModeServ <build> PatLib <build>
 QUIT                      OK, then the server stops
 ```
 
@@ -98,6 +99,17 @@ pass-through, the whole picture alternates red and green -- the complements of
 those two -- while every register on the scaler reads identical between the two
 frames. The card is still visibly alive with the border left alone, because
 `PROCanimring` and `PROCanimcorners` flip inside the picture.
+
+`VERSION` names the build of **both** files, because they tokenise and load
+separately: `PatLib` reaches the server through `LIBRARY`, so a rebuild that
+lands one and not the other leaves a server whose halves disagree, and nothing
+in its behaviour says so. A `PatLib` predating this command reports `unknown`
+rather than failing the request, and one that never loaded reports
+`not loaded`.
+
+Bump `FNver` in `ModeServ.bas` and `FNpatver` in `PatLib.bas` when changing
+either file. The string is compared by eye against this repository, so anything
+sortable does.
 
 `INTERLACE` is `*TV`, and **the sense is inverted**: `*TV <vert>,0` turns
 interlace ON and `,1` turns it OFF (PRM volume 1). Like `SYNC` it is a machine

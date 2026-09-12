@@ -27,6 +27,7 @@
   230 PROCcheck("FNcolours 8bpp",FNcolours(3),"C256")
   240 PROCcheck("FNcolours 32bpp",FNcolours(5),"C16M")
   250 PROCcheck("FNcolours unknown",FNcolours(9),"C?")
+  260 PROCcheck("FNverreply names both",FNverreply("X"),"ModeServ "+FNver+" PatLib X")
   370 PRINT
   380 IF fail%=0 THEN PRINT "all ";pass%;" checks passed" ELSE PRINT fail%;" of ";pass%+fail%;" FAILED"
   390 END

@@ -13,6 +13,7 @@
   120 REM   MODES                     one line per mode this monitor definition allows
   130 REM   PATTERN [CARD|PM5544]     OK, once drawn
   135 REM   SYNC [0|1|3]              OK SYNC <n> <mode>; 0 separate, 1 composite, 3 auto
+ 136 REM   VERSION                   OK ModeServ <build> PatLib <build>
   140 REM   QUIT                      OK, then the server stops
   150 REM
   155 REM Any command that errors replies FAIL and the server keeps listening.
@@ -145,6 +146,7 @@
  1355 WHEN "SYNC":PROCsync(c%,cmd$)
  1356 WHEN "BORDER":PROCborder(c%,cmd$)
  1357 WHEN "INTERLACE":PROCinterlace(c%,cmd$)
+ 1358 WHEN "VERSION":PROCversion(c%)
  1360 WHEN "":PROCsend(c%,"FAIL empty command")
  1370 OTHERWISE:PROCsend(c%,"FAIL unknown command "+w$)
  1380 ENDCASE
@@ -391,3 +393,24 @@
  3390 DEF FNilacename
  3400 IF ilace% THEN ="INTERLACED"
  3410 ="PROGRESSIVE"
+ 3420 :
+ 3430 REM Which build is actually running. The two files tokenise and load
+ 3440 REM separately, so PatLib can be a different build from the server that
+ 3450 REM LIBRARY-loaded it, and the reply names both.
+ 3460 DEF FNver
+ 3470 ="2026-09-12a"
+ 3480 :
+ 3490 DEF FNverreply(p$)
+ 3500 ="ModeServ "+FNver+" PatLib "+p$
+ 3510 :
+ 3520 REM A PatLib with no FNpatver is one from before this command existed, which
+ 3530 REM is the case the reply has to name rather than fail on.
+ 3540 DEF FNpatverstr
+ 3550 LOCAL ERROR
+ 3560 ON ERROR LOCAL ="unknown"
+ 3570 IF NOT haslib% THEN ="not loaded"
+ 3580 =FNpatver
+ 3590 :
+ 3600 DEF PROCversion(c%)
+ 3610 PROCsend(c%,"OK "+FNverreply(FNpatverstr))
+ 3620 ENDPROC
