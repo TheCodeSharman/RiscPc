@@ -160,21 +160,25 @@
   960 :
   970 REM The 75% colour bars, chord-clipped, in the band above centre.
   980 DEF PROCbandbars(cx%,cy%,r%)
-  990 LOCAL y%,i%,n%,top%,bot%,hw%,x%,bw%,dy
+  990 LOCAL y%,i%,n%,top%,bot%,hw%,hwm%,x%,x1%,bw%,dy
  1000 LOCAL bar%()
  1010 DIM bar%(5)
  1020 bar%(0)=&00C0C000:bar%(1)=&C0C00000:bar%(2)=&00C00000
  1030 bar%(3)=&C000C000:bar%(4)=&0000C000:bar%(5)=&C0000000
  1040 top%=cy%+(r%*30) DIV (100*UY%):bot%=cy%+(r%*8) DIV (100*UY%)
+ 1042 hwm%=FNbandhw(cy%,r%,bot%,top%):IF hwm%<6 THEN ENDPROC
+ 1044 bw%=(2*hwm%) DIV 6
  1050 FOR y%=bot% TO top%
  1060  dy=(y%-cy%)*UY%
  1070  IF ABS(dy)<r% THEN
  1080   hw%=SQR(r%*r%-dy*dy)/UX%
- 1090   bw%=(2*hw%) DIV 6
  1100   FOR i%=0 TO 5
  1110    PROCcol(bar%(i%))
- 1120    x%=cx%-hw%+i%*bw%
- 1130    IF i%=5 THEN PROCpix(x%,y%,cx%+hw%-x%,1) ELSE PROCpix(x%,y%,bw%,1)
+ 1120    x%=cx%-hwm%+i%*bw%
+ 1122    IF i%=5 THEN x1%=cx%+hwm% ELSE x1%=x%+bw%
+ 1124    IF x%<cx%-hw% THEN x%=cx%-hw%
+ 1126    IF x1%>cx%+hw% THEN x1%=cx%+hw%
+ 1130    IF x1%>x% THEN PROCpix(x%,y%,x1%-x%,1)
  1140   NEXT
  1150  ENDIF
  1160 NEXT
@@ -204,29 +208,38 @@
  1400 :
  1410 REM Greyscale staircase, black to white in six steps.
  1420 DEF PROCbandstair(cx%,cy%,r%)
- 1430 LOCAL y%,top%,bot%,hw%,i%,x%,bw%,v%,dy
+ 1430 LOCAL y%,top%,bot%,hw%,hwm%,i%,x%,x1%,bw%,v%,dy
  1440 top%=cy%-(r%*36) DIV (100*UY%):bot%=cy%-(r%*58) DIV (100*UY%)
+ 1442 hwm%=FNbandhw(cy%,r%,bot%,top%):IF hwm%<6 THEN ENDPROC
+ 1444 bw%=(2*hwm%) DIV 6
  1450 FOR y%=bot% TO top%
  1460  dy=(y%-cy%)*UY%
  1470  IF ABS(dy)<r% THEN
  1480   hw%=SQR(r%*r%-dy*dy)/UX%
- 1490   bw%=(2*hw%) DIV 6
  1500   FOR i%=0 TO 5
  1510    v%=(i%*255) DIV 5
  1520    PROCcol((v%<<24) OR (v%<<16) OR (v%<<8))
- 1530    x%=cx%-hw%+i%*bw%
- 1540    IF i%=5 THEN PROCpix(x%,y%,cx%+hw%-x%,1) ELSE PROCpix(x%,y%,bw%,1)
+ 1530    x%=cx%-hwm%+i%*bw%
+ 1532    IF i%=5 THEN x1%=cx%+hwm% ELSE x1%=x%+bw%
+ 1534    IF x%<cx%-hw% THEN x%=cx%-hw%
+ 1536    IF x1%>cx%+hw% THEN x1%=cx%+hw%
+ 1540    IF x1%>x% THEN PROCpix(x%,y%,x1%-x%,1)
  1550   NEXT
  1560  ENDIF
  1570 NEXT
  1580 ENDPROC
  1590 :
- 1600 REM The two black ident boxes, above and below the middle.
+ 1600 REM The two ident captions, above and below the middle. The box behind
+ 1601 REM each one is the TEXT BACKGROUND, so it fits the caption exactly and
+ 1602 REM in both axes. A rectangle drawn to hold them cannot: the text can
+ 1603 REM only land on the character grid, so a bar sized independently of it
+ 1604 REM is out by up to half a character across and half a row down.
+ 1605 REM Nothing is drawn where a caption is empty.
  1610 DEF PROCidents(cx%,cy%,r%)
  1620 LOCAL bh%
  1630 bh%=(r%*10) DIV (100*UY%)
- 1650 PROCbar(cx%,cy%+(r%*62) DIV (100*UY%),r%,bh%,CAPTOP$)
- 1660 PROCbar(cx%,cy%-(r%*72) DIV (100*UY%),r%,bh%,CAPBOT$)
+ 1650 PROCcaptext(CAPTOP$,cy%+(r%*62) DIV (100*UY%),bh%)
+ 1660 PROCcaptext(CAPBOT$,cy%-(r%*72) DIV (100*UY%),bh%)
  1670 ENDPROC
  1680 :
  1690 REM The centre cross, the one feature you line the picture up on.
@@ -262,6 +275,10 @@
  1990 W%=XW%+1 : H%=YW%+1
  2000 UX%=1<<XE% : UY%=1<<YE%
  2010 B%=H% DIV 32 : IF B%<2 THEN B%=2
+ 2011 REM The text cursor blinks in the middle of the picture and a scaler
+ 2012 REM samples it as content. The mouse POINTER stays -- it is how the
+ 2013 REM edges of the raster get found.
+ 2014 VDU 23,1,0,0,0,0,0,0,0,0
  2020 S%=B% : IF S%<4 THEN S%=4
  2021 REM The three below belong to the CALLER, and clearing them here is what
  2022 REM made the ident bars draw empty: PROCpm5544 calls this itself, after
@@ -473,23 +490,19 @@
  3460 PROCpix(W%-1,0,1,H%)
  3470 ENDPROC
  3480 :
- 3490 REM One caption line, inside the ident bar that starts x% across, py%
- 3500 REM pixels up, bw% wide and bh% tall. A real PM5544 puts the
- 3510 REM broadcaster's name there, so the bars are already black.
+ 3490 REM One caption line, centred across the screen and on the row nearest
+ 3500 REM where the ident bar would have sat -- py% pixels up and bh% tall.
+ 3510 REM Its own black text background is the box.
  3520 REM
  3530 REM Through ColourTrans: a raw COLOUR number is a different hue in a
  3540 REM 16-colour mode and a 256-colour one.
- 3550 DEF PROCcaptext(s$,x%,py%,bw%,bh%)
- 3560 LOCAL rh%,cw2%,col%,row%
+ 3550 DEF PROCcaptext(s$,py%,bh%)
+ 3560 LOCAL rh%,col%,row%
  3570 IF s$="" THEN ENDPROC
  3580 rh%=H% DIV (TY%+1):IF rh%<1 THEN ENDPROC
- 3582 cw2%=W% DIV (TX%+1):IF cw2%<1 THEN ENDPROC
  3590 SYS "ColourTrans_SetTextColour",&FFFFFF00,0,0,0
  3600 SYS "ColourTrans_SetTextColour",&00000000,0,0,128
- 3605 col%=(x%+(bw%-LEN(s$)*cw2%) DIV 2) DIV cw2%:IF col%<0 THEN col%=0
- 3606 REM TAB snaps to the row grid, so centring the row on the bar has to
- 3607 REM round to the NEAREST row. Truncating put the lower caption a row
- 3608 REM above its bar while the upper one happened to land inside.
+ 3605 col%=(TX%+1-LEN(s$)) DIV 2:IF col%<0 THEN col%=0
  3609 row%=(H%-py%-bh%+(bh%-rh%) DIV 2+rh% DIV 2) DIV rh%
  3610 IF row%<0 THEN row%=0
  3611 IF row%>TY% THEN row%=TY%
@@ -499,7 +512,7 @@
  3640 REM Which build of the card library this is. ModeServ's VERSION reports it,
  3650 REM because PatLib tokenises and loads separately from the server.
  3660 DEF FNpatver
- 3670 ="2026-09-12c"
+ 3670 ="2026-09-12d"
  3680 :
  3690 REM Grid line k, in pixels. NX% and NY% rarely divide W% and H%, and a
  3700 REM cell of W% DIV NX% repeated NX% times stops short of the far edge --
@@ -532,20 +545,17 @@
  3970 LOCAL ERROR
  3980 ON ERROR LOCAL =""
  3990 =CAPBOT$
- 4000 :
- 4010 REM One ident bar, widened to its caption when the caption is wider.
- 4020 REM The nominal bar is 70% of the circle radius, which a 40-column mode
- 4030 REM makes nine characters, so any caption spilled out of it and the bar
- 4040 REM stopped reading as a bar. Growing the bar instead keeps the caption
- 4050 REM on a black ground of its own shape, and leaves the wide modes --
- 4060 REM where the nominal bar already holds the text -- exactly as they were.
- 4070 DEF PROCbar(cx%,y%,r%,bh%,s$)
- 4080 LOCAL w%,cw2%
- 4090 cw2%=W% DIV (TX%+1):IF cw2%<1 THEN cw2%=1
- 4100 w%=(r%*70) DIV (100*UX%)
- 4110 IF (LEN(s$)+2)*cw2%>w% THEN w%=(LEN(s$)+2)*cw2%
- 4120 IF w%>W% THEN w%=W%
- 4130 PROCcol(&00000000)
- 4140 PROCpix(cx%-w% DIV 2,y%,w%,bh%)
- 4150 PROCcaptext(s$,cx%-w% DIV 2,y%,w%,bh%)
- 4160 ENDPROC
+ 4170 :
+ 4180 REM The half-width of the disc at the widest row of a band, so the bars
+ 4190 REM in it can be bounded ONCE. Taking each row's own half-width made
+ 4200 REM every internal division follow the circle, which drew as a jagged
+ 4210 REM staircase down each boundary. The outer edge still follows the
+ 4220 REM circle, because each row is clipped to it.
+ 4230 DEF FNbandhw(cy%,r%,bot%,top%)
+ 4240 LOCAL y%,dy
+ 4250 y%=bot%
+ 4260 IF top%<cy% THEN y%=top%
+ 4270 IF bot%<=cy% AND top%>=cy% THEN y%=cy%
+ 4280 dy=(y%-cy%)*UY%
+ 4290 IF ABS(dy)>=r% THEN =0
+ 4300 =SQR(r%*r%-dy*dy)/UX%
