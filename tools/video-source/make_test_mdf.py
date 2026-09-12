@@ -52,10 +52,25 @@ BASE = [
     (640, 256, 1024, 312, 55.00, 0, "312 lines, 17.2 kHz"),
     (640, 256, 1024, 312, 70.00, 0, "312 lines, 21.8 kHz"),
 
-    # Either side of 650 lines, where the progressive post divider drops an
-    # octave.  x_res differs only to keep the pair selectable apart.
-    (800, 600, 1056, 628, 60.00, 0, "628 lines, ordinary divider"),
-    (808, 600, 1056, 680, 60.00, 0, "680 lines, tall divider"),
+    # Either side of the ADC's oversampling cliff, at ONE line count so only
+    # the rate moves. Above a 39.2 kHz line the scaler's own divider cap pushes
+    # its sample clock past 80 MHz, which is the top crossover row -- and there
+    # is no faster tap above it to oversample from, so the decimators come out
+    # of circuit and the alias filtering goes with them. Wide, because what it
+    # costs is horizontal detail.
+    #
+    # These four are lifted from the stock Acorn AKF80 definition rather than
+    # derived, so the timings are ones Acorn shipped. AKF50, which the bench
+    # runs, tops out at 37.9 kHz and cannot reach the cliff; AKF80 clears it but
+    # has no 15 kHz mode at all, which is why both halves are here instead.
+    # gbsc-pro docs/investigations/the-decimators-filter.md
+    (1600, 600, 2048, 625, 56.25, 0, "625 lines, 35.2 kHz, below the cliff"),
+    (1600, 600, 2112, 625, 75.00, 0, "625 lines, 46.9 kHz, above the cliff"),
+
+    # The same decision with the widest line the machine can draw, where the
+    # trade is starkest: 2039 samples undecimated against 1256 oversampled by
+    # two, where at 46.9 kHz it is 2039 against 1706.
+    (1280, 1024, 1728, 1062, 59.94, 0, "1062 lines, 63.7 kHz"),
 ]
 
 

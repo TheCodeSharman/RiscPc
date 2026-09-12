@@ -150,25 +150,36 @@ v_timings:3,16,17,256,17,3
 sync_pol:0
 endmode
 
-# 628 lines, ordinary divider -- 37.680 kHz line, 60.00 Hz field, h total 1056, v total 628
+# 625 lines, 35.2 kHz, below the cliff -- 35.156 kHz line, 56.25 Hz field, h total 2048, v total 625
 startmode
 mode_name:
-x_res:800
+x_res:1600
 y_res:600
-pixel_rate:39790
-h_timings:36,30,76,800,76,38
-v_timings:3,16,3,600,3,3
+pixel_rate:72000
+h_timings:36,30,172,1600,172,38
+v_timings:3,17,1,600,1,3
 sync_pol:0
 endmode
 
-# 680 lines, tall divider -- 40.800 kHz line, 60.00 Hz field, h total 1056, v total 680
+# 625 lines, 46.9 kHz, above the cliff -- 46.875 kHz line, 75.00 Hz field, h total 2112, v total 625
 startmode
 mode_name:
-x_res:808
+x_res:1600
 y_res:600
-pixel_rate:43085
-h_timings:36,30,72,808,72,38
-v_timings:3,16,29,600,29,3
+pixel_rate:99000
+h_timings:36,30,204,1600,204,38
+v_timings:3,17,1,600,1,3
+sync_pol:0
+endmode
+
+# 1062 lines, 63.7 kHz -- 63.656 kHz line, 59.94 Hz field, h total 1728, v total 1062
+startmode
+mode_name:
+x_res:1280
+y_res:1024
+pixel_rate:109998
+h_timings:36,30,172,1280,172,38
+v_timings:3,16,8,1024,8,3
 sync_pol:0
 endmode
 
