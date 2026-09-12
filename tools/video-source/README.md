@@ -17,6 +17,7 @@ specific to any one scaler.
 | `ModeSweep.bas` | Cycles the stock AKF50 modes on a timer, 15.6–37.9 kHz. |
 | `ModeTest.bas` | 8 checks over `ModeServ`'s pure string helpers. No networking. |
 | `make_test_mdf.py` | **Host side.** Generates `RetroScaler-Test.mdf`, one mode per scaler decision, timings derived rather than typed. |
+| `make_acorn_mdf.py` | **Host side.** Generates `RetroScaler-Acorn.mdf`, the union of the thirteen stock Acorn definitions, 15.6 to 63.7 kHz, timings copied verbatim. |
 | `checksrc.py` | **Host side.** Structural check of the line-numbered sources. Run it after any edit. |
 | `modeserv_soak.py` | **Host side.** Cycles modes until ModeServ stops answering, then says whether ModeServ or the machine went. |
 | `Build.obey`, `BuildIn.exec` | Tokenise `src/` on the RISC OS side. |
