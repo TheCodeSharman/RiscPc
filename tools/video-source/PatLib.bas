@@ -70,7 +70,7 @@
   540 PROCcol(&80808000)
   550 FOR i%=0 TO NX%-1
   560  FOR j%=0 TO NY%-1
-  570   PROCpix(i%*cw%+1,j%*ch%+1,cw%-2,ch%-2)
+  570   PROCpix(FNgx(i%)+1,FNgy(j%)+1,FNgx(i%+1)-FNgx(i%)-2,FNgy(j%+1)-FNgy(j%)-2)
   580  NEXT
   590 NEXT
   600 CW%=cw%:CH%=ch%
@@ -94,13 +94,13 @@
   656 e%=CW% DIV 3:IF e%<1 THEN e%=1
   658 FOR i%=0 TO NX%-1
   660  IF i% AND 1 THEN PROCcol(&FFFFFF00) ELSE PROCcol(&00000000)
-  662  PROCpix(i%*CW%+1,0,CW%-2,d%)
-  664  PROCpix(i%*CW%+1,H%-d%,CW%-2,d%)
+  662  PROCpix(FNgx(i%)+1,0,FNgx(i%+1)-FNgx(i%)-2,d%)
+  664  PROCpix(FNgx(i%)+1,H%-d%,FNgx(i%+1)-FNgx(i%)-2,d%)
   666 NEXT
   668 FOR j%=0 TO NY%-1
   670  IF j% AND 1 THEN PROCcol(&FFFFFF00) ELSE PROCcol(&00000000)
-  672  PROCpix(0,j%*CH%+1,e%,CH%-2)
-  674  PROCpix(W%-e%,j%*CH%+1,e%,CH%-2)
+  672  PROCpix(0,FNgy(j%)+1,e%,FNgy(j%+1)-FNgy(j%)-2)
+  674  PROCpix(W%-e%,FNgy(j%)+1,e%,FNgy(j%+1)-FNgy(j%)-2)
   676 NEXT
   678 REM The four corners, white. Where the two runs meet, each would otherwise
   680 REM impose its own phase on the same square and whichever drew last would
@@ -129,24 +129,23 @@
   750 REM and 270 degrees, so they have to stay a matched pair of hues at one
   751 REM luminance -- not the arbitrary three-colour stack this used to draw.
   752 DEF PROCsidebars
-  753 LOCAL y0%,ht%,bh%,xa%,xb%,ba%,bb%
-  754 y0%=CH%:ht%=(NY%-2)*CH%
-  755 xa%=CW%:xb%=(NX%-2)*CW%
-  756 ba%=2*CW%:bb%=(NX%-3)*CW%
-  757 bh%=2*CH%
-  759 REM Upper half then lower half of each bar. Height counted in CELLS, not
-  760 REM as H%-2*CH%: H% is not an exact multiple of CH% after the DIV in
-  761 REM PROCgrid, so the bar stood ~12 pixels proud of the blocks beside it
-  762 REM instead of finishing level with them.
-  763 PROCcol(&7A9A3C00):PROCpix(xa%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
-  770 PROCcol(&7A5AB800):PROCpix(xa%+1,y0%,CW%-2,ht% DIV 2)
-  780 PROCcol(&0B907A00):PROCpix(xb%+1,y0%+ht% DIV 2,CW%-2,ht%-ht% DIV 2)
-  790 PROCcol(&E9647A00):PROCpix(xb%+1,y0%,CW%-2,ht% DIV 2)
+  753 LOCAL y0%,ht%,xa%,wa%,xb%,wb%,ba%,wba%,bb%,wbb%
+  754 y0%=FNgy(1):ht%=FNgy(NY%-1)-y0%
+  755 xa%=FNgx(1):wa%=FNgx(2)-xa%-2
+  756 xb%=FNgx(NX%-2):wb%=FNgx(NX%-1)-xb%-2
+  757 ba%=FNgx(2):wba%=FNgx(3)-ba%-2
+  758 bb%=FNgx(NX%-3):wbb%=FNgx(NX%-2)-bb%-2
+  759 REM Upper half then lower half of each bar, spanning grid lines 1 to
+  760 REM NY%-1 so they finish level with the blocks beside them.
+  763 PROCcol(&7A9A3C00):PROCpix(xa%+1,y0%+ht% DIV 2,wa%,ht%-ht% DIV 2)
+  770 PROCcol(&7A5AB800):PROCpix(xa%+1,y0%,wa%,ht% DIV 2)
+  780 PROCcol(&0B907A00):PROCpix(xb%+1,y0%+ht% DIV 2,wb%,ht%-ht% DIV 2)
+  790 PROCcol(&E9647A00):PROCpix(xb%+1,y0%,wb%,ht% DIV 2)
   800 REM The right-angle blocks: the same pair of hues on both sides.
   810 PROCcol(&D67A5700)
-  820 PROCpix(ba%+1,(NY%-3)*CH%,CW%-2,bh%):PROCpix(bb%+1,(NY%-3)*CH%,CW%-2,bh%)
+  820 PROCpix(ba%+1,FNgy(NY%-3),wba%,FNgy(NY%-1)-FNgy(NY%-3)):PROCpix(bb%+1,FNgy(NY%-3),wbb%,FNgy(NY%-1)-FNgy(NY%-3))
   830 PROCcol(&1E7A9D00)
-  840 PROCpix(ba%+1,CH%,CW%-2,bh%):PROCpix(bb%+1,CH%,CW%-2,bh%)
+  840 PROCpix(ba%+1,FNgy(1),wba%,FNgy(3)-FNgy(1)):PROCpix(bb%+1,FNgy(1),wbb%,FNgy(3)-FNgy(1))
   850 ENDPROC
   860 :
   870 REM One horizontal run clipped to the circle, at pixel row y%.
@@ -267,10 +266,17 @@
  2000 UX%=1<<XE% : UY%=1<<YE%
  2010 B%=H% DIV 32 : IF B%<2 THEN B%=2
  2020 S%=B% : IF S%<4 THEN S%=4
+ 2021 REM The three below belong to the CALLER, and clearing them here is what
+ 2022 REM made the ident bars draw empty: PROCpm5544 calls this itself, after
+ 2023 REM the caller has set them. Nor can they simply be left alone -- BASIC
+ 2024 REM raises "Unknown or missing variable" for one never assigned rather
+ 2025 REM than reading it as zero or empty, which is what broke TestPat. Each
+ 2026 REM is read through a trapped function: defaulted if absent, kept if set.
+ 2027 BORDERFLASH%=FNpatflag:CAPTOP$=FNpatcaptop:CAPBOT$=FNpatcapbot
  2028 IF BORDERFLASH%=0 THEN VDU 19,0,24,0,0,0
  2029 ANIM_CS%=50
  2030 CX%=W% DIV 2 : CY%=H% DIV 2
- 2031 AP%=0:ANIMKIND%=0:CAPTOP$="":CAPBOT$=""
+ 2031 AP%=0:ANIMKIND%=0
  2032 REM Sacrificial plot. The FIRST drawing operation after a MODE change is
  2033 REM lost -- measured with OS_ReadPoint, not guessed: a full-screen fill
  2034 REM issued straight after MODE reads back black, and the identical fill
@@ -446,9 +452,8 @@
  3202 REM scaler reads identical. The card is still visibly alive without it --
  3203 REM PROCanimring and PROCanimcorners flip INSIDE the picture.
  3204 REM
- 3205 REM BORDERFLASH% is never initialised here on purpose. BASIC starts an
- 3206 REM integer at zero, so a caller that says nothing gets the border left
- 3207 REM alone, and only a caller that asks for the flip gets it.
+ 3205 REM A caller that says nothing gets the border left alone, because
+ 3206 REM PROCpatinit defaults BORDERFLASH% to zero on its behalf.
  3208 DEF PROCborderflip
  3210 IF AP% THEN VDU 19,0,24,0,255,255 ELSE VDU 19,0,24,255,0,255
  3212 ENDPROC
@@ -491,3 +496,35 @@
  3650 REM because PatLib tokenises and loads separately from the server.
  3660 DEF FNpatver
  3670 ="2026-09-12a"
+ 3680 :
+ 3690 REM Grid line k, in pixels. NX% and NY% rarely divide W% and H%, and a
+ 3700 REM cell of W% DIV NX% repeated NX% times stops short of the far edge --
+ 3710 REM 13 rows of 19 cover 247 of a 256-line mode, leaving a band of the
+ 3720 REM white ground showing under the top castellation. Taking each line
+ 3730 REM from the full span lands the last one exactly on the edge and
+ 3740 REM spreads the remainder a pixel at a time. Everything keyed to the
+ 3750 REM grid asks for a LINE rather than multiplying a cell, so it stays
+ 3760 REM aligned. CW% and CH% remain the nominal cell, for thicknesses.
+ 3770 DEF FNgx(i%)
+ 3780 =(i%*W%) DIV NX%
+ 3790 :
+ 3800 DEF FNgy(j%)
+ 3810 =(j%*H%) DIV NY%
+ 3820 :
+ 3830 REM Each reads a caller-owned variable, or supplies the default when the
+ 3840 REM caller never assigned it. The trap is the only way to ask, BASIC
+ 3850 REM having no test for whether a variable exists.
+ 3860 DEF FNpatflag
+ 3870 LOCAL ERROR
+ 3880 ON ERROR LOCAL =0
+ 3890 =BORDERFLASH%
+ 3900 :
+ 3910 DEF FNpatcaptop
+ 3920 LOCAL ERROR
+ 3930 ON ERROR LOCAL =""
+ 3940 =CAPTOP$
+ 3950 :
+ 3960 DEF FNpatcapbot
+ 3970 LOCAL ERROR
+ 3980 ON ERROR LOCAL =""
+ 3990 =CAPBOT$
