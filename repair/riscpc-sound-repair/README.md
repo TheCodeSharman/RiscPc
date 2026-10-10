@@ -24,6 +24,11 @@ reverse-engineered by probing. See [[board-revision-vs-schematic]] /
   than the temporary part going back. **Q1 was swapped with it** — not strictly
   necessary, since Q1 had not failed, but the channels are symmetric and a matched
   pair is worth more than the one part saved.
+- **Oct 10 round (faults #10–#12):** right channel dropping out (intermittent
+  47 kΩ → pin 13 link, reflowed), left channel hiss (pin 5 VREF intermittent), and
+  op-amp #1 **replaced again** after being damaged by soldering on a live board.
+  Both channels loud and hiss-free afterwards. The #10 and #11 weak spots were never
+  pinned to joint vs via, so they're the first places to look if either symptom returns.
 - **Op-amp #2 / speaker(?) path — DEFERRED** (until a pressing need). op-amp #2
   (TL074) is now **populated** (it was unfitted). Its purpose is **unconfirmed** —
   may feed the internal speaker *and/or* an aux / CD-audio connector; not yet
@@ -102,8 +107,11 @@ SK12 L tip; Q1 emitter → 47 kΩ → pin 9; Q1 collector → +5 V; Q1 emitter �
   series output cap), so it *must* sit at ground. Quasi-bipolar output:
   **collector +5 V, emitter pulled toward −12 V through 340 Ω**, class-A ~35 mA.
   (The +5 V collector was measured — the earlier notes wrongly assumed +12 V.)
-- **VREF ≈ ⅔·VDD ≈ 3.33 V** feeds the I/V +inputs. DAC IREF (pin 7) ≈ 0.83 V.
-  Both confirm DAC + reference healthy.
+- **VREF ≈ ⅔·VDD ≈ 3.33 V** feeds the I/V +inputs (pins 3 and 5). DAC IREF (pin 7) ≈ 0.83 V.
+  Both confirm DAC + reference healthy. **The TDA1545A has no VREF pin.** The ⅔·VDD
+  is generated on the board, presumably a divider plus decoupling cap (not traced).
+  It's a high-impedance node: a broken link to it hisses (fault #11), and a damaged op-amp
+  input can drag it negative (fault #12).
 
 ### SOT-23 Q1/Q4 — identify pins by connection (not by package)
 | Pin | Tied to |
@@ -211,6 +219,36 @@ op-amp **output**, not the DAC pin.
    visible crack (surface residue scraped off), but genuinely open. **Fixed:**
    bridged resistor‑to‑via with a **wire**. Verified: pin 10 → GND = 15 kΩ, pin 10
    DC steady 0 V, hum gone, and pin 10 **no longer reacts to the probe**.
+10. **Right channel dropping out (Oct 10): intermittent cap → 47 kΩ → pin 13 link.**
+    The right channel went silent, came back after a CMOS reset, then went silent
+    again. Ctrl-Break didn't help. Scope bisection with Ctrl-G beeps: beep **present on
+    pin 1** and on **both legs of the coupling cap**, **absent on pin 14**, while pin 14
+    still sat at a healthy **+0.62 V DC** (driver biased, just no input). Power-off,
+    the path read fine: cap(−) → `473` → pin 13 had continuity, and the feedback
+    (pin 13 ↔ Q4 emitter) read **45 kΩ** (not shorted by the Q4 pad repair). The channel
+    then came back on its own after probing, so it's a pressure/thermal intermittent
+    on that link. **Fixed: reflowed the 47 kΩ.** **Reflow only, not bridged.** Same
+    family as #7, and the same "reads good now, dies later" risk applies.
+11. **Left channel hiss (Oct 10): pin 5 (left I/V +in, VREF) intermittently
+    disconnected from VREF.** Two pairs of earbuds hissed on the left only, and both
+    were clean on a MacBook. Full-bandwidth noise looked identical L/R on the scope,
+    about 1 mVrms each, mostly inaudible >8 kHz digital hash. The difference was
+    only in the **audible band**: averaged spectra gave **pin 7 ≈ 0.4–0.7 mVrms vs
+    pin 1 ≈ 0.14 mVrms at 0.4–1 kHz** (10–14 dB), equal above 8 kHz. That puts it at or
+    before the left I/V stage. **Tell: touching pin 5 with the probe silenced the hiss**,
+    the same high-Z-node tell as #9, one stage earlier. **It stayed silent after the probe
+    was removed**, so the pressure closed the joint. Fixed by the op-amp replacement in #12
+    (fresh pin 5 joint). Whether the weak spot was the pin joint or a via behind it was
+    **never established**. A pin 5 → pin 3 bridge was considered and **deliberately
+    not fitted** (not proven necessary; pin 4 = +12 V sits between them). If the left
+    hiss returns, start here.
+12. **Op-amp #1 killed by soldering on a powered board (Oct 10).** Pin 5 was
+    reflowed **with the machine on**. All sound stopped: **both I/V outputs railed at
+    −11 V**, VREF (pins 3/5) dragged to **−1.3 V**, and **DC on the headphone outputs
+    got the earbuds hot** (that pair is probably damaged). A healthy TL074 input draws
+    pA and cannot pull the ⅔·VDD divider negative, so the **+inputs were damaged**. DAC
+    was fine (VDD 5 V, BCK running). **Fixed: new TL074C (hot air)** → VREF 3.3 V,
+    I/V outs ≈ 3 V, drivers ≈ +0.6 V, jack 0 V DC, both channels loud and hiss-free.
 
 ## Diagnostic gotchas / measurement phantoms
 - **Diode test only proves a junction at ~1 mA** — high-current faults are
@@ -249,6 +287,27 @@ op-amp **output**, not the DAC pin.
   never steady gain. The idle base reads ~0.6 V (one Vbe above the 0 V emitter);
   a 50 mV L/R Vbe difference is normal spread, not a fault. Verify on **AC**, not
   DC bias, and don't desolder on a hunch.
+- **Never solder with the power on.** One reflow on pin 5 of a live board cost an
+  op-amp and a pair of earbuds (fault #12). Unplug the mains, not just the soft power.
+- **Railed outputs = DC on the headphones.** The outputs are DC-coupled. Check
+  the jack reads ≈ 0 V DC before plugging anything in after work on op-amp #1.
+- **Audible hiss can be invisible on the trace.** Both outputs carry ~1 mVrms of
+  >8 kHz digital hash, identical L/R, and it dominates the trace and the full-band
+  Vrms. A 10 dB L/R difference at 0.4–3 kHz (fault #11) was buried under it. Compare
+  **band-limited** noise: averaged spectra (`tools/rigol/scope_spec.py`) or **Math >
+  Filter, low-pass 3 kHz + Vrms on MATH** at the bench. Probe on **×1**; at ×10 the
+  scope's own floor (~2 mVrms) hides headphone-level hiss.
+- **Swapping earbuds between your ears tests ear vs channel, not board vs earbud.**
+  Swap the *pair* (or the sink) to clear the earbuds. Swap ears to rule out one ear
+  hearing high frequencies better.
+- **Unloaded ≠ loaded.** A probe cable in SK12 measures the outputs with no load. To see
+  what the earbuds get, use a splitter, or probe the 3.3 Ω / SK12 pins with the earbuds in.
+- **Ground the probe at the jack sleeve, not the chassis.** Chassis metal sits a few mV
+  of noise away from audio 0 V. Probe-tip-on-its-own-ground is the floor check, and it
+  must read near zero (≈ 0.1 mVrms here) for any reading to count.
+- **Count SOIC/SO-8 pins from the supplies, not the dot.** Readings that come out
+  exactly swapped (DAC "pin 1 = 5 V, pin 5 = 2.5 V") mean the chip was read 180° round.
+  TDA1545A: pin 4 GND faces pin 5 VDD. TL074: pin 4 +12 V faces pin 11 −12 V.
 
 ## RISC OS bench aids
 Sustained test tone (the default beep voice decays — use a flat envelope):

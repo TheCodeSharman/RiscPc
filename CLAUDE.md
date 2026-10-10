@@ -199,6 +199,12 @@ Before writing a new script, look here — these already exist. Don't reimplemen
   RISC OS BASIC parses `SYS` argument lists at execution and Brandy is more lenient.
   See its `README.md`.
 
+- **`tools/rigol/`** — drives the bench **Rigol DS1104Z** over USBTMC (pyusb): one-off
+  SCPI and screenshots (`rigol.py`), a background noise logger for hand-held probing
+  (`scope_log.py`), and averaged spectra of logged windows (`scope_spec.py`). Run under
+  `nix-shell -p 'python3.withPackages(p:[p.pyusb p.numpy])'`. Its `README.md` lists the
+  USB gotchas. Use these rather than rewriting a client.
+
 - **`tools/vscode-aasm/`** — VS Code TextMate grammar for Acorn AASM (see below).
 - **`acorn-post/decoders/`** — sigrok POST decoders (see above).
 

@@ -3067,3 +3067,72 @@ fix it, which was a probe tip on the card's transceiver pins.
 - **Working near one subsystem disturbs its neighbours**, and the disturbance goes
   unrecorded because it was not the point of the visit. When two faults keep correlating,
   ask what physical access they share.
+
+### Oct 10 — audio again: right channel dropout, left hiss, and an op-amp lost to a live iron
+
+The machine came to the bench with the **right headphone channel silent**. A CMOS reset
+brought it back, and then the **left channel hissed** loudly. By the end of the day both
+channels were loud and quiet, after three separate faults. The detail is in
+`repair/riscpc-sound-repair/README.md` as faults **#10–#12**. This entry records how it went.
+
+**The CMOS reset was a red herring.** The right channel dropped out again an hour later,
+and Ctrl-Break did nothing. A Ctrl-G beep at each node bisected it. The beep was on pin 1
+and on both legs of the coupling cap, and gone at pin 14, which still sat at a healthy
++0.62 V. Everything read fine with the power off. Then the channel came back after
+probing near the 47 kΩ, which is the intermittent signature again. It was reflowed and
+left at that. If it recurs, bridge it.
+
+**The left hiss took most of the day, and nearly all of that was measurement.** Several
+readings looked conclusive and weren't:
+
+- A steady **8–10 mV of 50 Hz** "on both channels" was the probe **lying idle**. It
+  sat unchanged for minutes between measurements.
+- "**Left 2.5× noisier**" came from a single capture taken while the probe settled. The
+  repeat was equal.
+- At **×10** the scope's floor (~2 mVrms) was above the hiss. Switching to ×1 got the
+  floor down to ~0.1 mVrms.
+- A reading through a line cable in SK12 was **unloaded**. A ground clip on **chassis**
+  metal measured chassis-to-audio-ground noise. A ground clip touching the ring
+  **shorted the right channel**.
+- Swapping earbuds between ears was proposed as a board-vs-earbud test, which it cannot
+  be (the Aug 23 lesson, repeated). Swapping the *pair* cleared the earbuds: a second
+  pair also hissed on the left, and the first was clean on a MacBook.
+
+What finally separated them was **band-limiting**. Both outputs carry about 1 mVrms of
+>8 kHz digital hash, identical left and right. It dominates both the trace and any
+full-band Vrms reading, so the two channels "looked the same" for hours. Averaged spectra
+from the logged raw captures put the difference at **0.4–3 kHz**, where the ears are most
+sensitive: pin 7 was about 10–14 dB above pin 1. A 3 kHz low-pass on the scope's Math
+channel then made it visible at the bench. It was larger on the left 3.3 Ω, larger on
+pin 7 than pin 1, and **touching pin 5 silenced it**. That is the floating-reference tell
+from Jul 19 again, one stage earlier, exactly where the Aug 23 entry had guessed. The hiss
+then **stayed gone after the probe was removed**, so the pressure had closed a marginal
+joint.
+
+**Then pin 5 was reflowed with the power still on, and all sound stopped.** Both I/V
+outputs railed at −11 V, and VREF fell to −1.3 V. The earbuds got hot from DC on the
+outputs; they're probably ruined. Two more traps on the way: the TDA1545A turned out to
+have **no VREF pin** (it's made on the board), and both the DAC and the op-amp were first
+read 180° round. The DAC pin 1/pin 5 readings came out exactly swapped. Something pulling
+a ⅔·VDD reference negative can only be the op-amp's own +inputs, so op-amp #1 was
+replaced with hot air. Afterwards: VREF 3.3 V, jack 0 V DC, both channels loud, no hiss.
+The planned pin 5 → pin 3 bridge was **not fitted**. It wasn't proven necessary, and it
+would have meant routing a wire past pin 4 (+12 V).
+
+The Rigol scripts were rewritten for the third time and are now kept in
+`tools/rigol/`: the USBTMC client, a background logger for hand-held probing, an
+averaged-spectrum tool and screenshots.
+
+#### Durable
+
+- **Never solder a powered board.** It cost an op-amp and a pair of earbuds. It also
+  turned a fixed fault into a dead channel pair, mid-diagnosis.
+- **What you hear is band-limited, so measure band-limited.** A full-band trace or Vrms
+  reading can be identical while one channel is 10 dB louder where hearing is most sensitive.
+- **A node that goes quiet when probed is floating.** If it *stays* quiet afterwards,
+  the probe pressed a marginal joint closed, and it will reopen.
+- **Before trusting a noise reading, know where the probe is.** Note how it was grounded,
+  whether the output was loaded, and take a floor reading the same way. Most of the
+  day's wrong turns broke one of those.
+- **Count pins from the supplies, not the dot.** Readings that come out exactly swapped
+  mean the chip is the other way round.
