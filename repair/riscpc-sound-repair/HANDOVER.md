@@ -20,6 +20,10 @@ today's faults. The last steps:
   flux. Recheck after the IPA clean and dry, left against right with the Math filter,
   before considering any work. The suspect list below still applies (pin 6 bridge,
   VREF decoupling, pin 5 → 3 link).
+  **Measured afterwards:** Math (3 kHz low-pass) at the left and right 3.3 Ω
+  **look identical**, where earlier in the day the left was clearly larger. So
+  the faint hiss is at the shared background level and not a left-channel fault.
+  Leave it unless it grows.
 - **Standing rule:** after any board work, **jack tip and ring must read a few mV DC at
   most** (meter on mV, ground on the sleeve) **before anything is plugged in.**
   That check would have saved both earbud pairs.
