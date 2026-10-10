@@ -806,6 +806,10 @@ Mostly diagnosis + planning this evening (parts on order).
   run the ddrescue recovery — **425 MB mule first.**
 
 ### Jul 4 — audio: intermittent right-channel dropout was the TOSLINK, *not* the board
+> **Correction (Oct 10):** the RiscPC has **no optical or digital output**. The chain
+> is **SK12 (analog) → adapter (analog to optical) → TOSLINK → soundbar**, so the
+> soundbar depends on the same headphone amp. "Bypasses S/PDIF" below really means
+> "bypasses the adapter, fibre and soundbar". The isolation logic still holds.
 - Symptom: right/whole-stream audio *sometimes* got through over the optical
   digital-out → TOSLINK adapter → soundbar path. **Not the op-amp repair
   regressing.**
@@ -3136,3 +3140,50 @@ averaged-spectrum tool and screenshots.
   day's wrong turns broke one of those.
 - **Count pins from the supplies, not the dot.** Readings that come out exactly swapped
   mean the chip is the other way round.
+
+### Oct 10 (evening) — the afternoon's "resolved" did not last; four more faults, two more earbuds
+
+The entry above ends with both channels loud and hiss-free. That lasted until the board
+was handled again. The evening was a run of faults, each fix disturbing the next, all
+around op-amp #1, whose pads are worn out by corrosion and repeated rework. Details are
+in the repair README as faults **#10–#14** and in `repair/riscpc-sound-repair/HANDOVER.md`.
+
+- **The power LED came first, and was unrelated.** TRM sheet 2, "Front Panel LEDs":
+  LK12 pin 4 = +5 V via R227 180 Ω (power LED), pin 3 = 0 V, pin 2 = +5 V via R213
+  82 Ω (HD LED), pin 1 = HD LED sink via R226 100 Ω. On this board pin 1 is the
+  right-hand end. The LED and cable worked on a lab supply, and R227 measured 180 Ω,
+  but **its link to pin 4 was open**. A wire from R227 to pin 4 fixed it.
+- **The right channel dropped out again** (fault #10, which had only been reflowed).
+  A bodge on the pin 13 leg brought hum. Then pin 12 leaked (11 kΩ against 15 kΩ to GND)
+  until it was reflowed. Then pin 14 stuck at 5 V while pin 13 sat at 0 V with a good
+  feedback resistor: **section D's input was cooked**, chip number three (fault #13).
+  With the chip off, the real fault was visible: the **input 47 kΩ's route to pin 13 had
+  degraded to 70 Ω**. It is now bypassed resistor-end to resistor-end. One attempt
+  created a 1.2 kΩ path that couldn't be seen even under the microscope (solder under
+  the 0805), and resoldering cured it.
+- **The PSU refused to start once** after the refit. No short was found. It came back
+  after unplugging and waiting, so probably a protection latch.
+- **The left then broke twice.** **Pin 5 floated even with a brand-new joint**, so the
+  weak spot behind fault #11 is the trace or via, now linked to pin 3. Then the **pin 6 pad
+  lifted** under the iron and cut the left I/V from the DAC's IOL (fault #14), which also
+  garbled the right. A bridge wire from pin 6 to DAC pin 6 fixed both.
+- **The last "garbled right" was an earbud.** It was weak on a MacBook too. Both earbud
+  pairs used today were damaged by DC from railed outputs. With fresh headphones, both
+  channels work, and the Math-filtered noise at the two 3.3 Ω resistors is
+  **identical**. A very faint left hiss is left alone as background.
+- **The Jul 4 entry was wrong about an optical output**, and it misled this session into
+  offering a "digital bypass" that doesn't exist. It is corrected in place.
+
+#### Durable
+
+- **Repeated rework on a corroded board is a fault generator.** Every fix on an IC leg
+  today damaged a neighbour: a chip, a pad, a leak. Bodge to **component ends**, make
+  **one change at a time**, and measure L against R after each.
+- **Check the jack for DC (a few mV at most) before plugging anything in after board
+  work.** It would have saved both earbud pairs.
+- **A damaged transducer is a broken instrument.** Once a pair has seen DC, retire it.
+  It produced a phantom "garbled" fault here.
+- **An open DAC output can disturb the other channel.** Fix the open side first, before
+  chasing the side that sounds wrong.
+- **Re-read the record before quoting it.** A wrong line in an old entry was confidently
+  repeated as fact.

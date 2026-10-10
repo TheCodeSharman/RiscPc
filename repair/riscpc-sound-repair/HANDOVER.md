@@ -126,15 +126,11 @@ diary or the README.
 - **Earbuds:** the pair that was on the jack when the outputs railed is probably
   damaged. Test it on the MacBook before trusting it.
 
-## Records to correct once the dust settles
+## Records — corrected (Oct 10, late)
 
-- **Dev Diary, Oct 10:** append this evening (above). The "loud and hiss-free" ending
-  is superseded.
-- **README:** fault #10 root cause (70 Ω degraded route, bypassed). Fault #11 (proven
-  trace/via; pin 5 → 3 link now fitted). A new fault for section D, damaged by heat
-  (chip #3). Pin 6 lifted pad. LK12/R227 power-LED fix (or put it in the diary only,
-  since it isn't audio).
-- **Dev Diary, Jul 4:** wrongly describes an "optical digital-out" on the RiscPC and
-  says headphones "bypass S/PDIF". The real chain is **SK12 analog → adapter
-  (analog to optical) → TOSLINK → soundbar**, so the soundbar path depends on this
-  same amp, and there's **no digital bypass**.
+The Dev Diary now has an **Oct 10 (evening)** entry. README faults #10 and #11 are
+updated, #13 (section D heat damage) and #14 (pin 6 lifted pad → DAC IOL bridge) are
+added, the status is refreshed, and the Jul 4 entry carries a correction for the
+non-existent optical output. Next up: **reassembly, then listen through the soundbar.**
+If it hums there but not in headphones, suspect a mains-earth ground loop (Aug 23)
+before the board.

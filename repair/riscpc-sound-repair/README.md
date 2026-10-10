@@ -24,11 +24,14 @@ reverse-engineered by probing. See [[board-revision-vs-schematic]] /
   than the temporary part going back. **Q1 was swapped with it** — not strictly
   necessary, since Q1 had not failed, but the channels are symmetric and a matched
   pair is worth more than the one part saved.
-- **Oct 10 round (faults #10–#12):** right channel dropping out (intermittent
-  47 kΩ → pin 13 link, reflowed), left channel hiss (pin 5 VREF intermittent), and
-  op-amp #1 **replaced again** after being damaged by soldering on a live board.
-  Both channels loud and hiss-free afterwards. The #10 and #11 weak spots were never
-  pinned to joint vs via, so they're the first places to look if either symptom returns.
+- **Oct 10 round (faults #10–#14):** right channel dropout (a degraded 47 kΩ →
+  pin 13 route, now bypassed), left channel hiss (pin 5's route to VREF, now linked
+  to pin 3), op-amp #1 **replaced twice** (live soldering, then heat), and a lifted
+  pin 6 pad bridged to the DAC. **End state: both channels working, with L/R noise
+  identical in the audible band.** A very faint left hiss is left alone. The board
+  is now heavily bodged around op-amp #1: **keep the iron off the IC legs, power
+  off and unplugged, and check the jack reads a few mV DC before plugging anything
+  in.** Two earbud pairs were damaged by DC from railed outputs that day.
 - **Op-amp #2 / speaker(?) path — DEFERRED** (until a pressing need). op-amp #2
   (TL074) is now **populated** (it was unfitted). Its purpose is **unconfirmed** —
   may feed the internal speaker *and/or* an aux / CD-audio connector; not yet
@@ -229,6 +232,14 @@ op-amp **output**, not the DAC pin.
     then came back on its own after probing, so it's a pressure/thermal intermittent
     on that link. **Fixed: reflowed the 47 kΩ.** **Reflow only, not bridged.** Same
     family as #7, and the same "reads good now, dies later" risk applies.
+    **Update, evening: it died again within hours, as predicted.** With the chip off,
+    the pin 13 pad → **input** 47 kΩ end read **70 Ω** (a corroded route), while the
+    pad → **feedback** 47 kΩ end read < 1 Ω. **Now bypassed:** a wire from the input
+    resistor's pin-13 end to the feedback resistor's pin-13 end, so the two meet without
+    using the degraded route. The first attempt left the feedback resistor reading
+    1.2 kΩ, most likely solder or flux under the 0805 body, invisible from above.
+    Resoldering cured it. **Bodge to resistor ends, not to the IC leg:** a wire on pin 13 itself
+    brought hum, and its heat cost a chip (#13).
 11. **Left channel hiss (Oct 10): pin 5 (left I/V +in, VREF) intermittently
     disconnected from VREF.** Two pairs of earbuds hissed on the left only, and both
     were clean on a MacBook. Full-bandwidth noise looked identical L/R on the scope,
@@ -242,6 +253,12 @@ op-amp **output**, not the DAC pin.
     **never established**. A pin 5 → pin 3 bridge was considered and **deliberately
     not fitted** (not proven necessary; pin 4 = +12 V sits between them). If the left
     hiss returns, start here.
+    **Update, evening: established.** After the next chip swap, pin 5 floated with a
+    brand-new joint, so **the weak spot is the trace or via behind pad 5**. The
+    **pin 5 → pin 3 link is now fitted** (insulated wire clear of pin 4). Both I/V
+    +inputs now share one VREF node, so any noise on VREF reaches both channels.
+    That's a good reason to add a VREF decoupling cap (10–47 µF + 100 nF to ground) if
+    a buzz on both channels ever appears.
 12. **Op-amp #1 killed by soldering on a powered board (Oct 10).** Pin 5 was
     reflowed **with the machine on**. All sound stopped: **both I/V outputs railed at
     −11 V**, VREF (pins 3/5) dragged to **−1.3 V**, and **DC on the headphone outputs
@@ -249,6 +266,25 @@ op-amp **output**, not the DAC pin.
     pA and cannot pull the ⅔·VDD divider negative, so the **+inputs were damaged**. DAC
     was fine (VDD 5 V, BCK running). **Fixed: new TL074C (hot air)** → VREF 3.3 V,
     I/V outs ≈ 3 V, drivers ≈ +0.6 V, jack 0 V DC, both channels loud and hiss-free.
+13. **Op-amp #1 section D damaged by heat (Oct 10, evening).** It happened after the
+    first pin 13 bodge (#10). There was hum, then **pin 14 stuck at 4.5–5 V** with Q4's
+    emitter at about 4 V, while **pin 13 sat at 0 V** and pin 12 at 0 V. The feedback
+    47 kΩ was proven good and connected at both ends (≈ 45 kΩ). So about 80 µA was
+    flowing into pin 13 with nowhere to go but the op-amp's own −input: a damaged
+    input. Along the way, pin 12 read **11 kΩ to GND** (15 k ∥ ≈ 47 k, a leak to the
+    pin 13 net from the rework) until reflowed. **Fixed: the third TL074C of the day,
+    hand-soldered, then hot-air reflowed.** A wrong turn worth avoiding:
+    emitter ↔ pin 13 "45 kΩ" was first trusted before the powered voltages proved the
+    loop broken. Ohmmeter paths through an op-amp lie.
+14. **Left I/V −input (pin 6) cut off from the DAC by a lifted pad (Oct 10, evening).**
+    Pad 6 moved under the iron. **Op-amp pin 6 → TDA1545A pin 6 (IOL) was then open**
+    (the right's pin 2 → DAC pin 8 read 0 Ω). The left went bad, and **the right went
+    "garbled" too**, presumably because the unloaded IOL upset the DAC's shared internals.
+    A reflow briefly closed the crack and masked both. **Fixed: insulated bridge wire
+    from the pin 6 leg to DAC pin 6.** That cleared the left. The right's remaining
+    garbling turned out to be a **DC-damaged earbud** (weak and scratchy on a MacBook too),
+    not the board. Afterwards, Math-filtered noise at the left and right 3.3 Ω measures
+    **identical**. A very faint left hiss is audible and left alone as background.
 
 ## Diagnostic gotchas / measurement phantoms
 - **Diode test only proves a junction at ~1 mA** — high-current faults are
