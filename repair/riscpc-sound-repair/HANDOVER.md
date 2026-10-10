@@ -1,6 +1,38 @@
 # Handover — headphone amp, end of Oct 10 2026
 
-**State: both channels play, but there is a buzz on both, worse than at any point
+**FINAL STATE (late evening, supersedes the buzz state described below): both
+channels work, the right is clean, and the left has a very faint hiss, deliberately
+left alone.** Tested with a pair of headphones that hasn't been through any of
+today's faults. The last steps:
+
+- **Hot-air reflow of op-amp #1** cleared the buzz on the right.
+- **Left still bad:** pin 5 (VREF) was a healthy 3.4 V, but **op-amp pin 6 → DAC pin 6
+  (IOL) had no continuity**, because the lifted pin 6 pad had cut it. (The right's
+  pin 2 → DAC pin 8 read 0 Ω.) **Fixed with an insulated bridge wire from the
+  pin 6 leg to TDA1545A pin 6.** That fixed the left. The open IOL had also garbled
+  the right, presumably through the DAC's shared internals, and a reflow had
+  temporarily masked it.
+- **The remaining "garbled right" was a damaged earbud**, not the board. The right
+  earbud was quieter on a MacBook too. **Both earbud pairs used today are suspect**
+  (DC from the railed outputs): one pair is evenly quieter, the other has a weak and
+  garbling right side. **Don't use either for testing.**
+- **The faint left hiss was left on purpose.** The board is still covered in fresh
+  flux. Recheck after the IPA clean and dry, left against right with the Math filter,
+  before considering any work. The suspect list below still applies (pin 6 bridge,
+  VREF decoupling, pin 5 → 3 link).
+- **Standing rule:** after any board work, **jack tip and ring must read a few mV DC at
+  most** (meter on mV, ground on the sleeve) **before anything is plugged in.**
+  That check would have saved both earbud pairs.
+
+I/V idle DC as last measured: **pin 7 ≈ 4 V, pin 1 ≈ 3 V** (VREF 3.3–3.4 V). Both
+are within the normal range, but the 1 V L/R difference was never explained. Note it
+in case gain or balance questions come up.
+
+---
+
+*The rest of this file is the earlier, mid-evening handover, kept for the sequence.*
+
+**Earlier state: both channels play, but there is a buzz on both, worse than at any point
 today. Stopped deliberately. The board is heavily reworked, fluxed and tired.**
 The next session should start by cleaning and measuring, not soldering.
 
